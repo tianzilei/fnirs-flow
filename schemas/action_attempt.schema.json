@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fnirs-flow ActionAttempt",
+  "description": "A run/report/export/package action referencing an immutable ProjectSnapshot.",
+  "type": "object",
+  "required": ["attempt_id", "snapshot_id", "action_type", "status", "created_at"],
+  "properties": {
+    "attempt_id": { "type": "string" },
+    "snapshot_id": { "type": "string", "description": "Reference to the immutable ProjectSnapshot" },
+    "action_type": { "type": "string", "enum": ["validate", "compile", "dry_run", "execute", "export", "package"] },
+    "status": { "type": "string", "enum": ["pending", "running", "completed", "failed", "cancelled"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "readiness_check": { "$ref": "readiness_result.schema.json" },
+    "risk_register": { "type": "array", "items": { "$ref": "risk_item.schema.json" } },
+    "artifacts": { "type": "array", "items": { "type": "object" } },
+    "failure_manifest": { "type": "array", "items": { "type": "object" } },
+    "metadata": { "type": "object" }
+  },
+  "additionalProperties": false
+}

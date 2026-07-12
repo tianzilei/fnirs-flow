@@ -1,0 +1,15 @@
+name: fnirs-flow
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.11
+  - mne>=1.6
+  - mne-nirs>=0.7
+  - scipy
+  - numpy
+  - pydantic
+  - pip:
+    - -e .[dev]
+    - ruff
+    - pytest-cov

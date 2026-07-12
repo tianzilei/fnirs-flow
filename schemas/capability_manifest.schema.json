@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fnirs-flow.dev/schemas/capability_manifest.schema.json",
+  "title": "fnirs-flow CapabilityManifest",
+  "description": "Declares what an executable node is allowed to do",
+  "type": "object",
+  "properties": {
+    "allowed_operations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of allowed operation types"
+    },
+    "file_access": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "File paths or patterns this node may access"
+    },
+    "network": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether network access is allowed"
+    },
+    "shell": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether shell command execution is allowed"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Required Python packages"
+    },
+    "checksum": {
+      "type": "string",
+      "description": "SHA256 of the executable code"
+    }
+  }
+}

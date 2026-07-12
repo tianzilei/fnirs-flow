@@ -1,0 +1,72 @@
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Python caches and local tooling state
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.conda/
+
+# Local environment and editor files
+.env
+.env.*
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Downloaded literature, generated tables, and bulky derived artifacts
+outputs/*
+!outputs/methodatom_library/
+*.html
+*.htm
+!webui/index.html
+*.xml
+*.pdf
+*.xlsx
+*.xls
+*.png
+*.jpg
+*.jpeg
+*.ndjson
+*.zip
+
+# Large source bibliographies / local data dumps
+Sample/
+pubmed_*.csv
+*_TitleAbstract.csv
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+.tmp/
+
+# Tool-specific directories
+.mimocode/
+.agents/
+
+# Node.js
+webui/node_modules/
+webui/dist/
+webui/.vite/
+
+# Reference repos (embedded submodules - use git submodule instead)
+References/

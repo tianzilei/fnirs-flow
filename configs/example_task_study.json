@@ -1,0 +1,22 @@
+{
+  "study_name": "Naturalistic auditory task pilot",
+  "scenario": "task",
+  "population": "healthy adults",
+  "design": "block",
+  "has_short_channels": true,
+  "has_systemic_physiology": true,
+  "uses_machine_learning": false,
+  "is_real_world": true,
+  "uses_resting_state": false,
+  "uses_hyperscanning": false,
+  "channels": 24,
+  "sampling_rate_hz": 7.81,
+  "outputs": ["HbO", "HbR"],
+  "primary_outcome": "auditory cortex activation",
+  "secondary_outcomes": ["prefrontal activation consistency"],
+  "inclusion_metadata": ["skin_tone", "hair_texture", "hair_density", "exclusion_reason"],
+  "planned_sensitivity_analyses": [
+    "with_vs_without_short_channel_regression",
+    "canonical_vs_flexible_hrf"
+  ]
+}

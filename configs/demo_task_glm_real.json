@@ -1,0 +1,232 @@
+{
+  "schema_version": "0.2.0",
+  "flow_id": "demo-task-glm-real",
+  "name": "Demo Task GLM Real Execution",
+  "description": "End-to-end task GLM using MNE-NIRS finger tapping dataset with real adapter execution",
+  "metadata": {
+    "author": "fnirs-flow",
+    "tags": ["task", "glm", "demo", "real-execution"],
+    "dataset_id": "bids-nirs-tapping"
+  },
+  "nodes": [
+    {
+      "id": "dataset_discovery",
+      "type": "dataset_discovery",
+      "atom_type": "dataset_discovery",
+      "category": "data",
+      "position": {"x": 0, "y": 0},
+      "config": {"dataset_id": "bids-nirs-tapping", "source_kind": "bids_nirs"},
+      "ports": [
+        {"name": "data_manifest", "direction": "out", "schema": "DataManifest", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "read_run",
+      "type": "read_run",
+      "atom_type": "read_run",
+      "category": "data",
+      "operation": "read_run",
+      "position": {"x": 100, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "data_manifest", "direction": "in", "schema": "DataManifest", "required": true},
+        {"name": "raw_data", "direction": "out", "schema": "RawData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "optical_density",
+      "type": "optical_density",
+      "atom_type": "optical_density",
+      "category": "preprocessing",
+      "operation": "optical_density",
+      "position": {"x": 200, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "raw_data", "direction": "in", "schema": "RawData", "required": true},
+        {"name": "od_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "qc_metrics",
+      "type": "qc_metrics",
+      "atom_type": "qc_metrics",
+      "category": "preprocessing",
+      "operation": "compute_qc",
+      "position": {"x": 400, "y": 0},
+      "config": {"sci_threshold": 0.8, "sd_distance_min": 0.01, "sd_distance_max": 0.08},
+      "ports": [
+        {"name": "raw_data", "direction": "in", "schema": "RawData", "required": true},
+        {"name": "qc_data", "direction": "out", "schema": "QCData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "motion_correction",
+      "type": "motion_correction",
+      "atom_type": "motion_correction",
+      "category": "preprocessing",
+      "operation": "motion_correction",
+      "position": {"x": 600, "y": 0},
+      "config": {"method": "tddr"},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "corrected_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "filtering",
+      "type": "filtering",
+      "atom_type": "filtering",
+      "category": "preprocessing",
+      "operation": "filtering",
+      "position": {"x": 800, "y": 0},
+      "config": {"l_freq": 0.01, "h_freq": 0.2},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "filtered_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "beer_lambert_law",
+      "type": "beer_lambert_law",
+      "atom_type": "beer_lambert_law",
+      "category": "preprocessing",
+      "operation": "beer_lambert_law",
+      "position": {"x": 1000, "y": 0},
+      "config": {"ppf": 6.0},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "hb_data", "direction": "out", "schema": "HaemoglobinData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "design_matrix",
+      "type": "design_matrix",
+      "atom_type": "design_matrix",
+      "category": "analysis",
+      "operation": "build_design_matrix",
+      "position": {"x": 1200, "y": 100},
+      "config": {
+        "hrf_model": "glover",
+        "conditions": ["tapping", "rest"],
+        "drift_order": 1,
+        "high_pass": 0.01
+      },
+      "ports": [
+        {"name": "data_manifest", "direction": "in", "schema": "DataManifest", "required": true},
+        {"name": "design_matrix", "direction": "out", "schema": "DesignMatrix", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "first_level_glm",
+      "type": "first_level_glm",
+      "atom_type": "first_level_glm",
+      "category": "analysis",
+      "operation": "first_level_glm",
+      "position": {"x": 1400, "y": 100},
+      "config": {
+        "hrf_model": "glover",
+        "noise_model": "ar1"
+      },
+      "ports": [
+        {"name": "haemoglobin", "direction": "in", "schema": "HaemoglobinData", "required": true},
+        {"name": "design_matrix", "direction": "in", "schema": "DesignMatrix", "required": true},
+        {"name": "glm_result", "direction": "out", "schema": "GLMResult", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "estimate_contrast",
+      "type": "estimate_contrast",
+      "atom_type": "estimate_contrast",
+      "category": "analysis",
+      "operation": "estimate_contrast",
+      "position": {"x": 1600, "y": 100},
+      "config": {
+        "contrasts": [
+          {"name": "tapping_vs_rest", "type": "contrast", "weights": [1, -1]}
+        ]
+      },
+      "ports": [
+        {"name": "glm_result", "direction": "in", "schema": "GLMResult", "required": true},
+        {"name": "contrast_result", "direction": "out", "schema": "ContrastResult", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "channel_output",
+      "type": "channel_output",
+      "atom_type": "channel_output",
+      "category": "output",
+      "operation": "channel_output",
+      "position": {"x": 1800, "y": 50},
+      "config": {},
+      "ports": [
+        {"name": "contrast_result", "direction": "in", "schema": "ContrastResult", "required": true},
+        {"name": "channel_results", "direction": "out", "schema": "ChannelResults", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "roi_output",
+      "type": "roi_output",
+      "atom_type": "roi_output",
+      "category": "output",
+      "operation": "roi_output",
+      "position": {"x": 1800, "y": 200},
+      "config": {"atlas": "mni"},
+      "ports": [
+        {"name": "channel_results", "direction": "in", "schema": "ChannelResults", "required": true},
+        {"name": "roi_results", "direction": "out", "schema": "ROIResults", "required": true}
+      ],
+      "status": "configured"
+    }
+  ],
+  "edges": [
+    {"id": "e-data-readrun", "source": "dataset_discovery", "target": "read_run", "source_handle": "data_manifest", "target_handle": "data_manifest"},
+    {"id": "e-readrun-od", "source": "read_run", "target": "optical_density", "source_handle": "raw_data", "target_handle": "raw_data"},
+    {"id": "e-readrun-qc", "source": "read_run", "target": "qc_metrics", "source_handle": "raw_data", "target_handle": "raw_data"},
+    {"id": "e-od-motion", "source": "optical_density", "target": "motion_correction", "source_handle": "od_data", "target_handle": "od_data"},
+    {"id": "e-motion-filter", "source": "motion_correction", "target": "filtering", "source_handle": "corrected_data", "target_handle": "od_data"},
+    {"id": "e-filter-mbll", "source": "filtering", "target": "beer_lambert_law", "source_handle": "filtered_data", "target_handle": "od_data"},
+    {"id": "e-mbll-glm", "source": "beer_lambert_law", "target": "first_level_glm", "source_handle": "hb_data", "target_handle": "haemoglobin"},
+    {"id": "e-data-design", "source": "dataset_discovery", "target": "design_matrix", "source_handle": "data_manifest", "target_handle": "data_manifest"},
+    {"id": "e-design-glm", "source": "design_matrix", "target": "first_level_glm", "source_handle": "design_matrix", "target_handle": "design_matrix"},
+    {"id": "e-glm-contrast", "source": "first_level_glm", "target": "estimate_contrast", "source_handle": "glm_result", "target_handle": "glm_result"},
+    {"id": "e-contrast-channel", "source": "estimate_contrast", "target": "channel_output", "source_handle": "contrast_result", "target_handle": "contrast_result"},
+    {"id": "e-channel-roi", "source": "channel_output", "target": "roi_output", "source_handle": "channel_results", "target_handle": "channel_results"}
+  ],
+  "study_design": {
+    "type": "task",
+    "conditions": [
+      {"name": "tapping", "onset_field": "onset", "duration_field": "duration"},
+      {"name": "rest", "onset_field": "onset", "duration_field": "duration"}
+    ],
+    "contrasts": [
+      {"name": "tapping_vs_rest", "type": "contrast", "weights": [1, -1], "conditions": ["tapping", "rest"]}
+    ]
+  },
+  "adapter_registry": [
+    {
+      "adapter_id": "mne-data-to-raw",
+      "name": "MNE Data to Raw",
+      "source_type": "DataManifest",
+      "target_type": "RawData",
+      "description": "Load BIDS-NIRS/SNIRF data into MNE Raw object"
+    },
+    {
+      "adapter_id": "mne-events-to-design",
+      "name": "MNE Events to Design Matrix",
+      "source_type": "EventsData",
+      "target_type": "DesignMatrix",
+      "description": "Construct design matrix from event files"
+    }
+  ]
+}

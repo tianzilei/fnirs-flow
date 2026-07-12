@@ -1,0 +1,1585 @@
+{
+  "schema_version": "0.2.0",
+  "flow_id": "demo-task-001",
+  "name": "Demo Task GLM Flow with Multi-Site Regression",
+  "description": "Task fNIRS GLM flow with multi-site regression mainline using MNE-NIRS finger tapping dataset",
+  "nodes": [
+    {
+      "id": "dataset_discovery",
+      "type": "dataset_discovery",
+      "category": "data",
+      "origin": "builtin",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "config": {
+        "dataset_id": "mne-fnirs-motor",
+        "source_kind": "mne_nirs_dataset"
+      },
+      "ports": [
+        {
+          "name": "data_manifest",
+          "direction": "out",
+          "schema": "DataManifest",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "study_design",
+      "type": "study_design",
+      "category": "design",
+      "origin": "builtin",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "config": {
+        "design_type": "block",
+        "conditions": [
+          "tapping",
+          "rest"
+        ],
+        "contrasts": [
+          "tapping > rest"
+        ]
+      },
+      "ports": [
+        {
+          "name": "design_spec",
+          "direction": "out",
+          "schema": "DesignSpec",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "site_metadata_extraction",
+      "type": "site_metadata_extraction",
+      "category": "data",
+      "origin": "builtin",
+      "position": {
+        "x": 200,
+        "y": 200
+      },
+      "config": {
+        "site_field": "site",
+        "required_fields": [
+          "site",
+          "scanner_id"
+        ],
+        "allow_missing": false
+      },
+      "ports": [
+        {
+          "name": "data_manifest",
+          "direction": "in",
+          "schema": "DataManifest",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "out",
+          "schema": "SiteMetadata",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "qc_metrics",
+      "type": "qc_metrics",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 400,
+        "y": 0
+      },
+      "config": {
+        "preset": "conservative_qc",
+        "sci_threshold": 0.8,
+        "sd_distance_min": 0.01,
+        "sd_distance_max": 0.08
+      },
+      "ports": [
+        {
+          "name": "raw_data",
+          "direction": "in",
+          "schema": "RawData",
+          "required": true
+        },
+        {
+          "name": "qc_report",
+          "direction": "out",
+          "schema": "QCReport",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "site_level_qc",
+      "type": "site_level_qc",
+      "category": "validation",
+      "origin": "builtin",
+      "position": {
+        "x": 400,
+        "y": 400
+      },
+      "config": {
+        "metrics": [
+          "mean_intensity",
+          "snr",
+          "sci_pass_rate",
+          "channel_dropout_rate"
+        ],
+        "outlier_threshold": 2.0,
+        "min_subjects_per_site": 5
+      },
+      "ports": [
+        {
+          "name": "qc_report",
+          "direction": "in",
+          "schema": "QCReport",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "site_qc_report",
+          "direction": "out",
+          "schema": "SiteQCReport",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "optical_density",
+      "type": "optical_density",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 600,
+        "y": 200
+      },
+      "config": {},
+      "ports": [
+        {
+          "name": "raw_data",
+          "direction": "in",
+          "schema": "RawData",
+          "required": true
+        },
+        {
+          "name": "od_data",
+          "direction": "out",
+          "schema": "OpticalDensityData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "motion_correction",
+      "type": "motion_correction",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 800,
+        "y": 200
+      },
+      "config": {
+        "method": "tddr"
+      },
+      "ports": [
+        {
+          "name": "od_data",
+          "direction": "in",
+          "schema": "OpticalDensityData",
+          "required": true
+        },
+        {
+          "name": "od_corrected",
+          "direction": "out",
+          "schema": "OpticalDensityData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "filtering",
+      "type": "filtering",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 1000,
+        "y": 200
+      },
+      "config": {
+        "l_freq": 0.01,
+        "h_freq": 0.2,
+        "preset": "basic_bandpass"
+      },
+      "ports": [
+        {
+          "name": "od_data",
+          "direction": "in",
+          "schema": "OpticalDensityData",
+          "required": true
+        },
+        {
+          "name": "od_filtered",
+          "direction": "out",
+          "schema": "OpticalDensityData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "mbll",
+      "type": "beer_lambert_law",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 1200,
+        "y": 200
+      },
+      "config": {
+        "ppf": 6.0
+      },
+      "ports": [
+        {
+          "name": "od_data",
+          "direction": "in",
+          "schema": "OpticalDensityData",
+          "required": true
+        },
+        {
+          "name": "haemoglobin",
+          "direction": "out",
+          "schema": "HaemoglobinData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "batch_effect_diagnostics",
+      "type": "batch_effect_diagnostics",
+      "category": "validation",
+      "origin": "builtin",
+      "position": {
+        "x": 1400,
+        "y": 400
+      },
+      "config": {
+        "methods": [
+          "pca",
+          "anova",
+          "icc"
+        ],
+        "significance_threshold": 0.05,
+        "icc_threshold": 0.1
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "diagnostics_report",
+          "direction": "out",
+          "schema": "DiagnosticsReport",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "combat_harmonization",
+      "type": "multi_site_harmonization",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 1600,
+        "y": 400
+      },
+      "config": {
+        "method": "combat",
+        "eb": true,
+        "parametric": true,
+        "preserve_biological": true,
+        "covariates": []
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "haemoglobin_harmonized",
+          "direction": "out",
+          "schema": "HaemoglobinData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "design_matrix",
+      "type": "design_matrix",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 1400,
+        "y": 0
+      },
+      "config": {
+        "hrf_model": "canonical"
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "design_spec",
+          "direction": "in",
+          "schema": "DesignSpec",
+          "required": true
+        },
+        {
+          "name": "design_matrix",
+          "direction": "out",
+          "schema": "DesignMatrix",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "first_level_glm",
+      "type": "first_level_glm",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 1600,
+        "y": 0
+      },
+      "config": {},
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "design_matrix",
+          "direction": "in",
+          "schema": "DesignMatrix",
+          "required": true
+        },
+        {
+          "name": "glm_results",
+          "direction": "out",
+          "schema": "GLMResults",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "mixed_effects_glm",
+      "type": "mixed_effects_glm",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 1800,
+        "y": 400
+      },
+      "config": {
+        "random_effects": [
+          "site"
+        ],
+        "random_intercept": true,
+        "random_slope": false,
+        "covariance_structure": "unstructured",
+        "reml": true
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "design_matrix",
+          "direction": "in",
+          "schema": "DesignMatrix",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "glm_results",
+          "direction": "out",
+          "schema": "GLMResults",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "site_covariate_glm",
+      "type": "site_covariate_glm",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 1800,
+        "y": 600
+      },
+      "config": {
+        "site_as_covariate": true,
+        "coding": "dummy",
+        "reference_site": "auto"
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "design_matrix",
+          "direction": "in",
+          "schema": "DesignMatrix",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "glm_results",
+          "direction": "out",
+          "schema": "GLMResults",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "contrast",
+      "type": "contrast",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 2000,
+        "y": 200
+      },
+      "config": {
+        "contrasts": [
+          "tapping > rest"
+        ]
+      },
+      "ports": [
+        {
+          "name": "glm_results",
+          "direction": "in",
+          "schema": "GLMResults",
+          "required": true
+        },
+        {
+          "name": "contrast_results",
+          "direction": "out",
+          "schema": "ContrastResults",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "channel_output",
+      "type": "channel_output",
+      "category": "output",
+      "origin": "builtin",
+      "position": {
+        "x": 2200,
+        "y": 100
+      },
+      "config": {
+        "format": "csv"
+      },
+      "ports": [
+        {
+          "name": "contrast_results",
+          "direction": "in",
+          "schema": "ContrastResults",
+          "required": true
+        },
+        {
+          "name": "channel_csv",
+          "direction": "out",
+          "schema": "CSVFile",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "roi_output",
+      "type": "roi_output",
+      "category": "output",
+      "origin": "builtin",
+      "position": {
+        "x": 2200,
+        "y": 300
+      },
+      "config": {
+        "aggregation": "mean",
+        "format": "csv"
+      },
+      "ports": [
+        {
+          "name": "contrast_results",
+          "direction": "in",
+          "schema": "ContrastResults",
+          "required": true
+        },
+        {
+          "name": "roi_csv",
+          "direction": "out",
+          "schema": "CSVFile",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "reporting",
+      "type": "reporting_checklist",
+      "category": "validation",
+      "origin": "builtin",
+      "position": {
+        "x": 2400,
+        "y": 200
+      },
+      "config": {},
+      "ports": [
+        {
+          "name": "contrast_results",
+          "direction": "in",
+          "schema": "ContrastResults",
+          "required": true
+        },
+        {
+          "name": "report",
+          "direction": "out",
+          "schema": "Report",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    },
+    {
+      "id": "package_export",
+      "type": "package_export",
+      "category": "export",
+      "origin": "builtin",
+      "position": {
+        "x": 2600,
+        "y": 200
+      },
+      "config": {
+        "exclude_raw_data": true
+      },
+      "ports": [
+        {
+          "name": "report",
+          "direction": "in",
+          "schema": "Report",
+          "required": true
+        },
+        {
+          "name": "package",
+          "direction": "out",
+          "schema": "Package",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-data-qc",
+      "source": "dataset_discovery",
+      "target": "qc_metrics",
+      "source_handle": "data_manifest",
+      "target_handle": "raw_data"
+    },
+    {
+      "id": "e-data-od",
+      "source": "dataset_discovery",
+      "target": "optical_density",
+      "source_handle": "data_manifest",
+      "target_handle": "raw_data"
+    },
+    {
+      "id": "e-data-site",
+      "source": "dataset_discovery",
+      "target": "site_metadata_extraction",
+      "source_handle": "data_manifest",
+      "target_handle": "data_manifest"
+    },
+    {
+      "id": "e-qc-site-qc",
+      "source": "qc_metrics",
+      "target": "site_level_qc",
+      "source_handle": "qc_report",
+      "target_handle": "qc_report"
+    },
+    {
+      "id": "e-site-site-qc",
+      "source": "site_metadata_extraction",
+      "target": "site_level_qc",
+      "source_handle": "site_metadata",
+      "target_handle": "site_metadata"
+    },
+    {
+      "id": "e-od-motion",
+      "source": "optical_density",
+      "target": "motion_correction",
+      "source_handle": "od_data",
+      "target_handle": "od_data"
+    },
+    {
+      "id": "e-motion-filter",
+      "source": "motion_correction",
+      "target": "filtering",
+      "source_handle": "od_corrected",
+      "target_handle": "od_data"
+    },
+    {
+      "id": "e-filter-mbll",
+      "source": "filtering",
+      "target": "mbll",
+      "source_handle": "od_filtered",
+      "target_handle": "od_data"
+    },
+    {
+      "id": "e-mbll-batch-diag",
+      "source": "mbll",
+      "target": "batch_effect_diagnostics",
+      "source_handle": "haemoglobin",
+      "target_handle": "haemoglobin"
+    },
+    {
+      "id": "e-site-batch-diag",
+      "source": "site_metadata_extraction",
+      "target": "batch_effect_diagnostics",
+      "source_handle": "site_metadata",
+      "target_handle": "site_metadata"
+    },
+    {
+      "id": "e-mbll-combat",
+      "source": "mbll",
+      "target": "combat_harmonization",
+      "source_handle": "haemoglobin",
+      "target_handle": "haemoglobin"
+    },
+    {
+      "id": "e-site-combat",
+      "source": "site_metadata_extraction",
+      "target": "combat_harmonization",
+      "source_handle": "site_metadata",
+      "target_handle": "site_metadata"
+    },
+    {
+      "id": "e-mbll-dmat",
+      "source": "mbll",
+      "target": "design_matrix",
+      "source_handle": "haemoglobin",
+      "target_handle": "haemoglobin"
+    },
+    {
+      "id": "e-design-dmat",
+      "source": "study_design",
+      "target": "design_matrix",
+      "source_handle": "design_spec",
+      "target_handle": "design_spec"
+    },
+    {
+      "id": "e-dmat-glm",
+      "source": "design_matrix",
+      "target": "first_level_glm",
+      "source_handle": "design_matrix",
+      "target_handle": "design_matrix"
+    },
+    {
+      "id": "e-mbll-glm",
+      "source": "mbll",
+      "target": "first_level_glm",
+      "source_handle": "haemoglobin",
+      "target_handle": "haemoglobin"
+    },
+    {
+      "id": "e-dmat-mixed",
+      "source": "design_matrix",
+      "target": "mixed_effects_glm",
+      "source_handle": "design_matrix",
+      "target_handle": "design_matrix"
+    },
+    {
+      "id": "e-combat-mixed",
+      "source": "combat_harmonization",
+      "target": "mixed_effects_glm",
+      "source_handle": "haemoglobin_harmonized",
+      "target_handle": "haemoglobin"
+    },
+    {
+      "id": "e-site-mixed",
+      "source": "site_metadata_extraction",
+      "target": "mixed_effects_glm",
+      "source_handle": "site_metadata",
+      "target_handle": "site_metadata"
+    },
+    {
+      "id": "e-dmat-site-cov",
+      "source": "design_matrix",
+      "target": "site_covariate_glm",
+      "source_handle": "design_matrix",
+      "target_handle": "design_matrix"
+    },
+    {
+      "id": "e-combat-site-cov",
+      "source": "combat_harmonization",
+      "target": "site_covariate_glm",
+      "source_handle": "haemoglobin_harmonized",
+      "target_handle": "haemoglobin"
+    },
+    {
+      "id": "e-site-site-cov",
+      "source": "site_metadata_extraction",
+      "target": "site_covariate_glm",
+      "source_handle": "site_metadata",
+      "target_handle": "site_metadata"
+    },
+    {
+      "id": "e-glm-contrast",
+      "source": "first_level_glm",
+      "target": "contrast",
+      "source_handle": "glm_results",
+      "target_handle": "glm_results"
+    },
+    {
+      "id": "e-mixed-contrast",
+      "source": "mixed_effects_glm",
+      "target": "contrast",
+      "source_handle": "glm_results",
+      "target_handle": "glm_results"
+    },
+    {
+      "id": "e-site-cov-contrast",
+      "source": "site_covariate_glm",
+      "target": "contrast",
+      "source_handle": "glm_results",
+      "target_handle": "glm_results"
+    },
+    {
+      "id": "e-contrast-ch",
+      "source": "contrast",
+      "target": "channel_output",
+      "source_handle": "contrast_results",
+      "target_handle": "contrast_results"
+    },
+    {
+      "id": "e-contrast-roi",
+      "source": "contrast",
+      "target": "roi_output",
+      "source_handle": "contrast_results",
+      "target_handle": "contrast_results"
+    },
+    {
+      "id": "e-contrast-report",
+      "source": "contrast",
+      "target": "reporting",
+      "source_handle": "contrast_results",
+      "target_handle": "contrast_results"
+    },
+    {
+      "id": "e-report-pkg",
+      "source": "reporting",
+      "target": "package_export",
+      "source_handle": "report",
+      "target_handle": "report"
+    }
+  ],
+  "adapter_registry": [
+    {
+      "adapter_id": "mne-data-to-raw",
+      "name": "MNE Dataset to Raw",
+      "source_type": "DataManifest",
+      "target_type": "RawData",
+      "transform": "Read SNIRF files via MNE-NIRS"
+    },
+    {
+      "adapter_id": "mne-od-mbll",
+      "name": "MNE OD to Haemoglobin",
+      "source_type": "OpticalDensityData",
+      "target_type": "HaemoglobinData",
+      "transform": "Modified Beer-Lambert Law via MNE-NIRS"
+    }
+  ],
+  "metadata": {
+    "created_at": "2026-07-09T00:00:00Z",
+    "modified_at": "2026-07-09T00:00:00Z",
+    "author": "fnirs-flow",
+    "tags": [
+      "multi_site",
+      "task",
+      "glm"
+    ]
+  },
+  "flow_atoms": [
+    {
+      "id": "dataset_discovery",
+      "type": "dataset_discovery",
+      "category": "data",
+      "origin": "builtin",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "config": {
+        "dataset_id": "mne-fnirs-motor",
+        "source_kind": "mne_nirs_dataset"
+      },
+      "ports": [
+        {
+          "name": "data_manifest",
+          "direction": "out",
+          "schema": "DataManifest",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "dataset_discovery"
+    },
+    {
+      "id": "study_design",
+      "type": "study_design",
+      "category": "design",
+      "origin": "builtin",
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "config": {
+        "design_type": "block",
+        "conditions": [
+          "tapping",
+          "rest"
+        ],
+        "contrasts": [
+          "tapping > rest"
+        ]
+      },
+      "ports": [
+        {
+          "name": "design_spec",
+          "direction": "out",
+          "schema": "DesignSpec",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "study_design"
+    },
+    {
+      "id": "site_metadata_extraction",
+      "type": "site_metadata_extraction",
+      "category": "data",
+      "origin": "builtin",
+      "position": {
+        "x": 200,
+        "y": 200
+      },
+      "config": {
+        "site_field": "site",
+        "required_fields": [
+          "site",
+          "scanner_id"
+        ],
+        "allow_missing": false
+      },
+      "ports": [
+        {
+          "name": "data_manifest",
+          "direction": "in",
+          "schema": "DataManifest",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "out",
+          "schema": "SiteMetadata",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "site_metadata_extraction"
+    },
+    {
+      "id": "qc_metrics",
+      "type": "qc_metrics",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 400,
+        "y": 0
+      },
+      "config": {
+        "preset": "conservative_qc",
+        "sci_threshold": 0.8,
+        "sd_distance_min": 0.01,
+        "sd_distance_max": 0.08
+      },
+      "ports": [
+        {
+          "name": "raw_data",
+          "direction": "in",
+          "schema": "RawData",
+          "required": true
+        },
+        {
+          "name": "qc_report",
+          "direction": "out",
+          "schema": "QCReport",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "qc_metrics"
+    },
+    {
+      "id": "site_level_qc",
+      "type": "site_level_qc",
+      "category": "validation",
+      "origin": "builtin",
+      "position": {
+        "x": 400,
+        "y": 400
+      },
+      "config": {
+        "metrics": [
+          "mean_intensity",
+          "snr",
+          "sci_pass_rate",
+          "channel_dropout_rate"
+        ],
+        "outlier_threshold": 2.0,
+        "min_subjects_per_site": 5
+      },
+      "ports": [
+        {
+          "name": "qc_report",
+          "direction": "in",
+          "schema": "QCReport",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "site_qc_report",
+          "direction": "out",
+          "schema": "SiteQCReport",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "site_level_qc"
+    },
+    {
+      "id": "optical_density",
+      "type": "optical_density",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 600,
+        "y": 200
+      },
+      "config": {},
+      "ports": [
+        {
+          "name": "raw_data",
+          "direction": "in",
+          "schema": "RawData",
+          "required": true
+        },
+        {
+          "name": "od_data",
+          "direction": "out",
+          "schema": "OpticalDensityData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "optical_density"
+    },
+    {
+      "id": "motion_correction",
+      "type": "motion_correction",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 800,
+        "y": 200
+      },
+      "config": {
+        "method": "tddr"
+      },
+      "ports": [
+        {
+          "name": "od_data",
+          "direction": "in",
+          "schema": "OpticalDensityData",
+          "required": true
+        },
+        {
+          "name": "od_corrected",
+          "direction": "out",
+          "schema": "OpticalDensityData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "motion_correction"
+    },
+    {
+      "id": "filtering",
+      "type": "filtering",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 1000,
+        "y": 200
+      },
+      "config": {
+        "l_freq": 0.01,
+        "h_freq": 0.2,
+        "preset": "basic_bandpass"
+      },
+      "ports": [
+        {
+          "name": "od_data",
+          "direction": "in",
+          "schema": "OpticalDensityData",
+          "required": true
+        },
+        {
+          "name": "od_filtered",
+          "direction": "out",
+          "schema": "OpticalDensityData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "filtering"
+    },
+    {
+      "id": "mbll",
+      "type": "beer_lambert_law",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 1200,
+        "y": 200
+      },
+      "config": {
+        "ppf": 6.0
+      },
+      "ports": [
+        {
+          "name": "od_data",
+          "direction": "in",
+          "schema": "OpticalDensityData",
+          "required": true
+        },
+        {
+          "name": "haemoglobin",
+          "direction": "out",
+          "schema": "HaemoglobinData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "beer_lambert_law"
+    },
+    {
+      "id": "batch_effect_diagnostics",
+      "type": "batch_effect_diagnostics",
+      "category": "validation",
+      "origin": "builtin",
+      "position": {
+        "x": 1400,
+        "y": 400
+      },
+      "config": {
+        "methods": [
+          "pca",
+          "anova",
+          "icc"
+        ],
+        "significance_threshold": 0.05,
+        "icc_threshold": 0.1
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "diagnostics_report",
+          "direction": "out",
+          "schema": "DiagnosticsReport",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "batch_effect_diagnostics"
+    },
+    {
+      "id": "combat_harmonization",
+      "type": "multi_site_harmonization",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "position": {
+        "x": 1600,
+        "y": 400
+      },
+      "config": {
+        "method": "combat",
+        "eb": true,
+        "parametric": true,
+        "preserve_biological": true,
+        "covariates": []
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "haemoglobin_harmonized",
+          "direction": "out",
+          "schema": "HaemoglobinData",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "multi_site_harmonization"
+    },
+    {
+      "id": "design_matrix",
+      "type": "design_matrix",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 1400,
+        "y": 0
+      },
+      "config": {
+        "hrf_model": "canonical"
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "design_spec",
+          "direction": "in",
+          "schema": "DesignSpec",
+          "required": true
+        },
+        {
+          "name": "design_matrix",
+          "direction": "out",
+          "schema": "DesignMatrix",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "design_matrix"
+    },
+    {
+      "id": "first_level_glm",
+      "type": "first_level_glm",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 1600,
+        "y": 0
+      },
+      "config": {},
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "design_matrix",
+          "direction": "in",
+          "schema": "DesignMatrix",
+          "required": true
+        },
+        {
+          "name": "glm_results",
+          "direction": "out",
+          "schema": "GLMResults",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "first_level_glm"
+    },
+    {
+      "id": "mixed_effects_glm",
+      "type": "mixed_effects_glm",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 1800,
+        "y": 400
+      },
+      "config": {
+        "random_effects": [
+          "site"
+        ],
+        "random_intercept": true,
+        "random_slope": false,
+        "covariance_structure": "unstructured",
+        "reml": true
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "design_matrix",
+          "direction": "in",
+          "schema": "DesignMatrix",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "glm_results",
+          "direction": "out",
+          "schema": "GLMResults",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "mixed_effects_glm"
+    },
+    {
+      "id": "site_covariate_glm",
+      "type": "site_covariate_glm",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 1800,
+        "y": 600
+      },
+      "config": {
+        "site_as_covariate": true,
+        "coding": "dummy",
+        "reference_site": "auto"
+      },
+      "ports": [
+        {
+          "name": "haemoglobin",
+          "direction": "in",
+          "schema": "HaemoglobinData",
+          "required": true
+        },
+        {
+          "name": "design_matrix",
+          "direction": "in",
+          "schema": "DesignMatrix",
+          "required": true
+        },
+        {
+          "name": "site_metadata",
+          "direction": "in",
+          "schema": "SiteMetadata",
+          "required": true
+        },
+        {
+          "name": "glm_results",
+          "direction": "out",
+          "schema": "GLMResults",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "site_covariate_glm"
+    },
+    {
+      "id": "contrast",
+      "type": "contrast",
+      "category": "analysis",
+      "origin": "builtin",
+      "position": {
+        "x": 2000,
+        "y": 200
+      },
+      "config": {
+        "contrasts": [
+          "tapping > rest"
+        ]
+      },
+      "ports": [
+        {
+          "name": "glm_results",
+          "direction": "in",
+          "schema": "GLMResults",
+          "required": true
+        },
+        {
+          "name": "contrast_results",
+          "direction": "out",
+          "schema": "ContrastResults",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "contrast"
+    },
+    {
+      "id": "channel_output",
+      "type": "channel_output",
+      "category": "output",
+      "origin": "builtin",
+      "position": {
+        "x": 2200,
+        "y": 100
+      },
+      "config": {
+        "format": "csv"
+      },
+      "ports": [
+        {
+          "name": "contrast_results",
+          "direction": "in",
+          "schema": "ContrastResults",
+          "required": true
+        },
+        {
+          "name": "channel_csv",
+          "direction": "out",
+          "schema": "CSVFile",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "channel_output"
+    },
+    {
+      "id": "roi_output",
+      "type": "roi_output",
+      "category": "output",
+      "origin": "builtin",
+      "position": {
+        "x": 2200,
+        "y": 300
+      },
+      "config": {
+        "aggregation": "mean",
+        "format": "csv"
+      },
+      "ports": [
+        {
+          "name": "contrast_results",
+          "direction": "in",
+          "schema": "ContrastResults",
+          "required": true
+        },
+        {
+          "name": "roi_csv",
+          "direction": "out",
+          "schema": "CSVFile",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "roi_output"
+    },
+    {
+      "id": "reporting",
+      "type": "reporting_checklist",
+      "category": "validation",
+      "origin": "builtin",
+      "position": {
+        "x": 2400,
+        "y": 200
+      },
+      "config": {},
+      "ports": [
+        {
+          "name": "contrast_results",
+          "direction": "in",
+          "schema": "ContrastResults",
+          "required": true
+        },
+        {
+          "name": "report",
+          "direction": "out",
+          "schema": "Report",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "reporting_checklist"
+    },
+    {
+      "id": "package_export",
+      "type": "package_export",
+      "category": "export",
+      "origin": "builtin",
+      "position": {
+        "x": 2600,
+        "y": 200
+      },
+      "config": {
+        "exclude_raw_data": true
+      },
+      "ports": [
+        {
+          "name": "report",
+          "direction": "in",
+          "schema": "Report",
+          "required": true
+        },
+        {
+          "name": "package",
+          "direction": "out",
+          "schema": "Package",
+          "required": true
+        }
+      ],
+      "status": "configured",
+      "execution_trust_level": "builtin_managed",
+      "atom_type": "package_export"
+    }
+  ]
+}

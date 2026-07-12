@@ -1,0 +1,257 @@
+{
+  "schema_version": "0.2.0",
+  "flow_id": "ai-draft-task-glm",
+  "name": "AI Draft: Task GLM Analysis",
+  "description": "AI-generated candidate flow for task-based fNIRS GLM analysis. Requires user review before execution.",
+  "metadata": {
+    "author": "ai-draft",
+    "tags": ["task", "glm", "ai-generated"],
+    "ai_generation": {
+      "generated_by": "generative_ai",
+      "model": "unspecified",
+      "created_at": "2026-07-11",
+      "input_summary": "Task-based fNIRS study with block design, SNIRF data, GLM analysis requested",
+      "assumptions": [
+        "Block design with conditions: Control, Tapping/Left, Tapping/Right",
+        "Standard 10-20 source-detector montage",
+        "Sampling rate >= 10 Hz",
+        "No short-channel regression (requires user confirmation)"
+      ],
+      "requires_user_confirmation": [
+        "motion_correction: confirm TDDR as correction method",
+        "filter_band: confirm 0.01-0.2 Hz bandpass",
+        "glm_hrf: confirm canonical HRF (consider FIR for sensitivity analysis)",
+        "contrasts: confirm Tapping/Left > Control, Tapping/Right > Control",
+        "short_channel_regression: confirm whether to include"
+      ],
+      "not_used_for_execution": true
+    }
+  },
+  "nodes": [
+    {
+      "id": "dataset_discovery",
+      "type": "dataset_discovery",
+      "atom_type": "dataset_discovery",
+      "category": "data",
+      "origin": "builtin",
+      "position": {"x": 0, "y": 0},
+      "config": {"dataset_id": "bids-nirs-tapping", "source_kind": "bids_nirs"},
+      "ports": [
+        {"name": "data_manifest", "direction": "out", "schema": "DataManifest", "required": true}
+      ],
+      "readiness_status": "configured",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "read_run",
+      "type": "read_run",
+      "atom_type": "read_run",
+      "category": "data",
+      "origin": "builtin",
+      "operation": "read_run",
+      "position": {"x": 100, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "data_manifest", "direction": "in", "schema": "DataManifest", "required": true},
+        {"name": "raw_data", "direction": "out", "schema": "RawData", "required": true}
+      ],
+      "readiness_status": "configured",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "optical_density",
+      "type": "optical_density",
+      "atom_type": "optical_density",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "operation": "optical_density",
+      "position": {"x": 200, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "raw_data", "direction": "in", "schema": "RawData", "required": true},
+        {"name": "od_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "readiness_status": "configured",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "qc_metrics",
+      "type": "qc_metrics",
+      "atom_type": "qc_metrics",
+      "category": "validation",
+      "origin": "builtin",
+      "operation": "qc_metrics",
+      "position": {"x": 300, "y": 0},
+      "config": {
+        "sci_threshold": 0.8,
+        "min_sci_pass_rate": 0.7
+      },
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "qc_report", "direction": "out", "schema": "QCReport", "required": true}
+      ],
+      "readiness_status": "configured",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "motion_correction",
+      "type": "motion_correction",
+      "atom_type": "motion_correction",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "operation": "motion_correction",
+      "position": {"x": 400, "y": 0},
+      "config": {"method": "tddr"},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "od_corrected", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "readiness_status": "needs_attention",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "filtering",
+      "type": "filtering",
+      "atom_type": "filtering",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "operation": "filtering",
+      "position": {"x": 500, "y": 0},
+      "config": {"l_freq": 0.01, "h_freq": 0.2},
+      "ports": [
+        {"name": "od_corrected", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "od_filtered", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "readiness_status": "needs_attention",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "mbll",
+      "type": "mbll",
+      "atom_type": "mbll",
+      "category": "preprocessing",
+      "origin": "builtin",
+      "operation": "mbll",
+      "position": {"x": 600, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "od_filtered", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "hb_data", "direction": "out", "schema": "HemoglobinData", "required": true}
+      ],
+      "readiness_status": "configured",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "design_matrix",
+      "type": "design_matrix",
+      "atom_type": "design_matrix",
+      "category": "design",
+      "origin": "builtin",
+      "operation": "design_matrix",
+      "position": {"x": 700, "y": 0},
+      "config": {"hrf_model": "canonical", "conditions": ["Control", "Tapping/Left", "Tapping/Right"]},
+      "ports": [
+        {"name": "hb_data", "direction": "in", "schema": "HemoglobinData", "required": true},
+        {"name": "design_matrix", "direction": "out", "schema": "DesignMatrix", "required": true}
+      ],
+      "readiness_status": "needs_attention",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "glm",
+      "type": "glm",
+      "atom_type": "glm",
+      "category": "analysis",
+      "origin": "builtin",
+      "operation": "glm",
+      "position": {"x": 800, "y": 0},
+      "config": {"noise_model": "ols"},
+      "ports": [
+        {"name": "hb_data", "direction": "in", "schema": "HemoglobinData", "required": true},
+        {"name": "design_matrix", "direction": "in", "schema": "DesignMatrix", "required": true},
+        {"name": "glm_result", "direction": "out", "schema": "GLMResult", "required": true}
+      ],
+      "readiness_status": "configured",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "contrast",
+      "type": "contrast",
+      "atom_type": "contrast",
+      "category": "analysis",
+      "origin": "builtin",
+      "operation": "contrast",
+      "position": {"x": 900, "y": 0},
+      "config": {
+        "contrasts": [
+          "Tapping/Left > Control",
+          "Tapping/Right > Control"
+        ]
+      },
+      "ports": [
+        {"name": "glm_result", "direction": "in", "schema": "GLMResult", "required": true},
+        {"name": "contrast_result", "direction": "out", "schema": "ContrastResult", "required": true}
+      ],
+      "readiness_status": "needs_attention",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "channel_output",
+      "type": "channel_output",
+      "atom_type": "channel_output",
+      "category": "output",
+      "origin": "builtin",
+      "operation": "channel_output",
+      "position": {"x": 1000, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "contrast_result", "direction": "in", "schema": "ContrastResult", "required": true},
+        {"name": "channel_report", "direction": "out", "schema": "ChannelReport", "required": true}
+      ],
+      "readiness_status": "configured",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    },
+    {
+      "id": "roi_output",
+      "type": "roi_output",
+      "atom_type": "roi_output",
+      "category": "output",
+      "origin": "builtin",
+      "operation": "roi_output",
+      "position": {"x": 1100, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "channel_report", "direction": "in", "schema": "ChannelReport", "required": true},
+        {"name": "roi_report", "direction": "out", "schema": "ROIReport", "required": true}
+      ],
+      "readiness_status": "configured",
+      "execution_status": "not_run",
+      "security_status": "trusted"
+    }
+  ],
+  "edges": [
+    {"id": "e1", "source": "dataset_discovery", "target": "read_run", "source_handle": "data_manifest", "target_handle": "data_manifest"},
+    {"id": "e2", "source": "read_run", "target": "optical_density", "source_handle": "raw_data", "target_handle": "raw_data"},
+    {"id": "e3", "source": "optical_density", "target": "qc_metrics", "source_handle": "od_data", "target_handle": "od_data"},
+    {"id": "e4", "source": "optical_density", "target": "motion_correction", "source_handle": "od_data", "target_handle": "od_data"},
+    {"id": "e5", "source": "motion_correction", "target": "filtering", "source_handle": "od_corrected", "target_handle": "od_corrected"},
+    {"id": "e6", "source": "filtering", "target": "mbll", "source_handle": "od_filtered", "target_handle": "od_filtered"},
+    {"id": "e7", "source": "mbll", "target": "design_matrix", "source_handle": "hb_data", "target_handle": "hb_data"},
+    {"id": "e8", "source": "mbll", "target": "glm", "source_handle": "hb_data", "target_handle": "hb_data"},
+    {"id": "e9", "source": "design_matrix", "target": "glm", "source_handle": "design_matrix", "target_handle": "design_matrix"},
+    {"id": "e10", "source": "glm", "target": "contrast", "source_handle": "glm_result", "target_handle": "glm_result"},
+    {"id": "e11", "source": "contrast", "target": "channel_output", "source_handle": "contrast_result", "target_handle": "contrast_result"},
+    {"id": "e12", "source": "channel_output", "target": "roi_output", "source_handle": "channel_report", "target_handle": "channel_report"}
+  ]
+}

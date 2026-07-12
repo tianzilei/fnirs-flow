@@ -1,0 +1,102 @@
+{
+  "schema_version": "0.2.0",
+  "flow_id": "demo-ml-validation-001",
+  "name": "Demo ML Validation Flow",
+  "description": "Minimal machine learning validation workflow with leakage-safe splitting and nested cross-validation",
+  "nodes": [
+    {
+      "id": "dataset_discovery",
+      "type": "dataset_discovery",
+      "atom_type": "dataset_discovery",
+      "category": "data",
+      "position": {"x": 0, "y": 0},
+      "config": {"dataset_id": "mne-fnirs-motor", "source_kind": "mne_nirs_dataset"},
+      "ports": [
+        {"name": "data_manifest", "direction": "out", "schema": "DataManifest", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "optical_density",
+      "type": "optical_density",
+      "atom_type": "optical_density",
+      "category": "preprocessing",
+      "position": {"x": 200, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "raw_data", "direction": "in", "schema": "RawData", "required": true},
+        {"name": "od_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "filtering",
+      "type": "filtering",
+      "atom_type": "filtering",
+      "category": "preprocessing",
+      "position": {"x": 400, "y": 0},
+      "config": {"l_freq": 0.01, "h_freq": 0.2},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "filtered_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "beer_lambert_law",
+      "type": "beer_lambert_law",
+      "atom_type": "beer_lambert_law",
+      "category": "preprocessing",
+      "position": {"x": 600, "y": 0},
+      "config": {"ppf": 6.0},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "hb_data", "direction": "out", "schema": "HaemoglobinData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "feature_extraction",
+      "type": "feature_extraction",
+      "atom_type": "feature_extraction",
+      "category": "analysis",
+      "position": {"x": 800, "y": 0},
+      "config": {"method": "mean_amplitude", "window": "epoch"},
+      "ports": [
+        {"name": "hb_data", "direction": "in", "schema": "HaemoglobinData", "required": true},
+        {"name": "feature_matrix", "direction": "out", "schema": "FeatureMatrix", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "ml_model",
+      "type": "ml_model",
+      "atom_type": "ml_model",
+      "category": "analysis",
+      "position": {"x": 1000, "y": 0},
+      "config": {
+        "model_type": "svm",
+        "validation_unit": "subject",
+        "nested_cv": true,
+        "preprocessing_inside_cv": true,
+        "n_outer_folds": 5,
+        "n_inner_folds": 3
+      },
+      "ports": [
+        {"name": "feature_matrix", "direction": "in", "schema": "FeatureMatrix", "required": true},
+        {"name": "ml_results", "direction": "out", "schema": "MLResults", "required": true}
+      ],
+      "status": "configured"
+    }
+  ],
+  "edges": [
+    {"id": "e-data-od", "source": "dataset_discovery", "target": "optical_density", "source_handle": "data_manifest", "target_handle": "raw_data"},
+    {"id": "e-od-filter", "source": "optical_density", "target": "filtering", "source_handle": "od_data", "target_handle": "od_data"},
+    {"id": "e-filter-mbll", "source": "filtering", "target": "beer_lambert_law", "source_handle": "filtered_data", "target_handle": "od_data"},
+    {"id": "e-mbll-feat", "source": "beer_lambert_law", "target": "feature_extraction", "source_handle": "hb_data", "target_handle": "hb_data"},
+    {"id": "e-feat-ml", "source": "feature_extraction", "target": "ml_model", "source_handle": "feature_matrix", "target_handle": "feature_matrix"}
+  ],
+  "adapter_registry": [
+    {"adapter_id": "mne-data-to-raw", "name": "MNE Dataset to Raw", "source_type": "DataManifest", "target_type": "RawData", "transform": "Read SNIRF files via MNE-NIRS"}
+  ]
+}

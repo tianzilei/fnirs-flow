@@ -1,0 +1,113 @@
+{
+  "schema_version": "0.2.0",
+  "flow_id": "demo-resting-state-001",
+  "name": "Demo Resting-State Connectivity Flow",
+  "description": "Minimal resting-state fNIRS connectivity workflow with frequency band selection and correlation analysis",
+  "nodes": [
+    {
+      "id": "dataset_discovery",
+      "type": "dataset_discovery",
+      "atom_type": "dataset_discovery",
+      "category": "data",
+      "position": {"x": 0, "y": 0},
+      "config": {"dataset_id": "mne-fnirs-motor", "source_kind": "mne_nirs_dataset"},
+      "ports": [
+        {"name": "data_manifest", "direction": "out", "schema": "DataManifest", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "optical_density",
+      "type": "optical_density",
+      "atom_type": "optical_density",
+      "category": "preprocessing",
+      "position": {"x": 200, "y": 0},
+      "config": {},
+      "ports": [
+        {"name": "raw_data", "direction": "in", "schema": "RawData", "required": true},
+        {"name": "od_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "qc_metrics",
+      "type": "qc_metrics",
+      "atom_type": "qc_metrics",
+      "category": "preprocessing",
+      "position": {"x": 400, "y": 0},
+      "config": {"sci_threshold": 0.8},
+      "ports": [
+        {"name": "raw_data", "direction": "in", "schema": "RawData", "required": true},
+        {"name": "qc_data", "direction": "out", "schema": "QCData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "motion_correction",
+      "type": "motion_correction",
+      "atom_type": "motion_correction",
+      "category": "preprocessing",
+      "position": {"x": 600, "y": 0},
+      "config": {"method": "tddr"},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "corrected_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "filtering",
+      "type": "filtering",
+      "atom_type": "filtering",
+      "category": "preprocessing",
+      "position": {"x": 800, "y": 0},
+      "config": {"l_freq": 0.01, "h_freq": 0.2},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "filtered_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "beer_lambert_law",
+      "type": "beer_lambert_law",
+      "atom_type": "beer_lambert_law",
+      "category": "preprocessing",
+      "position": {"x": 1000, "y": 0},
+      "config": {"ppf": 6.0},
+      "ports": [
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "hb_data", "direction": "out", "schema": "HaemoglobinData", "required": true}
+      ],
+      "status": "configured"
+    },
+    {
+      "id": "connectivity_analysis",
+      "type": "connectivity_analysis",
+      "atom_type": "connectivity_analysis",
+      "category": "analysis",
+      "position": {"x": 1200, "y": 0},
+      "config": {
+        "metric": "correlation",
+        "frequency_band": {"low": 0.01, "high": 0.1},
+        "fisher_z": true
+      },
+      "ports": [
+        {"name": "hb_data", "direction": "in", "schema": "HaemoglobinData", "required": true},
+        {"name": "connectivity_matrix", "direction": "out", "schema": "ConnectivityMatrix", "required": true}
+      ],
+      "status": "configured"
+    }
+  ],
+  "edges": [
+    {"id": "e-data-od", "source": "dataset_discovery", "target": "optical_density", "source_handle": "data_manifest", "target_handle": "raw_data"},
+    {"id": "e-data-qc", "source": "dataset_discovery", "target": "qc_metrics", "source_handle": "data_manifest", "target_handle": "raw_data"},
+    {"id": "e-od-motion", "source": "optical_density", "target": "motion_correction", "source_handle": "od_data", "target_handle": "od_data"},
+    {"id": "e-motion-filter", "source": "motion_correction", "target": "filtering", "source_handle": "corrected_data", "target_handle": "od_data"},
+    {"id": "e-filter-mbll", "source": "filtering", "target": "beer_lambert_law", "source_handle": "filtered_data", "target_handle": "od_data"},
+    {"id": "e-mbll-connectivity", "source": "beer_lambert_law", "target": "connectivity_analysis", "source_handle": "hb_data", "target_handle": "hb_data"}
+  ],
+  "adapter_registry": [
+    {"adapter_id": "mne-data-to-raw", "name": "MNE Dataset to Raw", "source_type": "DataManifest", "target_type": "RawData", "transform": "Read SNIRF files via MNE-NIRS"}
+  ]
+}
