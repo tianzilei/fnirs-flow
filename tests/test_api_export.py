@@ -57,6 +57,37 @@ def test_export_package_success(tmp_path):
         assert "manifest.json" in names
 
 
+def test_export_removes_macos_appledouble_sidecar(tmp_path, monkeypatch):
+    import shutil
+
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    pid = _create_and_compile_flow(client, tmp_path)
+    real_copy2 = shutil.copy2
+
+    def copy2_with_sidecar(src, dst, *args, **kwargs):
+        result = real_copy2(src, dst, *args, **kwargs)
+        Path(dst).with_name(f"._{Path(dst).name}").write_bytes(b"appledouble")
+        Path(dst).parent.with_name(f"._{Path(dst).parent.name}").write_bytes(b"appledouble")
+        outputs_dir = Path(dst).parent.parent
+        outputs_dir.with_name(f"._{outputs_dir.name}").write_bytes(b"appledouble")
+        (outputs_dir.parent / "._project.json").write_bytes(b"appledouble")
+        return result
+
+    monkeypatch.setattr(shutil, "copy2", copy2_with_sidecar)
+
+    resp = client.post(f"/api/projects/{pid}/export-package")
+
+    assert resp.status_code == 200
+    package_path = Path(resp.json()["package_path"])
+    workspace = package_path.parent.parent.parent
+    assert package_path.exists()
+    assert not package_path.with_name(f"._{package_path.name}").exists()
+    assert not package_path.parent.with_name(f"._{package_path.parent.name}").exists()
+    assert not list(workspace.rglob("._*"))
+
+
 @pytest.mark.parametrize(
     ("profile", "expected", "unexpected"),
     [

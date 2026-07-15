@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -28,6 +28,7 @@ import {
   Play,
   ShieldCheck,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import 'reactflow/dist/style.css';
 import type { AtomTemplate } from '../api/client';
 import { ParameterPanel } from './ParameterPanel';
@@ -36,6 +37,7 @@ interface FlowCanvasProps {
   flow: Record<string, unknown>;
   onChange: (flow: Record<string, unknown>) => void;
   readOnly?: boolean;
+  onInspectingChange?: (inspecting: boolean) => void;
 }
 
 const nodeColors: Record<string, string> = {
@@ -63,6 +65,7 @@ interface NodeDetail {
   atom_type: string;
   operation: string;
   category: string;
+  readiness_status: string;
   config: Record<string, unknown>;
   parameters: Record<string, unknown>;
   ports: Array<{ name: string; direction: string; schema: string }>;
@@ -183,85 +186,147 @@ function normalizePorts(atom: Record<string, unknown>): NodeDetail['ports'] {
   return [...inputPorts, ...outputPorts, ...legacyPorts];
 }
 
-export function FlowCanvas({ flow, onChange, readOnly = false }: FlowCanvasProps) {
+function atomToDetail(atom: Record<string, unknown>): NodeDetail {
+  return {
+    id: String(atom.id),
+    atom_type: String(atom.atom_type || atom.type || ''),
+    operation: String(atom.operation || ''),
+    category: String(atom.category || ''),
+    readiness_status: String(atom.readiness_status || atom.status || ''),
+    config: (atom.config as Record<string, unknown>) || {},
+    parameters: (atom.parameters as Record<string, unknown>) || {},
+    ports: normalizePorts(atom),
+  };
+}
+
+export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChange }: FlowCanvasProps) {
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<NodeDetail | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [searchParams] = useSearchParams();
+  const nodesRef = useRef<Node[]>([]);
+  const edgesRef = useRef<Edge[]>([]);
   const nodeCount = nodes.length;
   const edgeCount = edges.length;
 
   useEffect(() => {
-    setNodes(toNodes(flow));
-    setEdges(toEdges(flow));
+    const nextNodes = toNodes(flow);
+    const nextEdges = toEdges(flow);
+    nodesRef.current = nextNodes;
+    edgesRef.current = nextEdges;
+    setNodes(nextNodes);
+    setEdges(nextEdges);
   }, [flow, setNodes, setEdges]);
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
 
   const flowAtoms = useMemo(
     () => (asRecords(flow.flow_atoms).length > 0 ? asRecords(flow.flow_atoms) : asRecords(flow.nodes)),
     [flow]
   );
 
+  useEffect(() => {
+    const nodeId = searchParams.get('node');
+    if (!nodeId) return;
+    const atom = flowAtoms.find((item) => String(item.id) === nodeId);
+    if (atom) {
+      setSelectedNode(atomToDetail(atom));
+      onInspectingChange?.(true);
+    }
+  }, [flowAtoms, onInspectingChange, searchParams]);
+
   const onConnect = useCallback(
     (params: Connection) => {
       if (readOnly) return;
-      setEdges((currentEdges) => {
-        const nextEdges = addEdge({ ...params, animated: true, className: 'flow-edge' }, currentEdges);
-        onChange(syncFlow(flow, nodes, nextEdges));
-        return nextEdges;
-      });
+      const nextEdges = addEdge({ ...params, animated: true, className: 'flow-edge' }, edgesRef.current);
+      edgesRef.current = nextEdges;
+      setEdges(nextEdges);
+      onChange(syncFlow(flow, nodesRef.current, nextEdges));
     },
-    [flow, nodes, onChange, readOnly, setEdges]
+    [flow, onChange, readOnly, setEdges]
   );
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       if (readOnly) return;
-      setNodes((currentNodes) => {
-        const nextNodes = applyNodeChanges(changes, currentNodes);
-        if (shouldSyncNodeChanges(changes)) {
-          onChange(syncFlow(flow, nextNodes, edges));
-        }
-        return nextNodes;
-      });
+      const nextNodes = applyNodeChanges(changes, nodesRef.current);
+      nodesRef.current = nextNodes;
+      setNodes(nextNodes);
+      if (shouldSyncNodeChanges(changes)) {
+        onChange(syncFlow(flow, nextNodes, edgesRef.current));
+      }
     },
-    [edges, flow, onChange, readOnly, setNodes]
+    [flow, onChange, readOnly, setNodes]
   );
 
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       if (readOnly) return;
-      setEdges((currentEdges) => {
-        const nextEdges = applyEdgeChanges(changes, currentEdges);
-        if (shouldSyncEdgeChanges(changes)) {
-          onChange(syncFlow(flow, nodes, nextEdges));
-        }
-        return nextEdges;
-      });
+      const nextEdges = applyEdgeChanges(changes, edgesRef.current);
+      edgesRef.current = nextEdges;
+      setEdges(nextEdges);
+      if (shouldSyncEdgeChanges(changes)) {
+        onChange(syncFlow(flow, nodesRef.current, nextEdges));
+      }
     },
-    [nodes, flow, onChange, readOnly, setEdges]
+    [flow, onChange, readOnly, setEdges]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
       const atom = flowAtoms.find((item) => String(item.id) === node.id);
       if (atom) {
-        setSelectedNode({
-          id: String(atom.id),
-          atom_type: String(atom.atom_type || atom.type || ''),
-          operation: String(atom.operation || ''),
-          category: String(atom.category || ''),
-          config: (atom.config as Record<string, unknown>) || {},
-          parameters: (atom.parameters as Record<string, unknown>) || {},
-          ports: normalizePorts(atom),
-        });
+        setSelectedNode(atomToDetail(atom));
+        onInspectingChange?.(true);
       }
     },
-    [flowAtoms]
+    [flowAtoms, onInspectingChange]
   );
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
-  }, []);
+    onInspectingChange?.(false);
+  }, [onInspectingChange]);
+
+  const deleteSelectedNode = useCallback(() => {
+    if (readOnly || !selectedNode) return;
+    const nextNodes = nodesRef.current.filter((node) => node.id !== selectedNode.id);
+    const nextEdges = edgesRef.current.filter(
+      (edge) => edge.source !== selectedNode.id && edge.target !== selectedNode.id
+    );
+    nodesRef.current = nextNodes;
+    edgesRef.current = nextEdges;
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    setSelectedNode(null);
+    onInspectingChange?.(false);
+    onChange(syncFlow(flow, nextNodes, nextEdges));
+  }, [flow, onChange, onInspectingChange, readOnly, selectedNode, setEdges, setNodes]);
+
+  useEffect(() => {
+    if (readOnly || !selectedNode) return undefined;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName.toLowerCase();
+      const editingText = target?.isContentEditable || ['input', 'textarea', 'select'].includes(tagName || '');
+      if (editingText) return;
+
+      event.preventDefault();
+      deleteSelectedNode();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteSelectedNode, readOnly, selectedNode]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -278,10 +343,9 @@ export function FlowCanvas({ flow, onChange, readOnly = false }: FlowCanvasProps
       if (!payload) return;
 
       const template = JSON.parse(payload) as AtomTemplate;
-      const bounds = (event.currentTarget as HTMLDivElement).getBoundingClientRect();
-      const position = reactFlowInstance.project({
-        x: event.clientX - bounds.left,
-        y: event.clientY - bounds.top,
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
       });
       const baseId = template.operation || template.atom_type || template.id;
       const existingIds = new Set(nodes.map((node) => node.id));
@@ -394,11 +458,14 @@ export function FlowCanvas({ flow, onChange, readOnly = false }: FlowCanvasProps
             onChange={(name, value) => {
               if (readOnly) return;
               const updatedConfig = { ...selectedNode.config, [name]: value };
-              setSelectedNode({ ...selectedNode, config: updatedConfig });
+              const nextReadiness = selectedNode.readiness_status === 'not_configured'
+                ? 'configured'
+                : selectedNode.readiness_status;
+              setSelectedNode({ ...selectedNode, config: updatedConfig, readiness_status: nextReadiness });
               const atomKey = Array.isArray(flow.flow_atoms) ? 'flow_atoms' : 'nodes';
               const nextAtoms = asRecords(flow[atomKey]).map((atom) =>
                 String(atom.id) === selectedNode.id
-                  ? { ...atom, config: updatedConfig }
+                  ? { ...atom, config: updatedConfig, readiness_status: nextReadiness }
                   : atom
               );
               onChange({
@@ -411,6 +478,7 @@ export function FlowCanvas({ flow, onChange, readOnly = false }: FlowCanvasProps
               atom_id: selectedNode.id,
               atom_type: selectedNode.atom_type,
               operation: selectedNode.operation,
+              readiness_status: selectedNode.readiness_status,
             }}
           />
         </aside>

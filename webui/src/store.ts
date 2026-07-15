@@ -115,6 +115,7 @@ interface StoreState {
   fork: () => Promise<void>;
   trustAtom: (atomId: string) => Promise<void>;
   relinkData: (dataRoot: string) => Promise<void>;
+  refreshStatus: () => Promise<void>;
   clearError: () => void;
   loadHealth: () => Promise<void>;
 }
@@ -145,10 +146,11 @@ export const useStore = create<StoreState>((set, get) => ({
     const hasFatalRisk = validation?.risks?.some(
       (r: Record<string, unknown>) => r.severity === 'fatal'
     ) ?? false;
+    const validationPassed = validation ? validation.is_valid && !hasFatalRisk : !!readiness?.validated;
     return {
       selected: !!project,
       flowSaved: (!!flow && Object.keys(flow).length > 0) || !!readiness?.flow_saved,
-      validated: !!validation || !!readiness?.validated,
+      validated: validationPassed,
       compiled: !!compileResult || !!readiness?.compiled,
       dataDiscovered: !!discoverResult || !!readiness?.data_discovered,
       executed: !!executeInfo || !!readiness?.executed,
@@ -486,6 +488,17 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (e: any) {
       set({ error: { message: 'Relink failed', detail: api.formatApiError(e) }, loading: false });
       throw e;
+    }
+  },
+
+  refreshStatus: async () => {
+    const { project } = get();
+    if (!project) return;
+    try {
+      const readiness = await api.getProjectStatus(project.id);
+      set({ readiness });
+    } catch {
+      set({ readiness: null });
     }
   },
 

@@ -185,7 +185,7 @@ class URIBindingStore:
         self._project_dir.mkdir(parents=True, exist_ok=True)
         data = {"version": "1.0.0", "bindings": self._bindings}
         self._bindings_file.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False),
+            json.dumps(data, indent=2),
             encoding="utf-8",
         )
 

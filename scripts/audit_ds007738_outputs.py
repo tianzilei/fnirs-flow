@@ -6,11 +6,16 @@ import csv
 import json
 import math
 import os
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+from fnirs_flow.filesystem import is_visible_data_file  # noqa: E402
+
 DATASET_ROOT = Path(os.environ.get("FNIRS_DATASET_ROOT", PROJECT_ROOT / "Sample" / "ds007738-download")).resolve()
 OUTPUT_DIR = Path(
     os.environ.get("FNIRS_ANALYSIS_OUTPUT", PROJECT_ROOT / "outputs" / "ds007738_full_analysis")
@@ -24,11 +29,7 @@ CURRENT_ANALYSIS_VERSION = "2.0"
 def analysis_files(root: Path, pattern: str, *, recursive: bool = False) -> list[Path]:
     """Return matching files while ignoring macOS AppleDouble sidecars."""
     candidates = root.rglob(pattern) if recursive else root.glob(pattern)
-    return [
-        path
-        for path in candidates
-        if path.is_file() and not any(part.startswith("._") for part in path.relative_to(root).parts)
-    ]
+    return [path for path in candidates if is_visible_data_file(path, root=root)]
 
 
 def load_results() -> list[dict[str, Any]]:

@@ -17,6 +17,11 @@ from fnirs_flow.data.manifest import (
 )
 from fnirs_flow.data.participants import read_participant_table, write_participant_table_artifacts
 from fnirs_flow.data.registry import DatasetEntry, DatasetRegistry
+from fnirs_flow.filesystem import (
+    is_macos_metadata_path,
+    is_visible_data_file,
+    remove_macos_metadata_paths,
+)
 
 
 def _compute_file_hash(filepath: Path) -> str:
@@ -44,7 +49,7 @@ def _discover_mne_dataset(entry: DatasetEntry, outdir: Path) -> DataManifest:
 
     if local_root.exists():
         # Find SNIRF files
-        snirf_files = list(local_root.rglob("*.snirf"))
+        snirf_files = [path for path in local_root.rglob("*.snirf") if is_visible_data_file(path, root=local_root)]
         for f in snirf_files:
             rel_path = str(f.relative_to(local_root))
             files.append(
@@ -123,7 +128,7 @@ def _parse_bids_entities(path: Path) -> dict[str, str]:
 
 def _is_ignored_sidecar(path: Path) -> bool:
     """Ignore filesystem metadata files such as macOS AppleDouble sidecars."""
-    return any(part.startswith("._") for part in path.parts)
+    return is_macos_metadata_path(path)
 
 
 def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest:
@@ -137,7 +142,7 @@ def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest
     metadata_tables: list[MetadataTableReference] = []
 
     if local_root.exists():
-        for f in sorted(p for p in local_root.rglob("*") if p.is_file() and not _is_ignored_sidecar(p)):
+        for f in sorted(p for p in local_root.rglob("*") if is_visible_data_file(p, root=local_root)):
             rel_path = str(f.relative_to(local_root))
             role = "metadata"
             if f.suffix.lower() == ".snirf":
@@ -184,13 +189,15 @@ def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest
                 )
             )
 
-        for f in sorted(p for p in local_root.rglob("*_nirs.snirf") if not _is_ignored_sidecar(p)):
+        for f in sorted(p for p in local_root.rglob("*_nirs.snirf") if is_visible_data_file(p, root=local_root)):
             rel_path = str(f.relative_to(local_root))
             entities = _parse_bids_entities(f)
             # Find matching events TSV for this run
             events_path = ""
             events_suffix = "_events.tsv"
             for ef in local_root.rglob(f"*{events_suffix}"):
+                if not is_visible_data_file(ef, root=local_root):
+                    continue
                 ef_entities = _parse_bids_entities(ef)
                 if (
                     ef_entities.get("sub") == entities.get("sub")
@@ -314,4 +321,5 @@ def discover_dataset(dataset_id: str, outdir: str | Path) -> DataManifest:
                 ]
             )
 
+    remove_macos_metadata_paths(compiled_dir)
     return manifest

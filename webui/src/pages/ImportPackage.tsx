@@ -44,8 +44,13 @@ export function ImportPackage() {
       </section>
 
       <div className="import-content">
-        <section className="import-form">
-          <h3>Import .fnirsflow.zip Package</h3>
+        <section className="import-form workflow-panel">
+          <div className="section-heading">
+            <div>
+              <h3>Import .fnirsflow.zip Package</h3>
+              <p className="muted">Load a reproducibility package, then review trust and data relinking steps.</p>
+            </div>
+          </div>
           <div className="form-group">
             <label htmlFor="package-path">Package Path</label>
             <div className="input-with-button">
@@ -176,7 +181,7 @@ export function ImportPackage() {
         )}
 
         {!importStatus?.imported && !importSuccess && (
-          <section className="import-help">
+          <section className="import-help workflow-panel">
             <h3>How to Import</h3>
             <ol>
               <li>Obtain a <code>.fnirsflow.zip</code> package from another user or your own export</li>

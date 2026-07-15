@@ -1,9 +1,8 @@
-# Package Profile Specification
+# Package Profile 业务说明
 
-Updated: 2026-07-15
+生成日期：2026-07-10
 
-This document describes the default package profiles, import/export behavior,
-and custom executable atom quarantine rules exposed in the public release.
+本文档从业务逻辑第 23-26 节抽出更短的 package spec，重点描述三类默认 profile、导入/导出行为和 custom executable atom quarantine 规则。
 
 ## 1. 三类默认 Package Profile
 

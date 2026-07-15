@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
@@ -32,6 +33,7 @@ from fnirs_flow.api.exceptions import (
 from fnirs_flow.api.models import (
     BackendDescription,
     CompileResult,
+    DatasetRead,
     DiscoverResult,
     DryRunResult,
     ExecutionJobRead,
@@ -65,6 +67,8 @@ from fnirs_flow.api.projects import (
     validate_project_execution,
     validate_project_flow,
 )
+from fnirs_flow.data.registry import DatasetRegistry
+from fnirs_flow.filesystem import is_macos_metadata_path
 
 logger = logging.getLogger(__name__)
 
@@ -463,7 +467,7 @@ async def update_flow(project_id: str, data: FlowUpdate):
 
 @app.post("/api/projects/{project_id}/validate", response_model=ValidationResult)
 async def validate_flow_endpoint(project_id: str):
-    result = validate_project_flow(get_store(), project_id)
+    result = await run_in_threadpool(validate_project_flow, get_store(), project_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return result
@@ -489,7 +493,12 @@ async def compile_flow_endpoint(
             suggested_action="Fork the imported project before compiling",
         ) from exc
     try:
-        result = compile_project_flow(get_store(), project_id, base_revision=base_revision)
+        result = await run_in_threadpool(
+            compile_project_flow,
+            get_store(),
+            project_id,
+            base_revision=base_revision,
+        )
     except (ValueError, KeyError) as exc:
         raise _api_error(
             422,
@@ -525,6 +534,25 @@ async def compile_flow_endpoint(
 # --- Dataset Discovery ---
 
 
+@app.get("/api/datasets", response_model=list[DatasetRead])
+async def list_datasets_endpoint():
+    """List datasets available to the no-code data workspace."""
+    return [
+        DatasetRead(
+            dataset_id=entry.dataset_id,
+            name=entry.name,
+            source_kind=entry.source_kind,
+            url=entry.url,
+            doi=entry.doi,
+            citation=entry.citation,
+            license=entry.license,
+            description=entry.description,
+            folder_name=entry.folder_name,
+        )
+        for entry in DatasetRegistry().all_entries()
+    ]
+
+
 @app.post("/api/projects/{project_id}/discover-data", response_model=DiscoverResult)
 async def discover_data_endpoint(
     project_id: str,
@@ -541,7 +569,13 @@ async def discover_data_endpoint(
             suggested_action="Select an existing project",
         )
     try:
-        result = discover_project_data(get_store(), project_id, dataset_id, base_revision=base_revision)
+        result = await run_in_threadpool(
+            discover_project_data,
+            get_store(),
+            project_id,
+            dataset_id,
+            base_revision=base_revision,
+        )
     except ValueError as exc:
         raise _api_error(
             404,
@@ -624,7 +658,7 @@ async def import_participant_table_endpoint(project_id: str, data: ParticipantTa
 @app.post("/api/projects/{project_id}/dry-run", response_model=DryRunResult)
 async def dry_run_endpoint(project_id: str):
     try:
-        result = dry_run_project(get_store(), project_id)
+        result = await run_in_threadpool(dry_run_project, get_store(), project_id)
     except StaleCompiledPlanError as exc:
         raise _api_error(
             409,
@@ -801,6 +835,12 @@ async def get_design_history_endpoint(project_id: str):
     """Get design history status (HEAD, branches, dirty)."""
     store = get_store()
     head = store.get_design_head(project_id)
+    if head is None:
+        return {
+            "head": None,
+            "branches": [],
+            "dirty": False,
+        }
     branches = store.list_design_branches(project_id)
     dirty = store.is_design_dirty(project_id)
     return {
@@ -953,22 +993,46 @@ async def migrate_design_history_endpoint(project_id: str):
 # --- AI Draft Flow Generation ---
 
 
+def _sanitize_ai_settings(body: dict[str, Any]) -> dict[str, Any]:
+    settings = body.get("ai_settings")
+    if not isinstance(settings, dict):
+        return {}
+    sanitized: dict[str, Any] = {}
+    for key in ("provider", "base_url", "model", "organization", "project"):
+        value = str(settings.get(key, "")).strip()
+        if value:
+            sanitized[key] = value
+    for key in ("temperature", "max_tokens", "timeout_seconds"):
+        value = settings.get(key)
+        if isinstance(value, int | float):
+            sanitized[key] = value
+    sanitized["api_key_present"] = bool(settings.get("api_key_present")) or bool(
+        str(settings.get("api_key", "")).strip()
+    )
+    sanitized["mode"] = str(settings.get("mode", "template")).strip() or "template"
+    return sanitized
+
+
 @app.post("/api/ai/draft-flow")
 async def generate_ai_draft_endpoint(body: dict[str, Any]):
     """Generate a candidate flow from a scenario template."""
     from fnirs_flow.ai.draft_generator import generate_draft_flow
 
     scenario = body.get("scenario", "task")
+    ai_settings = _sanitize_ai_settings(body)
+    model_name = ai_settings.get("model") or body.get("model", "api_template")
     try:
         flow = generate_draft_flow(
             scenario,
             study_name=body.get("study_name", ""),
             data_format=body.get("data_format", "snirf"),
             conditions=body.get("conditions"),
-            model_name=body.get("model", "api_template"),
+            model_name=str(model_name),
             assumptions=body.get("assumptions"),
             user_confirmations=body.get("user_confirmations"),
         )
+        if ai_settings:
+            flow.setdefault("metadata", {}).setdefault("ai_generation", {})["settings"] = ai_settings
         return flow
     except ValueError as exc:
         raise _api_error(
@@ -977,7 +1041,7 @@ async def generate_ai_draft_endpoint(body: dict[str, Any]):
             str(exc),
             "ai_draft",
             recoverable=True,
-            suggested_action="Use one of: task, resting_state, machine_learning, real_world, hyperscanning, multi_site",
+            suggested_action="Use task or resting_state, or add the missing MethodAtom templates and input bindings.",
         ) from exc
 
 
@@ -992,16 +1056,20 @@ async def generate_ai_draft_for_project_endpoint(project_id: str, body: dict[str
     from fnirs_flow.ai.draft_generator import generate_draft_flow
 
     scenario = body.get("scenario", "task")
+    ai_settings = _sanitize_ai_settings(body)
+    model_name = ai_settings.get("model") or body.get("model", "api_template")
     try:
         flow = generate_draft_flow(
             scenario,
             study_name=body.get("study_name", ""),
             data_format=body.get("data_format", "snirf"),
             conditions=body.get("conditions"),
-            model_name=body.get("model", "api_template"),
+            model_name=str(model_name),
             assumptions=body.get("assumptions"),
             user_confirmations=body.get("user_confirmations"),
         )
+        if ai_settings:
+            flow.setdefault("metadata", {}).setdefault("ai_generation", {})["settings"] = ai_settings
     except ValueError as exc:
         raise _api_error(
             422,
@@ -1009,7 +1077,7 @@ async def generate_ai_draft_for_project_endpoint(project_id: str, body: dict[str
             str(exc),
             "ai_draft",
             recoverable=True,
-            suggested_action="Use one of: task, resting_state, machine_learning, real_world, hyperscanning, multi_site",
+            suggested_action="Use task or resting_state, or add the missing MethodAtom templates and input bindings.",
         ) from exc
 
     store = get_store()
@@ -1186,7 +1254,12 @@ async def get_project_lock_status(project_id: str):
 async def export_package_endpoint(project_id: str, data: ExportRequest | None = None):
     request = data or ExportRequest()
     try:
-        result = export_project_package(get_store(), project_id, profile_id=request.profile)
+        result = await run_in_threadpool(
+            export_project_package,
+            get_store(),
+            project_id,
+            profile_id=request.profile,
+        )
     except StaleCompiledPlanError as exc:
         raise _api_error(
             409,
@@ -1391,9 +1464,9 @@ async def project_results_endpoint(project_id: str, kind: str):
     files = []
     seen: set[str] = set()
     for path in sorted(paths):
-        if path.name.startswith("._"):
-            continue
         relative = path.relative_to(outdir).as_posix()
+        if is_macos_metadata_path(relative):
+            continue
         logical_name = relative.removeprefix("compiled/")
         if logical_name in seen:
             continue

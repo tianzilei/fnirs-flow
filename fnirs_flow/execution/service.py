@@ -37,8 +37,14 @@ from fnirs_flow.execution.engine import (
 from fnirs_flow.execution.failures import FailureStore
 from fnirs_flow.execution.operations import OperationRegistry, create_default_registry
 from fnirs_flow.execution.provenance import ProvenanceRecord
+from fnirs_flow.filesystem import remove_macos_metadata_paths
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_atom_backend_id(atom: dict[str, Any], default_backend_id: str) -> str:
+    """Return the atom backend, treating missing/null backend ids as default."""
+    return atom.get("backend_id") or default_backend_id
 
 
 class ExecutionRequest(BaseModel):
@@ -323,6 +329,7 @@ class ExecutionService:
             failed=failed,
             skipped=skipped,
         )
+        remove_macos_metadata_paths(outdir)
 
         return result
 
@@ -1106,7 +1113,7 @@ class ExecutionService:
                     provenance={
                         "predecessor_atom_ids": sorted(predecessors),
                         "operation": operation,
-                        "backend_id": atom.get("backend_id", default_backend_id),
+                        "backend_id": resolve_atom_backend_id(atom, default_backend_id),
                     },
                 )
                 self._emit_progress(
@@ -1132,7 +1139,7 @@ class ExecutionService:
                     self._inject_dependencies(atom, params, intermediate_state)
 
                     # Get the appropriate adapter for this atom (MethodAtom-level)
-                    atom_backend_id = atom.get("backend_id", default_backend_id)
+                    atom_backend_id = resolve_atom_backend_id(atom, default_backend_id)
                     adapter = adapter_pool.get(atom_backend_id, **adapter_kwargs)
                     artifact_offset = len(adapter.artifacts.all()) if hasattr(adapter, "artifacts") else 0
 

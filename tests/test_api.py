@@ -40,6 +40,71 @@ def test_atom_templates_api_is_not_shadowed_by_spa_fallback():
     assert isinstance(response.json(), list)
 
 
+def test_datasets_api_lists_builtin_registry():
+    from fastapi.testclient import TestClient
+
+    response = TestClient(app).get("/api/datasets")
+    assert response.status_code == 200
+    dataset_ids = {item["dataset_id"] for item in response.json()}
+    assert {"mne-fnirs-motor", "bids-nirs-tapping", "ds007738"} <= dataset_ids
+
+
+def test_ai_draft_openai_settings_are_sanitized():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    project = client.post("/api/projects", json={"name": "AI Settings"}).json()
+    response = client.post(
+        f"/api/projects/{project['id']}/ai/draft-flow",
+        json={
+            "scenario": "task",
+            "ai_settings": {
+                "mode": "openai-compatible",
+                "provider": "OpenAI compatible",
+                "base_url": "https://api.openai.com/v1",
+                "api_key_present": True,
+                "model": "gpt-5-mini",
+                "temperature": 0.2,
+                "max_tokens": 4096,
+                "timeout_seconds": 60,
+            },
+        },
+    )
+    assert response.status_code == 200
+
+    draft = client.get(f"/api/projects/{project['id']}/ai/draft").json()["draft"]
+    settings = draft["metadata"]["ai_generation"]["settings"]
+    assert settings["api_key_present"] is True
+    assert settings["model"] == "gpt-5-mini"
+    assert "api_key" not in settings
+    assert "sk-secret" not in json.dumps(draft)
+
+
+def test_ai_draft_legacy_api_key_is_not_persisted():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    project = client.post("/api/projects", json={"name": "AI Settings Legacy"}).json()
+    response = client.post(
+        f"/api/projects/{project['id']}/ai/draft-flow",
+        json={
+            "scenario": "task",
+            "ai_settings": {
+                "mode": "openai-compatible",
+                "api_key": "sk-secret",
+                "model": "gpt-5-mini",
+            },
+        },
+    )
+    assert response.status_code == 200
+
+    draft = client.get(f"/api/projects/{project['id']}/ai/draft").json()["draft"]
+    settings = draft["metadata"]["ai_generation"]["settings"]
+    assert settings["api_key_present"] is True
+    assert "api_key" not in settings
+    assert "sk-secret" not in json.dumps(draft)
+
+
 def test_invalid_content_length_returns_400():
     from fastapi.testclient import TestClient
 
@@ -119,6 +184,21 @@ def test_compile_flow():
     assert resp.status_code == 200
     data = resp.json()
     assert data["steps"] > 0
+    assert data["dag_layers"]
+    assert sum(len(layer) for layer in data["dag_layers"]) == data["steps"]
+    assert {"id", "atom_type", "node_type", "operation"} <= set(data["dag_layers"][0][0])
+
+
+def test_design_history_endpoint_before_initialize_returns_empty_state():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    proj = client.post("/api/projects", json={"name": "History Empty"}).json()
+
+    resp = client.get(f"/api/projects/{proj['id']}/history")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"head": None, "branches": [], "dirty": False}
 
 
 def test_import_project_participant_table(tmp_path):

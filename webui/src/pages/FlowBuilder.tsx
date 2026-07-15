@@ -7,6 +7,7 @@ import { ValidationPanel } from '../components/ValidationPanel';
 
 export function FlowBuilder() {
   const [showAIDraft, setShowAIDraft] = useState(false);
+  const [configuringNode, setConfiguringNode] = useState(false);
   const project = useStore((s) => s.project);
   const flow = useStore((s) => s.flow);
   const setFlow = useStore((s) => s.setFlow);
@@ -14,10 +15,15 @@ export function FlowBuilder() {
   const readOnly = useStore((s) => s.importStatus?.read_only ?? false);
 
   return (
-    <div className="canvas-layout">
+    <div className={`canvas-layout ${configuringNode && !showAIDraft ? 'configuring-node' : ''}`}>
       <Sidebar />
       <div className="canvas-container">
-        <FlowCanvas flow={flow} onChange={setFlow} readOnly={readOnly} />
+        <FlowCanvas
+          flow={flow}
+          onChange={setFlow}
+          readOnly={readOnly}
+          onInspectingChange={setConfiguringNode}
+        />
       </div>
       {showAIDraft && project ? (
         <AIDraftReviewPanel
@@ -28,7 +34,7 @@ export function FlowBuilder() {
           onClose={() => setShowAIDraft(false)}
         />
       ) : (
-        <ValidationPanel result={validation} onOpenAIDraft={() => setShowAIDraft(true)} />
+        !configuringNode && <ValidationPanel result={validation} onOpenAIDraft={() => setShowAIDraft(true)} />
       )}
     </div>
   );

@@ -14,7 +14,16 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from fnirs_flow.api.portability import find_absolute_path_records, is_trackable_bundle_path
+from fnirs_flow.api.portability import (
+    find_absolute_path_records,
+    is_trackable_bundle_path,
+    portable_json_value,
+)
+from fnirs_flow.filesystem import (
+    is_macos_metadata_path,
+    macos_metadata_ignore,
+    remove_macos_metadata_paths,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +86,8 @@ class ProjectBundleManager:
             # Use staging for atomic migration
             staging = staging_root / f"{project_id}-migration"
             try:
-                shutil.copytree(candidate, staging, dirs_exist_ok=True)
+                shutil.copytree(candidate, staging, dirs_exist_ok=True, ignore=macos_metadata_ignore)
+                self._portableize_legacy_staging(staging)
                 self.save_from_staging(
                     project_id, staging, reason="legacy_folder_migration", keep_previous=False
                 )
@@ -93,6 +103,20 @@ class ProjectBundleManager:
 
         return migrated
 
+    @staticmethod
+    def _portableize_legacy_staging(staging: Path) -> None:
+        """Strip runtime-only local paths from legacy folders before bundling."""
+        for path in sorted(staging.rglob("*.json")):
+            if is_macos_metadata_path(path.relative_to(staging)):
+                continue
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            portable = portable_json_value(payload)
+            if portable != payload:
+                path.write_text(json.dumps(portable, indent=2), encoding="utf-8")
+
     def read_bundle_header(self, bundle_path: Path) -> dict[str, Any]:
         """Read bounded project-list metadata without verifying or extracting payload files."""
         try:
@@ -102,6 +126,9 @@ class ProjectBundleManager:
                 names = archive.namelist()
                 if len(names) != len(set(names)):
                     raise ProjectBundleError("Project bundle contains duplicate paths")
+                for name in names:
+                    if name != BUNDLE_MANIFEST:
+                        self._validate_member_path(name)
                 if len(names) > MAX_BUNDLE_FILES:
                     raise ProjectBundleError("Project bundle contains too many files")
                 if BUNDLE_MANIFEST not in names:
@@ -132,7 +159,7 @@ class ProjectBundleManager:
         self.migrate_legacy_directories()
         projects: dict[str, dict[str, Any]] = {}
         for bundle in sorted(self.base_dir.glob(f"*{BUNDLE_SUFFIX}")):
-            if bundle.name.startswith("._"):
+            if is_macos_metadata_path(bundle.name):
                 continue
             project_id = bundle.name[: -len(BUNDLE_SUFFIX)]
             try:
@@ -203,6 +230,7 @@ class ProjectBundleManager:
         os.close(temp_fd)
         temp_path = Path(temp_name)
         try:
+            remove_macos_metadata_paths(workspace)
             file_manifest: dict[str, dict[str, Any]] = {}
             previous_files: dict[str, dict[str, Any]] = previous_manifest.get("files", {})
             # Try to open the previous bundle for copying unchanged entries
@@ -216,7 +244,10 @@ class ProjectBundleManager:
                 with zipfile.ZipFile(temp_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                     for source in self._iter_bundle_files(workspace):
                         relative = source.relative_to(workspace).as_posix()
-                        current_size = source.stat().st_size
+                        try:
+                            current_size = source.stat().st_size
+                        except OSError:
+                            continue
                         prev_entry = previous_files.get(relative)
                         # Change detection: skip re-read/re-compress if file is unchanged
                         if (prev_entry
@@ -292,6 +323,8 @@ class ProjectBundleManager:
                 # Some systems don't support fsync on directories
                 pass
 
+            remove_macos_metadata_paths(workspace)
+            remove_macos_metadata_paths(self.base_dir)
             self._prune_versions(project_id)
             return manifest
         finally:
@@ -377,7 +410,7 @@ class ProjectBundleManager:
         candidates.extend(
             path
             for path in version_dir.glob(f"*{BUNDLE_SUFFIX}")
-            if not path.name.startswith("._")
+            if not is_macos_metadata_path(path.name)
         )
         for path in candidates:
             try:
@@ -418,7 +451,7 @@ class ProjectBundleManager:
         self.verify(candidate, expected_project_id=project_id)
         # Clear target before extracting
         if target_dir.exists():
-            shutil.rmtree(target_dir)
+            shutil.rmtree(target_dir, ignore_errors=True)
         target_dir.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(candidate, "r") as archive:
             for name in archive.namelist():
@@ -435,7 +468,7 @@ class ProjectBundleManager:
         workspace = self.workspace_path(project_id)
         staging = self.workspace_root / f".{project_id}.extracting"
         if staging.exists():
-            shutil.rmtree(staging)
+            shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)
         try:
             with zipfile.ZipFile(bundle, "r") as archive:
@@ -448,12 +481,12 @@ class ProjectBundleManager:
                     with archive.open(name) as source, target.open("wb") as destination:
                         shutil.copyfileobj(source, destination)
             if workspace.exists():
-                shutil.rmtree(workspace)
+                shutil.rmtree(workspace, ignore_errors=True)
             staging.replace(workspace)
             return workspace
         finally:
             if staging.exists():
-                shutil.rmtree(staging)
+                shutil.rmtree(staging, ignore_errors=True)
 
     def read_manifest(self, bundle_path: Path) -> dict[str, Any]:
         try:
@@ -516,6 +549,7 @@ class ProjectBundleManager:
         temp_path = Path(temp_name)
 
         try:
+            remove_macos_metadata_paths(staging_dir)
             file_manifest: dict[str, dict[str, Any]] = {}
             with zipfile.ZipFile(temp_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 for source in self._iter_bundle_files(staging_dir):
@@ -579,8 +613,10 @@ class ProjectBundleManager:
             # Swap staging into workspace
             workspace = self.workspace_path(project_id)
             if workspace.exists():
-                shutil.rmtree(workspace)
+                shutil.rmtree(workspace, ignore_errors=True)
             shutil.move(str(staging_dir), str(workspace))
+            remove_macos_metadata_paths(workspace)
+            remove_macos_metadata_paths(self.base_dir)
 
             self._prune_versions(project_id)
             return manifest
@@ -616,7 +652,7 @@ class ProjectBundleManager:
         versions = sorted(
             path
             for path in (self.version_root / project_id).glob(f"*{BUNDLE_SUFFIX}")
-            if not path.name.startswith("._") and not path.name.startswith("corrupt-")
+            if not is_macos_metadata_path(path.name) and not path.name.startswith("corrupt-")
         )
         for obsolete in versions[: max(0, len(versions) - self.retained_versions)]:
             obsolete.unlink(missing_ok=True)
@@ -630,7 +666,7 @@ class ProjectBundleManager:
     def _highest_retained_revision(self, project_id: str) -> int:
         revisions = []
         for path in (self.version_root / project_id).glob(f"revision-*{BUNDLE_SUFFIX}"):
-            if path.name.startswith("._"):
+            if is_macos_metadata_path(path.name):
                 continue
             try:
                 revisions.append(int(path.name.removeprefix("revision-").removesuffix(BUNDLE_SUFFIX)))
@@ -645,10 +681,13 @@ class ProjectBundleManager:
         for path in sorted(workspace.rglob("*")):
             if path.is_symlink():
                 raise ProjectBundleError(f"Managed project contains a symbolic link: {path}")
-            if not path.is_file():
-                continue
             relative = path.relative_to(workspace)
-            if any(part.startswith("._") or part in {".DS_Store", ".git"} for part in relative.parts):
+            if is_macos_metadata_path(relative) or any(part == ".git" for part in relative.parts):
+                continue
+            try:
+                if not path.is_file():
+                    continue
+            except OSError:
                 continue
             relative_posix = PurePosixPath(relative.as_posix())
             if not is_trackable_bundle_path(relative_posix):
@@ -658,7 +697,10 @@ class ProjectBundleManager:
                 raise ProjectBundleError(
                     f"Machine-local absolute path in {relative_posix.as_posix()}: {findings[0]}"
                 )
-            member_size = path.stat().st_size
+            try:
+                member_size = path.stat().st_size
+            except OSError:
+                continue
             if member_size > MAX_MEMBER_BYTES:
                 raise ProjectBundleError(
                     f"Single file exceeds the 8 MiB per-member limit: {relative_posix.as_posix()} ({member_size} bytes)"
@@ -682,6 +724,8 @@ class ProjectBundleManager:
         path = PurePosixPath(name)
         if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
             raise ProjectBundleError(f"Unsafe path in project bundle: {name!r}")
+        if is_macos_metadata_path(path):
+            raise ProjectBundleError(f"macOS metadata file is not allowed in project bundle: {name!r}")
 
     @staticmethod
     def _verify_history_integrity(archive: zipfile.ZipFile, names: list[str]) -> None:

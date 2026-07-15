@@ -83,6 +83,10 @@ button {
   gap: 8px;
 }
 
+.rail-more {
+  position: relative;
+}
+
 .rail-nav button:hover:not(:disabled),
 .rail-nav button.active {
   background: rgba(255, 255, 255, 0.11);
@@ -93,6 +97,39 @@ button {
 .rail-nav button:disabled {
   opacity: 0.28;
   cursor: not-allowed;
+}
+
+.rail-more-menu {
+  position: absolute;
+  top: 0;
+  left: 46px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 168px;
+  padding: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  background: #111827;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.28);
+}
+
+.rail-more-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.rail-more-menu button span {
+  font-size: 0.82rem;
+  font-weight: 650;
 }
 
 .app-workbench {
@@ -300,6 +337,10 @@ button {
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--validation-width);
   height: 100%;
   min-height: 0;
+}
+
+.canvas-layout.configuring-node {
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 0;
 }
 
 .canvas-container {
@@ -828,6 +869,103 @@ pre {
   font-size: 1rem;
 }
 
+.workflow-stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workflow-stepper button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.workflow-stepper button > span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.workflow-stepper button.active {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #eff6ff;
+}
+
+.workflow-stepper button.done {
+  border-color: #bbf7d0;
+  color: var(--success);
+  background: #f0fdf4;
+}
+
+.workflow-panel {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
+}
+
+.ready-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.readiness-checklist {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.readiness-checklist.compact-list {
+  margin: 10px 0 0;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.check-item.done {
+  color: var(--success);
+}
+
+.run-empty-guide {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.run-empty-guide .readiness-checklist {
+  justify-items: start;
+}
+
+.metadata-grid.advanced {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 .metadata-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -1158,6 +1296,35 @@ pre {
   color: var(--error);
 }
 
+.validation-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.validation-hero.valid {
+  background: #f0fdf4;
+  color: var(--success);
+}
+
+.validation-hero.invalid {
+  background: #fef2f2;
+  color: var(--error);
+}
+
+.validation-hero h3 {
+  margin: 7px 0 3px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.validation-hero p {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
 .errors-section,
 .warnings-section,
 .risks-section {
@@ -1185,6 +1352,65 @@ pre {
 .error-item {
   background: #fef2f2;
   color: var(--error);
+}
+
+.validation-issue-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.validation-issue-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.validation-issue-group-title span {
+  margin-left: auto;
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  text-align: center;
+}
+
+.validation-fix-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 7px;
+  background: white;
+}
+
+.validation-fix-card > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.validation-fix-card p,
+.validation-fix-card small {
+  grid-column: 1 / -1;
+}
+
+.validation-fix-card p {
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.validation-fix-card small {
+  color: var(--text-secondary);
+}
+
+.validation-fix-card button {
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .warning-item {
@@ -2592,6 +2818,54 @@ pre {
   border-radius: 5px;
   background: white;
   color: var(--text);
+}
+
+.ai-settings-subpanel {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: white;
+}
+
+.ai-settings-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 9px;
+  border: 0;
+  background: white;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.ai-settings-toggle strong {
+  font-size: 0.76rem;
+}
+
+.ai-settings-toggle em {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-subtle);
+}
+
+.ai-settings-grid .span-2 {
+  grid-column: 1 / -1;
 }
 
 .ai-review-section p,

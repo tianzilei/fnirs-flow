@@ -15,6 +15,7 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+from fnirs_flow.filesystem import is_visible_data_file  # noqa: E402
 
 DEFAULT_REFERENCE = PROJECT_ROOT / "outputs" / "ds007738_golden_path"
 DEFAULT_RERUN = PROJECT_ROOT / "outputs" / "ds007738_cross_env_v1"
@@ -51,7 +52,7 @@ def result_json_files(root: Path) -> dict[str, Path]:
     for relative_dir in ("derivatives/channel", "derivatives/roi", "derivatives/group"):
         directory = root / relative_dir
         for path in directory.glob("*.json"):
-            if not path.name.startswith("._"):
+            if is_visible_data_file(path, root=root):
                 files[path.relative_to(root).as_posix()] = path
     return files
 

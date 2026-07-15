@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import {
   AIDraftFlow,
   AIDraftScenario,
@@ -24,11 +24,18 @@ interface AIDraftReviewPanelProps {
 const SCENARIOS: Array<{ value: AIDraftScenario; label: string }> = [
   { value: 'task', label: 'Task GLM' },
   { value: 'resting_state', label: 'Resting state' },
-  { value: 'machine_learning', label: 'Machine learning' },
-  { value: 'real_world', label: 'Real world' },
-  { value: 'hyperscanning', label: 'Hyperscanning' },
-  { value: 'multi_site', label: 'Multi-site' },
 ];
+
+const DEFAULT_AI_BASE_URL = 'https://api.openai.com/v1';
+const DEFAULT_AI_MODEL = 'gpt-5-mini';
+const DRAFT_STEPS = [
+  { id: 'generate', label: 'Generate' },
+  { id: 'validate', label: 'Validate' },
+  { id: 'review', label: 'Review' },
+  { id: 'apply', label: 'Apply' },
+] as const;
+
+type DraftStep = typeof DRAFT_STEPS[number]['id'];
 
 function recordId(item: Record<string, unknown>, index: number): string {
   return typeof item.id === 'string' ? item.id : `item-${index + 1}`;
@@ -69,10 +76,22 @@ export function AIDraftReviewPanel({
   const [studyName, setStudyName] = useState(projectName);
   const [dataFormat, setDataFormat] = useState('snirf');
   const [conditions, setConditions] = useState('');
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [aiMode, setAiMode] = useState<'template' | 'openai-compatible'>('template');
+  const [aiProvider, setAiProvider] = useState('OpenAI compatible');
+  const [aiBaseUrl, setAiBaseUrl] = useState(DEFAULT_AI_BASE_URL);
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [aiModel, setAiModel] = useState(DEFAULT_AI_MODEL);
+  const [aiOrganization, setAiOrganization] = useState('');
+  const [aiProject, setAiProject] = useState('');
+  const [aiTemperature, setAiTemperature] = useState(0.2);
+  const [aiMaxTokens, setAiMaxTokens] = useState(4096);
+  const [aiTimeoutSeconds, setAiTimeoutSeconds] = useState(60);
   const [draft, setDraft] = useState<AIDraftFlow | null>(null);
   const [validation, setValidation] = useState<AIDraftValidation | null>(null);
   const [confirmedItems, setConfirmedItems] = useState<Set<string>>(new Set());
   const [reviewer, setReviewer] = useState('');
+  const [draftStep, setDraftStep] = useState<DraftStep>('generate');
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +107,7 @@ export function AIDraftReviewPanel({
         setDraft(pending);
         const confirmed = pending?.metadata.ai_generation.confirmed_parameters ?? [];
         setConfirmedItems(new Set(confirmed));
+        if (pending) setDraftStep('validate');
       })
       .catch((loadError) => active && setError(formatApiError(loadError)))
       .finally(() => active && setLoading(false));
@@ -110,10 +130,23 @@ export function AIDraftReviewPanel({
         study_name: studyName.trim(),
         data_format: dataFormat.trim() || 'snirf',
         conditions: conditions.split(',').map((item) => item.trim()).filter(Boolean),
+        ai_settings: {
+          mode: aiMode,
+          provider: aiProvider.trim() || 'OpenAI compatible',
+          base_url: aiBaseUrl.trim() || DEFAULT_AI_BASE_URL,
+          api_key_present: aiApiKey.trim().length > 0,
+          model: aiModel.trim() || DEFAULT_AI_MODEL,
+          organization: aiOrganization.trim() || undefined,
+          project: aiProject.trim() || undefined,
+          temperature: aiTemperature,
+          max_tokens: aiMaxTokens,
+          timeout_seconds: aiTimeoutSeconds,
+        },
       });
       setDraft(generated);
       setValidation(null);
       setConfirmedItems(new Set(generated.metadata.ai_generation.confirmed_parameters ?? []));
+      setDraftStep('validate');
       setNotice('Draft generated in isolation. The current flow is unchanged.');
     } catch (generateError) {
       setError(formatApiError(generateError));
@@ -127,6 +160,7 @@ export function AIDraftReviewPanel({
       setWorking(true);
       setError(null);
       setValidation(await validateProjectAIDraft(projectId));
+      setDraftStep('review');
     } catch (validateError) {
       setError(formatApiError(validateError));
     } finally {
@@ -154,6 +188,7 @@ export function AIDraftReviewPanel({
       setDraft(null);
       setValidation(null);
       setConfirmAction(null);
+      setDraftStep('generate');
       setNotice('Reviewed draft applied to the current flow. Validate before compiling.');
     } catch (applyError) {
       setError(formatApiError(applyError));
@@ -171,6 +206,7 @@ export function AIDraftReviewPanel({
       setValidation(null);
       setConfirmedItems(new Set());
       setConfirmAction(null);
+      setDraftStep('generate');
       setNotice('Pending AI draft discarded. The current flow was not changed.');
     } catch (discardError) {
       setError(formatApiError(discardError));
@@ -193,6 +229,29 @@ export function AIDraftReviewPanel({
 
       {!loading && (
         <div className="ai-draft-content">
+          <div className="workflow-stepper ai-stepper">
+            {DRAFT_STEPS.map((step, index) => {
+              const done = (
+                (step.id === 'generate' && !!draft)
+                || (step.id === 'validate' && !!validation)
+                || (step.id === 'review' && allConfirmed)
+                || (step.id === 'apply' && canApply)
+              );
+              return (
+                <button
+                  key={step.id}
+                  className={`${draftStep === step.id ? 'active' : ''} ${done ? 'done' : ''}`}
+                  onClick={() => setDraftStep(step.id)}
+                  disabled={step.id !== 'generate' && !draft}
+                >
+                  {done ? <CheckCircle2 size={14} /> : <span>{index + 1}</span>}
+                  {step.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {draftStep === 'generate' && (
           <section className="ai-review-section">
             <h4>Generate candidate</h4>
             <label>Scenario
@@ -205,15 +264,92 @@ export function AIDraftReviewPanel({
             <label>Conditions (comma-separated)
               <input value={conditions} onChange={(event) => setConditions(event.target.value)} placeholder="left, right" />
             </label>
+            <div className="ai-settings-subpanel">
+              <button
+                type="button"
+                className="ai-settings-toggle"
+                onClick={() => setAiSettingsOpen((open) => !open)}
+                aria-expanded={aiSettingsOpen}
+              >
+                <span>{aiSettingsOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}</span>
+                <strong>AI API settings</strong>
+                <em>{aiMode === 'template' ? 'Template mode' : aiModel || 'OpenAI-compatible'}</em>
+              </button>
+              {aiSettingsOpen && (
+                <div className="ai-settings-grid">
+                  <label>Mode
+                    <select value={aiMode} onChange={(event) => setAiMode(event.target.value as 'template' | 'openai-compatible')}>
+                      <option value="template">Template mode</option>
+                      <option value="openai-compatible">OpenAI-compatible</option>
+                    </select>
+                  </label>
+                  <label>Provider
+                    <input value={aiProvider} onChange={(event) => setAiProvider(event.target.value)} placeholder="OpenAI compatible" />
+                  </label>
+                  <label className="span-2">Base URL
+                    <input value={aiBaseUrl} onChange={(event) => setAiBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" />
+                  </label>
+                  <label className="span-2">API key
+                    <input
+                      value={aiApiKey}
+                      onChange={(event) => setAiApiKey(event.target.value)}
+                      placeholder="sk-..."
+                      type="password"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label>Model
+                    <input value={aiModel} onChange={(event) => setAiModel(event.target.value)} placeholder={DEFAULT_AI_MODEL} />
+                  </label>
+                  <label>Temperature
+                    <input
+                      value={aiTemperature}
+                      onChange={(event) => setAiTemperature(Number(event.target.value))}
+                      type="number"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                    />
+                  </label>
+                  <label>Max tokens
+                    <input
+                      value={aiMaxTokens}
+                      onChange={(event) => setAiMaxTokens(Number(event.target.value))}
+                      type="number"
+                      min="1"
+                      step="1"
+                    />
+                  </label>
+                  <label>Timeout seconds
+                    <input
+                      value={aiTimeoutSeconds}
+                      onChange={(event) => setAiTimeoutSeconds(Number(event.target.value))}
+                      type="number"
+                      min="1"
+                      step="1"
+                    />
+                  </label>
+                  <label>Organization
+                    <input value={aiOrganization} onChange={(event) => setAiOrganization(event.target.value)} placeholder="optional" />
+                  </label>
+                  <label>Project
+                    <input value={aiProject} onChange={(event) => setAiProject(event.target.value)} placeholder="optional" />
+                  </label>
+                  <p className="ai-safety-note span-2">Current generation still uses the built-in template workflow. The API key stays in this browser session and is not saved into the Flow.</p>
+                </div>
+              )}
+            </div>
             <button className="primary-button full-width" onClick={handleGenerate} disabled={working}>
               {working ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
               {draft ? 'Replace pending draft' : 'Generate draft'}
             </button>
             <p className="ai-safety-note">Generation stores a pending FlowGraph only. It never runs code or overwrites the current flow.</p>
           </section>
+          )}
 
           {draft && ai && diff ? (
             <>
+              {draftStep === 'validate' && (
               <section className="ai-review-section draft-summary">
                 <div className="section-title-row"><h4>Candidate summary</h4><code>{draft.flow_id}</code></div>
                 <strong>{draft.name}</strong>
@@ -224,7 +360,9 @@ export function AIDraftReviewPanel({
                   <span><strong>{ai.model}</strong> model</span>
                 </div>
               </section>
+              )}
 
+              {draftStep === 'review' && (
               <section className="ai-review-section">
                 <h4>Diff from current flow</h4>
                 <div className="diff-grid">
@@ -237,12 +375,16 @@ export function AIDraftReviewPanel({
                 {diff.removed.length > 0 ? <p><strong>Removed:</strong> {diff.removed.join(', ')}</p> : null}
                 {diff.changed.length > 0 ? <p><strong>Changed:</strong> {diff.changed.join(', ')}</p> : null}
               </section>
+              )}
 
+              {draftStep === 'review' && (
               <section className="ai-review-section">
                 <h4>Assumptions</h4>
                 <ul>{ai.assumptions.map((item) => <li key={item}>{item}</li>)}</ul>
               </section>
+              )}
 
+              {draftStep === 'validate' && (
               <section className="ai-review-section">
                 <div className="section-title-row"><h4>Validation & risks</h4>
                   <button className="ghost-button compact" onClick={handleValidate} disabled={working}>Validate draft</button>
@@ -263,7 +405,9 @@ export function AIDraftReviewPanel({
                   </div>
                 )}
               </section>
+              )}
 
+              {draftStep === 'review' && (
               <section className="ai-review-section confirmations">
                 <h4>Human confirmations</h4>
                 {required.length === 0 ? <p>No explicit high-impact confirmations were generated.</p> : required.map((item) => (
@@ -277,6 +421,19 @@ export function AIDraftReviewPanel({
                 </label>
                 <p className="ai-safety-note">Applying records the reviewer, timestamp, and exact confirmations. Remaining validation risks still block compile or execution.</p>
               </section>
+              )}
+
+              {draftStep === 'apply' && (
+              <section className="ai-review-section">
+                <h4>Apply reviewed draft</h4>
+                <p>{canApply ? 'All required confirmations are complete.' : 'Complete every confirmation and reviewer field before applying.'}</p>
+                <div className="draft-metrics">
+                  <span><strong>{draft.nodes.length}</strong> atoms</span>
+                  <span><strong>{draft.edges.length}</strong> links</span>
+                  <span><strong>{confirmedItems.size}/{required.length}</strong> confirmations</span>
+                </div>
+              </section>
+              )}
 
               <div className="ai-draft-actions">
                 <button className="ghost-button danger" onClick={() => setConfirmAction('discard')} disabled={working}>

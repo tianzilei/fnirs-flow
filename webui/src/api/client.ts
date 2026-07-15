@@ -70,6 +70,12 @@ export interface CompileResult {
   steps: number;
   layers: number;
   output_files: string[];
+  dag_layers?: Array<Array<{
+    id: string;
+    atom_type?: string;
+    node_type?: string;
+    operation?: string;
+  }>>;
 }
 
 export interface DiscoverResult {
@@ -79,6 +85,23 @@ export interface DiscoverResult {
   local_root: string;
   source_url: string;
   metadata_tables: number;
+}
+
+export interface DatasetEntry {
+  dataset_id: string;
+  name: string;
+  source_kind: string;
+  url: string;
+  doi: string;
+  citation: string;
+  license: string;
+  description: string;
+  folder_name: string;
+}
+
+export async function listDatasets(): Promise<DatasetEntry[]> {
+  const { data } = await api.get('/datasets');
+  return data;
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -118,6 +141,7 @@ export async function compileFlow(projectId: string): Promise<CompileResult> {
 export async function discoverData(projectId: string, datasetId: string): Promise<DiscoverResult> {
   const { data } = await api.post(`/projects/${projectId}/discover-data`, null, {
     params: { dataset_id: datasetId },
+    timeout: 120000,
   });
   return data;
 }
@@ -586,6 +610,18 @@ export interface AIGenerationMetadata {
   confirmed_by: string;
   confirmed_at: string;
   not_used_for_execution: boolean;
+  settings?: {
+    provider?: string;
+    base_url?: string;
+    model?: string;
+    organization?: string;
+    project?: string;
+    temperature?: number;
+    max_tokens?: number;
+    timeout_seconds?: number;
+    api_key_present?: boolean;
+    mode?: string;
+  };
 }
 
 export interface AIDraftFlow extends Record<string, unknown> {
@@ -605,6 +641,18 @@ export interface GenerateAIDraftRequest {
   study_name?: string;
   data_format?: string;
   conditions?: string[];
+  ai_settings?: {
+    mode: 'template' | 'openai-compatible';
+    provider: string;
+    base_url: string;
+    api_key_present?: boolean;
+    model: string;
+    organization?: string;
+    project?: string;
+    temperature: number;
+    max_tokens: number;
+    timeout_seconds: number;
+  };
 }
 
 export interface DraftReadiness {

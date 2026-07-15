@@ -1,5 +1,6 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useShallow } from 'zustand/react/shallow';
 import {
   AlertTriangle,
   Boxes,
@@ -11,6 +12,7 @@ import {
   FlaskConical,
   FolderKanban,
   Loader2,
+  MoreHorizontal,
   Play,
   Save,
   Settings,
@@ -27,10 +29,14 @@ const navItems: Array<{ id: NavId; label: string; icon: typeof FolderKanban }> =
   { id: 'flow', label: 'Flow', icon: Boxes },
   { id: 'data', label: 'Data', icon: Database },
   { id: 'checks', label: 'Checks', icon: FileCheck2 },
+  { id: 'compile', label: 'Compile', icon: FileCheck2 },
   { id: 'runs', label: 'Runs', icon: Play },
   { id: 'results', label: 'Results', icon: CheckCircle2 },
-  { id: 'compile', label: 'Compile', icon: FileCheck2 },
   { id: 'package', label: 'Export', icon: Download },
+];
+
+const moreNavItems: Array<{ id: NavId; label: string; icon: typeof FolderKanban }> = [
+  { id: 'atoms', label: 'Atom Library', icon: Boxes },
   { id: 'import', label: 'Import', icon: Download },
   { id: 'system', label: 'System', icon: Settings },
 ];
@@ -39,19 +45,18 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { id: projectId } = useParams();
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const project = useStore((s) => s.project);
   const loading = useStore((s) => s.loading);
   const error = useStore((s) => s.error);
   const clearError = useStore((s) => s.clearError);
-  const projectStatus = useStore((s) => s.projectStatus);
+  const status = useStore(useShallow((s) => s.projectStatus()));
   const saveFlow = useStore((s) => s.saveFlow);
   const validate = useStore((s) => s.validate);
   const compile = useStore((s) => s.compile);
   const execute = useStore((s) => s.execute);
   const readOnly = useStore((s) => s.importStatus?.read_only ?? false);
-
-  const status = projectStatus();
 
   // Auto-load project when URL has :id
   const selectProject = useStore((s) => s.selectProject);
@@ -94,17 +99,20 @@ export function AppShell() {
   }, [location.pathname, projectId]);
 
   const activeNav = getActiveNav();
+  const moreActive = moreNavItems.some((item) => item.id === activeNav);
   const isSuccessNotice = error
     ? ['Fork created', 'Flow saved', 'Execution cancelled'].includes(error.message)
     : false;
 
   const handleNavClick = (navId: NavId) => {
+    setMoreOpen(false);
     if (navId === 'projects') {
       navigate('/projects');
     } else if (navId === 'system') {
       navigate('/system');
-    } else if (projectId) {
-      navigate(`/projects/${projectId}/${navId}`);
+    } else {
+      const targetProjectId = projectId || project?.id;
+      if (targetProjectId) navigate(`/projects/${targetProjectId}/${navId}`);
     }
   };
 
@@ -138,6 +146,38 @@ export function AppShell() {
               </button>
             );
           })}
+          <div className="rail-more">
+            <button
+              className={moreActive || moreOpen ? 'active' : ''}
+              onClick={() => setMoreOpen((open) => !open)}
+              title="More"
+              aria-label="More navigation"
+              aria-expanded={moreOpen}
+            >
+              <MoreHorizontal size={18} />
+            </button>
+            {moreOpen && (
+              <div className="rail-more-menu" role="menu">
+                {moreNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const disabled = !canOpen(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      className={activeNav === item.id ? 'active' : ''}
+                      onClick={() => !disabled && handleNavClick(item.id)}
+                      disabled={disabled}
+                      role="menuitem"
+                      aria-current={activeNav === item.id ? 'page' : undefined}
+                    >
+                      <Icon size={16} />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </nav>
       </aside>
 

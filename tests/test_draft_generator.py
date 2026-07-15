@@ -21,6 +21,15 @@ class TestDraftGenerator:
             assert "type" in node
             assert "label" in node
 
+    def test_task_scenario_uses_executable_default_templates(self):
+        flow = generate_draft_flow("task")
+        node_ids = {node["id"] for node in flow["nodes"]}
+        template_ids = {node["template_id"] for node in flow["nodes"]}
+        assert "n_read_run" in node_ids
+        assert "tddr_motion_correction" in template_ids
+        assert "bandpass_filter" in template_ids
+        assert all(node["readiness_status"] != "not_configured" for node in flow["nodes"])
+
     def test_required_atoms_connect_only_compatible_ports(self):
         flow = generate_draft_flow("task")
         nodes = {node["id"]: node for node in flow["nodes"]}
@@ -41,6 +50,36 @@ class TestDraftGenerator:
     def test_task_draft_has_no_schema_or_graph_errors(self):
         report = validate_flow(generate_draft_flow("task"))
         assert report.errors == []
+        assert report.warnings == []
+
+    def test_task_draft_has_no_fatal_risks_after_human_confirmation(self):
+        flow = generate_draft_flow("task")
+        ai = flow["metadata"]["ai_generation"]
+        ai["confirmed_parameters"] = list(ai["requires_user_confirmation"])
+        ai["confirmed_by"] = "reviewer"
+        ai["confirmed_at"] = "2026-07-15T00:00:00+00:00"
+        ai["not_used_for_execution"] = False
+        report = validate_flow(flow)
+        assert [risk.message for risk in report.risks if risk.severity == "fatal"] == []
+
+    def test_supported_non_task_scenario_includes_run_reader(self):
+        flow = generate_draft_flow("resting_state")
+        node_ids = {node["id"] for node in flow["nodes"]}
+        assert "n_read_run" in node_ids
+        assert "n_optical_density" in node_ids
+
+        report = validate_flow(flow)
+        assert report.warnings == []
+
+    def test_missing_required_templates_fail_explicitly(self):
+        for scenario in ("real_world", "multi_site"):
+            with pytest.raises(ValueError, match="unavailable required MethodAtom templates"):
+                generate_draft_flow(scenario)
+
+    def test_scenarios_with_external_required_inputs_fail_explicitly(self):
+        for scenario in ("machine_learning", "hyperscanning"):
+            with pytest.raises(ValueError, match="requires inputs not available"):
+                generate_draft_flow(scenario)
 
     def test_high_impact_atoms_marked_for_review(self):
         flow = generate_draft_flow("task")

@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { CheckCircle2 } from 'lucide-react';
+import { formatApiError, listDatasets } from '../api/client';
 import { useStore } from '../store';
 
 interface Dataset {
   id: string;
   name: string;
   description: string;
+  sourceKind?: string;
 }
 
 const PREVIEW_COLUMN_LIMIT = 12;
@@ -14,6 +17,15 @@ const JOIN_LIST_LIMIT = 12;
 const DEFAULT_DATASETS: Dataset[] = [
   { id: 'mne-fnirs-motor', name: 'MNE fNIRS Motor Task', description: 'Finger tapping experiment' },
 ];
+
+const DATA_STEPS = [
+  { id: 'dataset', label: 'Dataset' },
+  { id: 'participants', label: 'Participants' },
+  { id: 'join', label: 'Join Preview' },
+  { id: 'ready', label: 'Ready' },
+] as const;
+
+type DataStep = typeof DATA_STEPS[number]['id'];
 
 function formatMetadataValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return 'blank';
@@ -27,7 +39,11 @@ export function DataWorkspace() {
   const importParticipantTable = useStore((s) => s.importParticipantTable);
   const discoverResult = useStore((s) => s.discoverResult);
   const participantTableResult = useStore((s) => s.participantTableResult);
+  const [activeStep, setActiveStep] = useState<DataStep>('dataset');
   const [selectedDataset, setSelectedDataset] = useState('');
+  const [datasets, setDatasets] = useState<Dataset[]>(DEFAULT_DATASETS);
+  const [datasetsLoading, setDatasetsLoading] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [participantPath, setParticipantPath] = useState('');
   const [idColumn, setIdColumn] = useState('participant_id');
   const [includeColumn, setIncludeColumn] = useState('include');
@@ -54,6 +70,41 @@ export function DataWorkspace() {
   });
   const joinPreview = participantTableResult?.validation_report.join_preview;
 
+  useEffect(() => {
+    if (participantTableResult) setActiveStep('join');
+    else if (discoverResult) setActiveStep('participants');
+  }, [discoverResult, participantTableResult]);
+
+  useEffect(() => {
+    let active = true;
+    setDatasetsLoading(true);
+    listDatasets()
+      .then((entries) => {
+        if (!active) return;
+        const nextDatasets = entries.map((entry) => ({
+          id: entry.dataset_id,
+          name: entry.name,
+          description: entry.description || entry.url || entry.source_kind,
+          sourceKind: entry.source_kind,
+        }));
+        if (nextDatasets.length > 0) {
+          setDatasets(nextDatasets);
+          setSelectedDataset((current) => current || nextDatasets[0].id);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setError(formatApiError(err));
+        }
+      })
+      .finally(() => {
+        if (active) setDatasetsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleDiscover = async () => {
     if (!selectedDataset) return;
     setLoading(true);
@@ -61,7 +112,7 @@ export function DataWorkspace() {
     try {
       await discover(selectedDataset);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Discovery failed');
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
@@ -88,7 +139,7 @@ export function DataWorkspace() {
         participant_role_column: participantRoleColumn.trim() || 'participant_role',
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Participant table import failed');
+      setError(formatApiError(err));
     } finally {
       setMetadataLoading(false);
     }
@@ -101,41 +152,74 @@ export function DataWorkspace() {
           <span className="page-kicker">Dataset</span>
           <h2>Data Workspace</h2>
         </div>
-        <div className="page-actions">
-          <button className="primary-button" onClick={handleDiscover} disabled={!selectedDataset || loading}>
-            {loading ? 'Discovering...' : 'Discover Dataset'}
-          </button>
-        </div>
       </section>
 
-      <div className="dataset-selector">
-        <div className="dataset-list">
-          {DEFAULT_DATASETS.map((ds) => (
-            <div
-              key={ds.id}
-              role="button"
-              tabIndex={0}
-              className={`dataset-card ${selectedDataset === ds.id ? 'selected' : ''}`}
-              onClick={() => setSelectedDataset(ds.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setSelectedDataset(ds.id);
-                }
-              }}
+      <div className="workflow-stepper data-stepper">
+        {DATA_STEPS.map((step, index) => {
+          const done = (
+            (step.id === 'dataset' && !!discoverResult)
+            || (step.id === 'participants' && !!participantTableResult)
+            || (step.id === 'join' && !!participantTableResult)
+            || (step.id === 'ready' && !!participantTableResult && (joinPreview?.matched_subjects.length || 0) > 0)
+          );
+          return (
+            <button
+              key={step.id}
+              className={`${activeStep === step.id ? 'active' : ''} ${done ? 'done' : ''}`}
+              onClick={() => setActiveStep(step.id)}
             >
-              <h4>{ds.name}</h4>
-              <p>{ds.description}</p>
-            </div>
-          ))}
-        </div>
+              {done ? <CheckCircle2 size={14} /> : <span>{index + 1}</span>}
+              {step.label}
+            </button>
+          );
+        })}
       </div>
 
       {error && <div className="error-message">{error}</div>}
 
-      <section className="metadata-import">
+      {activeStep === 'dataset' && (
+        <section className="workflow-panel">
+          <div className="section-heading">
+            <div>
+              <h3>Select and Discover Dataset</h3>
+              <p className="muted">Choose a registered dataset, then discover local files and run metadata.</p>
+            </div>
+            <button className="primary-button" onClick={handleDiscover} disabled={!selectedDataset || loading}>
+              {loading ? 'Discovering...' : 'Discover Dataset'}
+            </button>
+          </div>
+          {datasetsLoading && <div className="panel-state">Loading registered datasets...</div>}
+          <div className="dataset-list">
+            {datasets.map((ds) => (
+              <div
+                key={ds.id}
+                role="button"
+                tabIndex={0}
+                className={`dataset-card ${selectedDataset === ds.id ? 'selected' : ''}`}
+                onClick={() => setSelectedDataset(ds.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedDataset(ds.id);
+                  }
+                }}
+              >
+                <h4>{ds.name}</h4>
+                <p>{ds.description}</p>
+                {ds.sourceKind && <span className="dataset-source">{ds.sourceKind}</span>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {activeStep === 'participants' && (
+      <section className="metadata-import workflow-panel">
         <div className="section-heading">
-          <h3>Participant Metadata</h3>
+          <div>
+            <h3>Import Participant Metadata</h3>
+            <p className="muted">Start with the table path and core identity columns. Advanced roles can stay at defaults.</p>
+          </div>
           <button className="primary-button" onClick={handleImportParticipantTable} disabled={!participantPath.trim() || metadataLoading}>
             {metadataLoading ? 'Importing...' : 'Import Table'}
           </button>
@@ -161,6 +245,12 @@ export function DataWorkspace() {
             Group column
             <input value={groupColumn} onChange={(event) => setGroupColumn(event.target.value)} />
           </label>
+        </div>
+        <button className="ghost-button compact" onClick={() => setAdvancedOpen((open) => !open)}>
+          {advancedOpen ? 'Hide advanced column roles' : 'Show advanced column roles'}
+        </button>
+        {advancedOpen && (
+        <div className="metadata-grid advanced">
           <label>
             Label column
             <input value={labelColumn} onChange={(event) => setLabelColumn(event.target.value)} />
@@ -198,9 +288,11 @@ export function DataWorkspace() {
             <input value={participantRoleColumn} onChange={(event) => setParticipantRoleColumn(event.target.value)} />
           </label>
         </div>
+        )}
       </section>
+      )}
 
-      {discoverResult && (
+      {activeStep === 'join' && discoverResult && (
         <div className="discovery-result">
           <h3>Discovery Result</h3>
           <dl>
@@ -230,7 +322,7 @@ export function DataWorkspace() {
         </div>
       )}
 
-      {participantTableResult && (
+      {activeStep === 'join' && participantTableResult && (
         <div className="discovery-result">
           <h3>Participant Table</h3>
           <dl>
@@ -369,6 +461,23 @@ export function DataWorkspace() {
             )}
           </div>
         </div>
+      )}
+
+      {activeStep === 'ready' && (
+        <section className="workflow-panel ready-panel">
+          <CheckCircle2 size={24} />
+          <div>
+            <h3>{participantTableResult ? 'Data workspace is configured' : 'Finish participant import to continue'}</h3>
+            <p className="muted">
+              {participantTableResult
+                ? `${joinPreview?.matched_subjects.length || 0} subject(s) matched. Continue to compile when the flow is valid.`
+                : 'Import participant metadata and review the join preview before running the analysis.'}
+            </p>
+          </div>
+          <button className="ghost-button" onClick={() => setActiveStep(participantTableResult ? 'join' : 'participants')}>
+            Review details
+          </button>
+        </section>
       )}
     </div>
   );

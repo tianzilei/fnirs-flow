@@ -87,6 +87,51 @@ test('parameter edits persist across save and browser refresh', async ({ page })
   await expect(page.locator('.param-row').filter({ hasText: 'high_pass' }).locator('input')).toHaveValue('0.02');
 });
 
+test('selected canvas node can be deleted with keyboard', async ({ page }) => {
+  const flowState = {
+    value: {
+      flow_id: 'flow-1',
+      nodes: [
+        {
+          id: 'loader-1',
+          atom_type: 'load_snirf',
+          operation: 'load_snirf',
+          category: 'data',
+          position: { x: 0, y: 0 },
+          output_ports: [{ name: 'raw', schema: 'RawNIRS' }],
+        },
+        {
+          id: 'filter-1',
+          atom_type: 'filtering',
+          operation: 'filtering',
+          category: 'preprocessing',
+          position: { x: 180, y: 0 },
+          input_ports: [{ name: 'raw', schema: 'RawNIRS' }],
+          output_ports: [{ name: 'filtered', schema: 'RawNIRS' }],
+        },
+      ],
+      edges: [{ id: 'edge-1', source: 'loader-1', target: 'filter-1' }],
+    },
+  };
+  await installProjectApi(page, flowState);
+  await page.goto('/projects/p1/flow?node=filter-1');
+
+  await expect(page.locator('.canvas-status-pill')).toContainText('2 atoms');
+  await expect(page.locator('.canvas-status-pill')).toContainText('1 links');
+  await expect(page.locator('.inspection-panel')).toBeVisible();
+
+  await page.keyboard.press('Delete');
+
+  await expect(page.getByText('filtering', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.canvas-status-pill')).toContainText('1 atoms');
+  await expect(page.locator('.canvas-status-pill')).toContainText('0 links');
+
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Flow saved')).toBeVisible();
+  expect((flowState.value.nodes as Array<Record<string, unknown>>).map((node) => node.id)).toEqual(['loader-1']);
+  expect(flowState.value.edges).toEqual([]);
+});
+
 test('imported package can be relinked, trusted, and forked', async ({ page }) => {
   let imported = false;
   let quarantined = ['custom-glm'];

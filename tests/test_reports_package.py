@@ -9,7 +9,7 @@ import zipfile
 import pytest
 
 from fnirs_flow.exporters.package_exporter import export_package, get_package_contents
-from fnirs_flow.exporters.package_importer import check_package_integrity, import_package
+from fnirs_flow.exporters.package_importer import check_package_integrity, fork_package, import_package
 from fnirs_flow.exporters.reports import (
     generate_analysis_plan,
     generate_run_report,
@@ -96,6 +96,29 @@ class TestPackageExportImport:
         result = import_package(pkg_path, import_dir)
         assert len(result["extracted_files"]) > 0
         assert (import_dir / "plan.json").exists()
+
+    def test_fork_package_ignores_macos_metadata_sidecars(self, tmp_path):
+        package_dir = tmp_path / "imported"
+        package_dir.mkdir()
+        (package_dir / "plan.json").write_text("{}", encoding="utf-8")
+        (package_dir / "._plan.json").write_bytes(b"appledouble")
+        (package_dir / ".DS_Store").write_bytes(b"finder")
+        macosx = package_dir / "__MACOSX"
+        macosx.mkdir()
+        (macosx / "._plan.json").write_bytes(b"appledouble")
+        (package_dir / "import_metadata.json").write_text(
+            json.dumps({"read_only": True, "quarantined_atoms": []}),
+            encoding="utf-8",
+        )
+
+        result = fork_package(package_dir, tmp_path / "forked", unfork=True)
+
+        fork_dir = tmp_path / "forked"
+        assert result["fork_dir"] == str(fork_dir)
+        assert (fork_dir / "plan.json").exists()
+        assert not (fork_dir / "._plan.json").exists()
+        assert not (fork_dir / ".DS_Store").exists()
+        assert not (fork_dir / "__MACOSX").exists()
 
     def test_import_package_rejects_duplicate_members(self, tmp_path):
         pkg_path = tmp_path / "duplicate.fnirsflow.zip"

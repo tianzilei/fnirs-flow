@@ -14,6 +14,7 @@ from fnirs_flow.api.exceptions import (
     ProjectRevisionConflictError,
     ProjectTransactionError,
 )
+from fnirs_flow.filesystem import macos_metadata_ignore
 
 if TYPE_CHECKING:
     from fnirs_flow.api.projects import ProjectStore
@@ -35,7 +36,7 @@ def recover_staging_directories(staging_root: Path) -> int:
         if not entry.is_dir():
             continue
         try:
-            shutil.rmtree(entry)
+            shutil.rmtree(entry, ignore_errors=True)
             count += 1
         except OSError as exc:
             logger.warning("Could not remove stale staging dir %s: %s", entry, exc)
@@ -133,10 +134,18 @@ class ProjectTransaction:
             if self._expected_head_commit_id is not None:
                 self._check_expected_head()
 
-            # 3. Copy workspace → staging
+            # 3. Ensure the disposable workspace has been materialized, then
+            # copy workspace → staging. Materialization replaces the workspace,
+            # so it must happen before copytree starts.
+            self._store.ensure_project_loaded(self._project_id)
             workspace = bundles.workspace_path(self._project_id)
             if workspace.exists():
-                shutil.copytree(workspace, self._staging_dir, dirs_exist_ok=True)
+                shutil.copytree(
+                    workspace,
+                    self._staging_dir,
+                    dirs_exist_ok=True,
+                    ignore=macos_metadata_ignore,
+                )
             else:
                 self._staging_dir.mkdir(parents=True, exist_ok=True)
 
@@ -254,7 +263,7 @@ class ProjectTransaction:
     def _cleanup_staging(self) -> None:
         if self._staging_dir is not None and self._staging_dir.exists():
             try:
-                shutil.rmtree(self._staging_dir)
+                shutil.rmtree(self._staging_dir, ignore_errors=True)
             except OSError as exc:
                 logger.warning(
                     "Could not clean up staging dir %s: %s",

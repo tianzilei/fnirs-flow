@@ -58,7 +58,7 @@
       "position": {"x": 400, "y": 0},
       "config": {"sci_threshold": 0.8, "sd_distance_min": 0.01, "sd_distance_max": 0.08},
       "ports": [
-        {"name": "raw_data", "direction": "in", "schema": "RawData", "required": true},
+        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
         {"name": "qc_data", "direction": "out", "schema": "QCData", "required": true}
       ],
       "status": "configured"
@@ -192,7 +192,7 @@
   "edges": [
     {"id": "e-data-readrun", "source": "dataset_discovery", "target": "read_run", "source_handle": "data_manifest", "target_handle": "data_manifest"},
     {"id": "e-readrun-od", "source": "read_run", "target": "optical_density", "source_handle": "raw_data", "target_handle": "raw_data"},
-    {"id": "e-readrun-qc", "source": "read_run", "target": "qc_metrics", "source_handle": "raw_data", "target_handle": "raw_data"},
+    {"id": "e-od-qc", "source": "optical_density", "target": "qc_metrics", "source_handle": "od_data", "target_handle": "od_data"},
     {"id": "e-od-motion", "source": "optical_density", "target": "motion_correction", "source_handle": "od_data", "target_handle": "od_data"},
     {"id": "e-motion-filter", "source": "motion_correction", "target": "filtering", "source_handle": "corrected_data", "target_handle": "od_data"},
     {"id": "e-filter-mbll", "source": "filtering", "target": "beer_lambert_law", "source_handle": "filtered_data", "target_handle": "od_data"},

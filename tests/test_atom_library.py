@@ -94,6 +94,22 @@ class TestLiteratureDerivedMethodAtoms:
         assert atom.origin == NodeOrigin.EVIDENCE_DERIVED
         assert atom.config["source_atom_id"] == "ATOM_descriptive_statistics"
 
+    def test_nirs_spm_spatial_registration_projection_atom(self):
+        library = create_builtin_library()
+        template = library.get("atom_nirs_spm_spatial_registration_projection")
+        assert template is not None
+        assert template.operation == "nirs_spm_spatial_registration_projection"
+        assert "NIRS_SPM_UsersGuide_v4_spatial_registration" in template.evidence_refs
+        assert template.default_config["software"] == "NIRS-SPM v4 r1"
+        assert template.default_config["mri_registration_algorithm"] == "Horn absolute orientation"
+        assert template.default_config["template_registration_algorithm"] == "NFRI MNI estimation"
+        assert template.default_config["projection_sequence"] == [
+            "rendered_brain",
+            "hypothetical_head_surface",
+            "cortical_surface",
+        ]
+        assert template.default_config["execution_readiness"] == "needs_attention"
+
     def test_runtime_fingerprint_reports_library_inputs(self):
         fingerprint = method_atom_library_fingerprint()
         assert fingerprint["method_atoms_rows"] > 0

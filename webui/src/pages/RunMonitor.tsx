@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react';
 import { AlertTriangle, Boxes, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, CopyCheck, FileJson, GitFork, Play, Radar, ShieldCheck, XCircle } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store';
 import type { AtomExecutionSummary } from '../api/client';
 
@@ -24,12 +25,13 @@ export function RunMonitor() {
   const cancelExecution = useStore((s) => s.cancelExecution);
   const fork = useStore((s) => s.fork);
   const trustAtom = useStore((s) => s.trustAtom);
-  const projectStatus = useStore((s) => s.projectStatus)();
+  const projectStatus = useStore(useShallow((s) => s.projectStatus()));
   const quarantined = (importStatus?.quarantined_atoms.length ?? 0) > 0;
 
   const hasFatalRisk = validation?.risks?.some(
     (r: Record<string, unknown>) => r.severity === 'fatal'
   ) ?? false;
+  const canPlanRun = projectStatus.compiled && projectStatus.dataDiscovered && !quarantined && !hasFatalRisk;
   const completed = runs.filter((run) => run.status === 'completed').length;
   const failed = runs.filter((run) => run.status === 'failed').length;
   const artifacts = runs.reduce(
@@ -46,14 +48,19 @@ export function RunMonitor() {
           <h2>Run Monitor</h2>
         </div>
         <div className="page-actions">
-          <button className="ghost-button" onClick={dryRun} disabled={loading || !projectStatus.compiled}>
+          <button
+            className="ghost-button"
+            onClick={dryRun}
+            disabled={loading || !canPlanRun}
+            title={!canPlanRun ? 'Dry run requires a compiled flow, bound data, and no fatal validation risks' : 'Plan project runs'}
+          >
             <CopyCheck size={16} />
             <span>{loading ? 'Running...' : 'Dry Run'}</span>
           </button>
           <button
             className="primary-button"
             onClick={execute}
-            disabled={loading || !projectStatus.compiled || !projectStatus.dataDiscovered || quarantined || hasFatalRisk}
+            disabled={loading || !canPlanRun}
             title={hasFatalRisk ? 'Cannot execute: fatal validation risks detected' : 'Execute project'}
           >
             <Play size={16} />
@@ -180,7 +187,16 @@ export function RunMonitor() {
             </table>
           ) : (
             <div className="empty-state compact">
-              <p>No runs yet.</p>
+              <div className="run-empty-guide">
+                <strong>No runs yet.</strong>
+                <span>{canPlanRun ? 'Use Dry Run to preview planned subject/session runs.' : 'Complete the readiness checks before planning execution.'}</span>
+                <div className="readiness-checklist compact-list">
+                  <CheckItem done={projectStatus.compiled} label="Compiled plan" />
+                  <CheckItem done={projectStatus.dataDiscovered} label="Bound data" />
+                  <CheckItem done={!hasFatalRisk} label="No fatal validation risks" />
+                  <CheckItem done={!quarantined} label="No quarantined atoms" />
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -220,6 +236,10 @@ export function RunMonitor() {
       </section>
     </div>
   );
+}
+
+function CheckItem({ done, label }: { done: boolean; label: string }) {
+  return <div className={`check-item ${done ? 'done' : ''}`}>{done ? '✓' : '○'} {label}</div>;
 }
 
 function AtomResultDetails({

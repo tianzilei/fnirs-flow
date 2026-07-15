@@ -77,6 +77,7 @@ class CompileResult(BaseModel):
     steps: int
     layers: int
     output_files: list[str] = Field(default_factory=list)
+    dag_layers: list[list[dict[str, str]]] = Field(default_factory=list)
     # MethodAtom-first: atom count and atom types
     atoms: int = 0
     atom_types: list[str] = Field(default_factory=list)
@@ -90,6 +91,18 @@ class BackendDescription(BaseModel):
     description: str = ""
     is_available: bool
     is_loaded: bool
+
+
+class DatasetRead(BaseModel):
+    dataset_id: str
+    name: str
+    source_kind: str
+    url: str = ""
+    doi: str = ""
+    citation: str = ""
+    license: str = ""
+    description: str = ""
+    folder_name: str = ""
 
 
 class DryRunResult(BaseModel):

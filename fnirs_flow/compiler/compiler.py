@@ -21,6 +21,7 @@ from fnirs_flow.compiler.manifests import (
     write_risk_register,
 )
 from fnirs_flow.dependencies.resolver import resolve_dependencies
+from fnirs_flow.filesystem import remove_macos_metadata_paths
 from fnirs_flow.flow.models import FlowGraph
 from fnirs_flow.validation.api import validate_flow
 
@@ -384,6 +385,7 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
     write_reporting_checklist(compiled_dir)
     write_artifact_manifest([], compiled_dir)
     write_reproducibility_manifest(flow_hash, compiled_dir)
+    remove_macos_metadata_paths(compiled_dir)
 
     return CompileResult(
         flow_graph=flow,

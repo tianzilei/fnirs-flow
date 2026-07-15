@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from fnirs_flow.api.project_bundle import ProjectBundleError, ProjectBundleManager
 from fnirs_flow.api.uri import URIBindingStore
+from fnirs_flow.filesystem import is_visible_data_file, remove_macos_metadata_paths
 from fnirs_flow.history.service import HistoryService
 from fnirs_flow.history.zip_json_store import ZipJsonHistoryStore
 
@@ -217,31 +218,33 @@ class ProjectStore:
         Returns True if the project was already loaded or was successfully loaded.
         Returns False if the project doesn't exist or couldn't be loaded.
         """
-        if project_id not in self._projects:
-            return False
-
-        if project_id in self._materialized_projects:
-            return True
-
-        # Try to extract and verify the project
-        try:
-            self._bundles.extract_verified(project_id)
-            workspace = self._bundles.workspace_path(project_id)
-            metadata_path = workspace / "project.json"
-            if not metadata_path.exists():
+        with self._lock:
+            if project_id not in self._projects:
                 return False
-            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            if metadata.get("id") != project_id:
+
+            if project_id in self._materialized_projects:
+                return True
+
+            # Try to extract and verify the project. This replaces the
+            # disposable workspace, so it must be serialized per store.
+            try:
+                self._bundles.extract_verified(project_id)
+                workspace = self._bundles.workspace_path(project_id)
+                metadata_path = workspace / "project.json"
+                if not metadata_path.exists():
+                    return False
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if metadata.get("id") != project_id:
+                    return False
+                metadata["integrity_status"] = "verified"
+                metadata["last_verified_at"] = datetime.now(timezone.utc).isoformat()
+                metadata["verification_scope"] = "full"
+                self._projects[project_id] = metadata
+                self._materialized_projects.add(project_id)
+                return True
+            except (ProjectBundleError, json.JSONDecodeError, OSError) as exc:
+                logger.warning("Failed to load project '%s': %s", project_id, exc)
                 return False
-            metadata["integrity_status"] = "verified"
-            metadata["last_verified_at"] = datetime.now(timezone.utc).isoformat()
-            metadata["verification_scope"] = "full"
-            self._projects[project_id] = metadata
-            self._materialized_projects.add(project_id)
-            return True
-        except (ProjectBundleError, json.JSONDecodeError, OSError) as exc:
-            logger.warning("Failed to load project '%s': %s", project_id, exc)
-            return False
 
     def register_transaction(self, project_id: str, tx: ProjectTransaction) -> None:
         """Register an active transaction for a project."""
@@ -761,13 +764,28 @@ def compile_project_flow(
 
     compiled_dir = store.get_output_dir(project_id) / "compiled"
     atom_types = list({n.atom_type or n.node_type for n in result.execution_dag.nodes})
+    node_by_id = {n.atom_id or n.step_id: n for n in result.execution_dag.nodes}
+    dag_layers = [
+        [
+            {
+                "id": node.atom_id or node.step_id,
+                "atom_type": node.atom_type or node.node_type,
+                "node_type": node.node_type,
+                "operation": node.operation or "",
+            }
+            for atom_id in layer
+            if (node := node_by_id.get(atom_id)) is not None
+        ]
+        for layer in result.execution_dag.execution_layers
+    ]
 
     return CompileResult(
         flow_id=result.flow_graph.flow_id,
         flow_hash=result.flow_hash,
         steps=len(result.execution_dag.nodes),
         layers=len(result.execution_dag.execution_layers),
-        output_files=[f.name for f in sorted(compiled_dir.iterdir()) if f.is_file()],
+        output_files=[f.name for f in sorted(compiled_dir.iterdir()) if is_visible_data_file(f, root=compiled_dir)],
+        dag_layers=dag_layers,
         atoms=len(result.execution_dag.nodes),
         atom_types=sorted(atom_types),
     )
@@ -1177,6 +1195,7 @@ def export_project_package(
             final_dir.mkdir(parents=True, exist_ok=True)
             pkg_path = final_dir / tmp_pkg.name
             shutil.copy2(tmp_pkg, pkg_path)
+            remove_macos_metadata_paths(outdir.parent)
         return ExportResult(
             package_path=str(pkg_path),
             size_bytes=pkg_path.stat().st_size,

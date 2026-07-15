@@ -173,6 +173,19 @@ class TestPackageVerifier:
         assert not result.valid
         assert any("Unsafe zip entry" in e for e in result.errors)
 
+    def test_verify_rejects_macos_metadata_members(self, tmp_path: Path) -> None:
+        """Test verification rejects macOS metadata members."""
+        pkg_path = tmp_path / "macos-metadata.fnirsflow.zip"
+
+        with zipfile.ZipFile(pkg_path, "w") as zf:
+            zf.writestr("plan.json", "{}")
+            zf.writestr("__MACOSX/._plan.json", b"appledouble")
+            zf.writestr("manifest.json", json.dumps({"schema_version": "1.0.0", "files": {}}))
+
+        result = verify_package(pkg_path)
+        assert not result.valid
+        assert any("Unsafe zip entry" in e for e in result.errors)
+
     def _compute_hash(self, data: dict) -> str:
         """Compute hash of JSON data."""
         import hashlib

@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from fnirs_flow.execution.service import ExecutionRequest, ExecutionService
+from fnirs_flow.execution.service import ExecutionRequest, ExecutionService, resolve_atom_backend_id
 
 # ============================================================================
 # _build_run_id tests
@@ -183,6 +183,12 @@ class TestInjectDependencies:
 
 
 class TestBackendCreation:
+    def test_null_backend_id_uses_default_backend(self):
+        assert resolve_atom_backend_id({"backend_id": None}, "mne_nirs") == "mne_nirs"
+        assert resolve_atom_backend_id({"backend_id": ""}, "mne_nirs") == "mne_nirs"
+        assert resolve_atom_backend_id({}, "mne_nirs") == "mne_nirs"
+        assert resolve_atom_backend_id({"backend_id": "cedalion"}, "mne_nirs") == "cedalion"
+
     def test_requested_backend_is_not_silently_replaced(self):
         registry = MagicMock()
         registry.create.side_effect = ValueError("Backend cedalion is not available")

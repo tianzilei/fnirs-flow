@@ -134,6 +134,38 @@ class TestProjectPersistence:
         assert (tmp_path / f"{project_id}.fnirsflow").is_file()
         assert not legacy.exists()
 
+    def test_legacy_migration_portableizes_runtime_absolute_paths(self, tmp_path):
+        project_id = "legacy-paths"
+        legacy = tmp_path / project_id
+        compiled = legacy / "outputs" / "compiled"
+        compiled.mkdir(parents=True)
+        (legacy / "project.json").write_text(
+            json.dumps(
+                {
+                    "id": project_id,
+                    "name": "Legacy Paths",
+                    "description": "",
+                    "flow": {},
+                    "snapshots": [],
+                    "attempts": [],
+                    "state": {},
+                }
+            ),
+            encoding="utf-8",
+        )
+        (compiled / "data_manifest.json").write_text(
+            json.dumps({"dataset_id": "d", "local_root": "/Volumes/private/data"}),
+            encoding="utf-8",
+        )
+
+        store = ProjectStore(tmp_path)
+
+        assert store.get(project_id).name == "Legacy Paths"
+        with zipfile.ZipFile(tmp_path / f"{project_id}.fnirsflow") as archive:
+            manifest = json.loads(archive.read("outputs/compiled/data_manifest.json"))
+        assert manifest["local_root"] == "data"
+        assert not legacy.exists()
+
     def test_retained_revision_can_be_restored_as_new_revision(self, tmp_path):
         store = ProjectStore(tmp_path)
         project = store.create("Restore")
@@ -203,6 +235,34 @@ class TestProjectPersistence:
         assert flow["flow_id"] == "lazy-flow"
         assert (tmp_path / ".workspaces" / project.id / "project.json").is_file()
 
+    def test_concurrent_first_load_materializes_workspace_once(self, tmp_path):
+        import concurrent.futures
+        import time
+
+        store1 = ProjectStore(tmp_path)
+        project = store1.create("Concurrent Lazy")
+        store1.update_flow(project.id, {"flow_id": "concurrent-flow", "nodes": [], "edges": []})
+        shutil.rmtree(tmp_path / ".workspaces")
+        store2 = ProjectStore(tmp_path)
+        calls = 0
+        original_extract = store2._bundles.extract_verified
+
+        def slow_extract(project_id: str):
+            nonlocal calls
+            calls += 1
+            time.sleep(0.05)
+            return original_extract(project_id)
+
+        with patch.object(store2._bundles, "extract_verified", side_effect=slow_extract):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(lambda _: store2.get_flow(project.id), range(2)))
+
+        assert results == [
+            {"flow_id": "concurrent-flow", "nodes": [], "edges": []},
+            {"flow_id": "concurrent-flow", "nodes": [], "edges": []},
+        ]
+        assert calls == 1
+
     def test_bundle_header_read_is_size_bounded(self, tmp_path, monkeypatch):
         store = ProjectStore(tmp_path)
         project = store.create("Bounded Header")
@@ -238,6 +298,65 @@ class TestProjectPersistence:
         assert "outputs/derivatives/group_statistics.csv" in names
         assert "outputs/derivatives/raw_signal.snirf" not in names
         assert "outputs/derivatives/intermediate.bin" not in names
+
+    def test_macos_metadata_files_are_not_bundled(self, tmp_path):
+        store = ProjectStore(tmp_path)
+        project = store.create("No metadata")
+        compiled = store.get_output_dir(project.id) / "compiled"
+        compiled.mkdir(parents=True)
+        (compiled / "flow.json").write_text("{}", encoding="utf-8")
+        (compiled / "._flow.json").write_bytes(b"appledouble")
+        (compiled / ".DS_Store").write_bytes(b"finder")
+        macosx = store.get_output_dir(project.id) / "__MACOSX"
+        macosx.mkdir()
+        (macosx / "flow.json").write_text("{}", encoding="utf-8")
+
+        store.commit_project(project.id, reason="metadata_noise")
+
+        with zipfile.ZipFile(tmp_path / f"{project.id}.fnirsflow") as archive:
+            names = set(archive.namelist())
+        assert "outputs/compiled/flow.json" in names
+        assert not any("._" in name or ".DS_Store" in name or "__MACOSX" in name for name in names)
+
+    def test_lazy_bundle_header_rejects_macos_metadata_members(self, tmp_path):
+        manager = ProjectBundleManager(tmp_path)
+        bundle_path = tmp_path / "sidecar.fnirsflow"
+        with zipfile.ZipFile(bundle_path, "w") as archive:
+            archive.writestr("project.json", json.dumps({"id": "sidecar", "name": "Sidecar"}))
+            archive.writestr("__MACOSX/._project.json", b"appledouble")
+            archive.writestr(
+                "bundle_manifest.json",
+                json.dumps(
+                    {
+                        "schema_version": project_bundle.BUNDLE_SCHEMA_VERSION,
+                        "project_id": "sidecar",
+                        "revision": 1,
+                        "files": {"project.json": {"sha256": "", "size": 0}},
+                    }
+                ),
+            )
+
+        with pytest.raises(ProjectBundleError, match="macOS metadata"):
+            manager.read_bundle_header(bundle_path)
+
+    def test_save_removes_macos_metadata_from_workspace(self, tmp_path):
+        store = ProjectStore(tmp_path)
+        project = store.create("Clean Workspace")
+        compiled = store.get_output_dir(project.id) / "compiled"
+        compiled.mkdir(parents=True)
+        (compiled / "plan.json").write_text("{}", encoding="utf-8")
+        (compiled / "._plan.json").write_bytes(b"appledouble")
+        (tmp_path / "._uri_bindings.json").write_bytes(b"appledouble")
+        versions = tmp_path / ".versions" / project.id
+        versions.mkdir(parents=True)
+        (versions / "._revision-00000001.fnirsflow").write_bytes(b"appledouble")
+
+        store.commit_project(project.id, reason="metadata_cleanup")
+
+        workspace = store._bundles.workspace_path(project.id)
+        assert (workspace / "outputs" / "compiled" / "plan.json").exists()
+        assert not list(workspace.rglob("._*"))
+        assert not list(tmp_path.rglob("._*"))
 
     def test_machine_local_paths_are_rejected(self, tmp_path):
         store = ProjectStore(tmp_path)

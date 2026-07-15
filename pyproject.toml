@@ -58,7 +58,7 @@ full = [
 ]
 
 [project.scripts]
-fnirs-flow = "cli:main"
+fnirs-flow = "fnirs_flow.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

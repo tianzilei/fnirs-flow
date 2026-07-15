@@ -18,6 +18,7 @@ from fnirs_flow.api.portability import (
     find_absolute_path_records,
 )
 from fnirs_flow.api.uri import ProjectURI, create_external_data_uri, create_project_uri
+from fnirs_flow.filesystem import is_macos_metadata_path, is_visible_data_file
 
 MAX_PACKAGE_BYTES = 10 * 1024**2
 
@@ -293,7 +294,7 @@ def export_package(
             derivatives = outdir / "derivatives"
             if derivatives.exists():
                 for result_file in sorted(derivatives.rglob("*")):
-                    if result_file.is_file() and not any(part.startswith("._") for part in result_file.parts):
+                    if is_visible_data_file(result_file, root=outdir):
                         add_portable_file(
                             zf, result_file, result_file.relative_to(outdir).as_posix()
                         )
@@ -301,6 +302,8 @@ def export_package(
         # Add any .md reports if profile includes them
         if profile.include_reports:
             for md_file in outdir.glob("*.md"):
+                if is_macos_metadata_path(md_file.name):
+                    continue
                 if md_file.name not in [f for f in profile.include_patterns if f.endswith(".md")]:
                     add_portable_file(zf, md_file, md_file.name)
 

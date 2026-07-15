@@ -55,6 +55,21 @@ SNIRF_READER = MethodAtomTemplate(
     tags=["data", "snirf"],
 )
 
+RUN_READER = MethodAtomTemplate(
+    template_id="read_run",
+    name="Read Dataset Run",
+    category=MethodAtomCategory.DATA,
+    atom_type="read_run",
+    operation="read_run",
+    description="Read each discovered BIDS/SNIRF run from a data manifest",
+    default_config={"preload": False},
+    ports=[
+        AtomPort(name="data_manifest", direction="in", schema="DataManifest"),
+        AtomPort(name="raw_data", direction="out", schema="RawData"),
+    ],
+    tags=["data", "bids", "snirf", "run"],
+)
+
 NIRX_READER = MethodAtomTemplate(
     template_id="nirx_reader",
     name="NIRx Reader",
@@ -1388,6 +1403,7 @@ ALL_NODE_TEMPLATES: list[MethodAtomTemplate] = [
     DATASET_DISCOVERY,
     BIDS_IMPORT,
     SNIRF_READER,
+    RUN_READER,
     NIRX_READER,
     HITACHI_READER,
     ISS_READER,

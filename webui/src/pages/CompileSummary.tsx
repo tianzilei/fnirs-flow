@@ -1,4 +1,6 @@
 import { Layers, FileCode2, GitBranch, Hash } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store';
 import { DagLayerPreview } from '../components/DagLayerPreview';
 
@@ -8,6 +10,12 @@ export function CompileSummary() {
   const snapshot = useStore((s) => s.snapshot);
   const compile = useStore((s) => s.compile);
   const createSnapshot = useStore((s) => s.createSnapshot);
+  const validation = useStore((s) => s.validation);
+  const status = useStore(useShallow((s) => s.projectStatus()));
+  const navigate = useNavigate();
+  const { id: projectId } = useParams();
+  const hasFatalRisk = validation?.risks.some((risk) => risk.severity === 'fatal') ?? false;
+  const canCompile = !loading && !hasFatalRisk;
 
   return (
     <div className="page compile-summary work-page">
@@ -17,7 +25,7 @@ export function CompileSummary() {
           <h2>Compile Summary</h2>
         </div>
         <div className="page-actions">
-          <button className="primary-button" onClick={compile} disabled={loading}>
+          <button className="primary-button" onClick={compile} disabled={!canCompile}>
             {loading ? 'Compiling...' : 'Compile Flow'}
           </button>
         </div>
@@ -49,7 +57,7 @@ export function CompileSummary() {
           </section>
 
           <section className="dag-preview-section">
-            <DagLayerPreview />
+            <DagLayerPreview layers={result.dag_layers} />
           </section>
 
           {result.output_files && result.output_files.length > 0 && (
@@ -90,10 +98,32 @@ export function CompileSummary() {
       )}
 
       {!result && (
-        <div className="empty-state">
-          <p>Click "Compile Flow" to generate the execution plan and DAG.</p>
-        </div>
+        <section className="workflow-panel">
+          <div className="section-heading">
+            <div>
+              <h3>Before compiling</h3>
+              <p className="muted">A compiled plan requires a saved flow with no fatal validation risks.</p>
+            </div>
+            <button className="primary-button" onClick={compile} disabled={!canCompile}>
+              {loading ? 'Compiling...' : 'Compile Flow'}
+            </button>
+          </div>
+          <div className="readiness-checklist">
+            <CheckItem done={status.flowSaved} label="Flow saved" />
+            <CheckItem done={status.validated && !hasFatalRisk} label="Validation passed without fatal risks" />
+            <CheckItem done={status.dataDiscovered} label="Data discovered or relinked" />
+          </div>
+          {hasFatalRisk && projectId && (
+            <button className="ghost-button" onClick={() => navigate(`/projects/${projectId}/checks`)}>
+              Open validation fixes
+            </button>
+          )}
+        </section>
       )}
     </div>
   );
+}
+
+function CheckItem({ done, label }: { done: boolean; label: string }) {
+  return <div className={`check-item ${done ? 'done' : ''}`}>{done ? '✓' : '○'} {label}</div>;
 }

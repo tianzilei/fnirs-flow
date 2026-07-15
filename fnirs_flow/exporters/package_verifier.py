@@ -10,6 +10,8 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, Field
 
+from fnirs_flow.filesystem import is_macos_metadata_path
+
 MAX_PACKAGE_BYTES = 10 * 1024**2
 MAX_UNCOMPRESSED_BYTES = 10 * 1024**2
 MAX_MEMBER_BYTES = 8 * 1024**2
@@ -182,6 +184,8 @@ def _is_safe_member_path(name: str) -> bool:
     if len(name) >= 3 and name[0].isalpha() and name[1:3] in {":/", ":\\"}:
         return False
     path = PurePosixPath(name.rstrip("/"))
+    if is_macos_metadata_path(path):
+        return False
     return (
         not path.is_absolute()
         and bool(path.parts)

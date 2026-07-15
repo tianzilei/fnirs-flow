@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, Package } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store';
 import { listPackageProfiles, type PackageProfile } from '../api/client';
 
@@ -28,6 +29,9 @@ export function ExportPackage() {
   const exportResult = useStore((s) => s.exportResult);
   const loading = useStore((s) => s.loading);
   const exportPackage = useStore((s) => s.exportPackage);
+  const project = useStore((s) => s.project);
+  const refreshStatus = useStore((s) => s.refreshStatus);
+  const projectStatus = useStore(useShallow((s) => s.projectStatus()));
   const [exported, setExported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState('reproducibility_package');
@@ -37,9 +41,15 @@ export function ExportPackage() {
     listPackageProfiles().then(setProfiles).catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    if (project) void refreshStatus();
+  }, [project?.id, refreshStatus]);
+
   const currentProfile = profiles.find((p) => p.profile_id === selectedProfile);
+  const canExport = projectStatus.compiled && !loading && !exported;
 
   const handleExport = async () => {
+    if (!canExport) return;
     setError(null);
     try {
       await exportPackage({ profile: selectedProfile });
@@ -57,11 +67,20 @@ export function ExportPackage() {
           <h2>Export Package</h2>
         </div>
         <div className="page-actions">
-          <button className="primary-button" onClick={handleExport} disabled={loading || exported}>
+          <button className="primary-button" onClick={handleExport} disabled={!canExport}>
             {loading ? 'Exporting...' : exported ? 'Exported' : 'Export Package'}
           </button>
         </div>
       </section>
+
+      {!projectStatus.compiled && (
+        <section className="notice-panel warning">
+          <div>
+            <strong>Compile required</strong>
+            <span>Export is enabled after the current flow has a compiled plan.</span>
+          </div>
+        </section>
+      )}
 
       <div className="export-content">
         <section className="profile-selector">

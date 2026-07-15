@@ -12,6 +12,11 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from fnirs_flow.api.uri import ProjectURI, URIBindingStore, create_external_data_uri
+from fnirs_flow.filesystem import (
+    is_macos_metadata_path,
+    macos_metadata_ignore,
+    remove_macos_metadata_paths,
+)
 
 MAX_PACKAGE_BYTES = 10 * 1024**2
 MAX_UNCOMPRESSED_BYTES = 10 * 1024**2
@@ -132,6 +137,8 @@ def _validate_zip_path(member: str, outdir: Path) -> bool:
         if len(member) >= 3 and member[0].isalpha() and member[1:3] in {":/", ":\\"}:
             return False
         path = PurePosixPath(member.rstrip("/"))
+        if is_macos_metadata_path(path):
+            return False
         if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
             return False
         target = (outdir / member).resolve()
@@ -295,6 +302,7 @@ def import_package(
     # Write import metadata
     metadata_path = outdir / "import_metadata.json"
     metadata_path.write_text(json.dumps(import_metadata, indent=2), encoding="utf-8")
+    remove_macos_metadata_paths(outdir)
 
     return {
         "extracted_files": extracted_files,
@@ -331,8 +339,8 @@ def fork_package(
     if fork_dir.exists():
         raise ValueError(f"Fork directory already exists: {fork_dir}")
 
-    # Copy the package
-    shutil.copytree(package_dir, fork_dir)
+    # Copy the package without Finder/AppleDouble metadata sidecars.
+    shutil.copytree(package_dir, fork_dir, ignore=macos_metadata_ignore)
 
     # Update import metadata
     metadata_path = fork_dir / "import_metadata.json"
@@ -356,6 +364,7 @@ def fork_package(
             metadata["forked_at"] = datetime.now(timezone.utc).isoformat()
             metadata["read_only"] = True
         metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    remove_macos_metadata_paths(fork_dir)
 
     return {
         "fork_dir": str(fork_dir),

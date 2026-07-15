@@ -87,6 +87,8 @@ PUBLIC_SCRIPT_FILES = [
 
 EXCLUDED_NAMES = {
     ".DS_Store",
+    ".AppleDouble",
+    ".LSOverride",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
@@ -97,6 +99,7 @@ EXCLUDED_NAMES = {
     "dist",
     "htmlcov",
     "node_modules",
+    "__MACOSX",
 }
 
 EXCLUDED_PREFIXES = (
