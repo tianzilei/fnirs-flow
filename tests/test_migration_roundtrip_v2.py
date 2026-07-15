@@ -166,10 +166,10 @@ class TestMigrationTable:
         assert get_latest_version() == "0.3.0"
 
     def test_needs_migration_for_v01(self):
-        assert needs_migration("0.1.0") is True
+        assert needs_migration("0.1.0")
 
     def test_no_migration_for_latest(self):
-        assert needs_migration("0.3.0") is False
+        assert not needs_migration("0.3.0")
 
     def test_migration_chain_versions(self):
         for entry in MIGRATION_TABLE:

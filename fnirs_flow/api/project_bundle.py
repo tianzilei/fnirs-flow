@@ -267,9 +267,12 @@ class ProjectBundleManager:
 
             self.verify(temp_path, expected_project_id=project_id)
 
-            # fsync the temporary file to ensure durability
-            with open(temp_path, "rb") as f:
-                os.fsync(f.fileno())
+            # fsync the temporary file to ensure durability (best-effort on Windows)
+            try:
+                with open(temp_path, "rb") as f:
+                    os.fsync(f.fileno())
+            except OSError:
+                pass
 
             if keep_previous and bundle.exists() and bundle_was_valid:
                 self._retain_previous(project_id, bundle, previous_manifest)
@@ -345,16 +348,18 @@ class ProjectBundleManager:
                         ".cfg", ".csv", ".html", ".json", ".jsonl", ".md", ".r",
                         ".rst", ".svg", ".toml", ".tsv", ".txt", ".yaml", ".yml",
                     }:
-                        with tempfile.NamedTemporaryFile(suffix=PurePosixPath(name).suffix) as temporary:
-                            temporary.write(archive.read(info))
-                            temporary.flush()
-                            findings = find_absolute_path_records(Path(temporary.name))
+                        file_bytes = archive.read(info)
+                        findings = find_absolute_path_records(
+                            Path(name), content=file_bytes,
+                        )
                         if findings:
                             raise ProjectBundleError(
                                 f"Machine-local absolute path in {name}: {findings[0]}"
                             )
                 if "project.json" not in declared:
                     raise ProjectBundleError("Project bundle has no project.json")
+                # Validate history integrity if history files are present
+                self._verify_history_integrity(archive, names)
                 return manifest
         except (zipfile.BadZipFile, json.JSONDecodeError, KeyError, OSError) as exc:
             raise ProjectBundleError(f"Unreadable project bundle {bundle_path.name}: {exc}") from exc
@@ -546,9 +551,12 @@ class ProjectBundleManager:
 
             self.verify(temp_path, expected_project_id=project_id)
 
-            # fsync the temporary file to ensure durability
-            with open(temp_path, "rb") as f:
-                os.fsync(f.fileno())
+            # fsync the temporary file to ensure durability (best-effort on Windows)
+            try:
+                with open(temp_path, "rb") as f:
+                    os.fsync(f.fileno())
+            except OSError:
+                pass
 
             if keep_previous and bundle.exists() and bundle_was_valid:
                 self._retain_previous(project_id, bundle, previous_manifest)
@@ -674,3 +682,66 @@ class ProjectBundleManager:
         path = PurePosixPath(name)
         if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
             raise ProjectBundleError(f"Unsafe path in project bundle: {name!r}")
+
+    @staticmethod
+    def _verify_history_integrity(archive: zipfile.ZipFile, names: list[str]) -> None:
+        """Validate history graph integrity if history files are present.
+
+        Checks:
+        - state.json is valid JSON with head and refs
+        - HEAD commit exists
+        - All branch refs point to existing commits
+        - Each commit's parent(s) and design_object_id exist
+        """
+        state_path = "history/state.json"
+        if state_path not in names:
+            return  # no history — nothing to check
+        try:
+            state_data = json.loads(archive.read(state_path))
+        except (json.JSONDecodeError, KeyError) as exc:
+            raise ProjectBundleError(f"Corrupt history state.json: {exc}") from exc
+
+        head_commit_id = state_data.get("head", {}).get("commit_id", "")
+        refs = state_data.get("refs", {}).get("heads", {})
+
+        def _commit_path(cid: str) -> str:
+            return f"history/commits/{cid[:2]}/{cid[2:]}.json"
+
+        def _object_path(oid: str) -> str:
+            return f"history/objects/{oid[:2]}/{oid[2:]}.json"
+
+        # Validate HEAD commit exists
+        if head_commit_id and _commit_path(head_commit_id) not in names:
+            raise ProjectBundleError(f"History HEAD commit missing: {head_commit_id[:16]}")
+
+        # Validate all branch refs
+        all_commit_ids: set[str] = set()
+        for branch, cid in refs.items():
+            if _commit_path(cid) not in names:
+                raise ProjectBundleError(f"Branch {branch!r} points to missing commit: {cid[:16]}")
+            all_commit_ids.add(cid)
+
+        # Walk reachable commits and validate parents + objects
+        visited: set[str] = set()
+        queue = list(all_commit_ids)
+        while queue:
+            cid = queue.pop(0)
+            if cid in visited:
+                continue
+            visited.add(cid)
+            cpath = _commit_path(cid)
+            if cpath not in names:
+                raise ProjectBundleError(f"Commit missing: {cid[:16]}")
+            try:
+                commit_data = json.loads(archive.read(cpath))
+            except (json.JSONDecodeError, KeyError) as exc:
+                raise ProjectBundleError(f"Corrupt commit {cid[:16]}: {exc}") from exc
+            # Validate parent commits
+            for parent_id in commit_data.get("parents", []):
+                if _commit_path(parent_id) not in names:
+                    raise ProjectBundleError(f"Parent commit missing: {parent_id[:16]}")
+                queue.append(parent_id)
+            # Validate design object
+            obj_id = commit_data.get("design_object_id", "")
+            if obj_id and _object_path(obj_id) not in names:
+                raise ProjectBundleError(f"Design object missing: {obj_id[:16]}")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -13,10 +14,11 @@ MNE_HOME = PROJECT_ROOT / ".tmp" / "mne"
 TEST_TMP.mkdir(parents=True, exist_ok=True)
 MNE_HOME.mkdir(parents=True, exist_ok=True)
 
-os.environ.setdefault("TMP", str(TEST_TMP))
-os.environ.setdefault("TEMP", str(TEST_TMP))
-os.environ.setdefault("TMPDIR", str(TEST_TMP))
-os.environ.setdefault("PYTEST_DEBUG_TEMPROOT", str(TEST_TMP))
+os.environ["TMP"] = str(TEST_TMP)
+os.environ["TEMP"] = str(TEST_TMP)
+os.environ["TMPDIR"] = str(TEST_TMP)
+os.environ["PYTEST_DEBUG_TEMPROOT"] = str(TEST_TMP)
+tempfile.tempdir = str(TEST_TMP)
 os.environ.setdefault("_MNE_FAKE_HOME_DIR", str(MNE_HOME))
 os.environ.setdefault("MNE_HOME", str(MNE_HOME))
 os.environ.setdefault("MNE_DONTWRITE_HOME", "true")

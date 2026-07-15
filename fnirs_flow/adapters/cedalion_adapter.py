@@ -52,7 +52,7 @@ def _compute_recording_hash(recording: Any) -> str:
             return hashlib.sha256(data_bytes).hexdigest()[:16]
         # Fallback to string representation
         return hashlib.sha256(str(recording).encode()).hexdigest()[:16]
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return hashlib.sha256(str(type(recording)).encode()).hexdigest()[:16]
 
 

@@ -3,12 +3,12 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python>=3.11
-  - mne>=1.6
-  - mne-nirs>=0.7
-  - scipy
-  - numpy
-  - pydantic
+  - python>=3.11,<3.14
+  - mne>=1.6,<2.0
+  - mne-nirs>=0.7,<1.0
+  - scipy>=1.10,<2.0
+  - numpy>=1.24,<2.0
+  - pydantic>=2.0,<3.0
   - pip:
     - fnirs-flow[api,mne,ml-motion]
     - ruff

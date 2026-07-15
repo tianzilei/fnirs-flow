@@ -69,8 +69,8 @@ class TestPydanticModels:
         config = MLConfig()
         assert config.split_strategy == "subject_wise"
         assert config.cv_scheme == "leave_one_out"
-        assert config.nested_cv is True
-        assert config.preprocessing_in_fold is True
+        assert config.nested_cv
+        assert config.preprocessing_in_fold
         assert "random_trial_split" in config.prohibited_strategies
 
     def test_evidence_backed_config_defaults(self) -> None:
@@ -120,7 +120,7 @@ class TestConfigManager:
         manager = ConfigManager()
         config = manager.get_preprocessing_config(scenario="resting_state")
         assert isinstance(config, PreprocessingConfig)
-        assert config.short_channel_regression is True
+        assert config.short_channel_regression
 
     def test_get_qc_config_conservative(self) -> None:
         """Test getting conservative QC configuration."""

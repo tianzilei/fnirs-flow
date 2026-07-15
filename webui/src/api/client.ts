@@ -436,3 +436,236 @@ export async function restoreProjectRevision(projectId: string, revision: number
   const { data } = await api.post(`/projects/${projectId}/bundle/restore/${revision}`);
   return data;
 }
+
+// --- Design History (FlowVCS) ---
+
+export interface AuthorInfo {
+  id: string;
+  display_name: string;
+}
+
+export interface DesignCommitLogEntry {
+  commit_id: string;
+  parents: string[];
+  semantic_flow_hash: string;
+  message: string;
+  author: AuthorInfo;
+  created_at: string;
+  reason: string;
+}
+
+export interface BranchInfo {
+  name: string;
+  commit_id: string;
+  is_current: boolean;
+}
+
+export interface DesignHistoryStatus {
+  head: DesignCommitLogEntry | null;
+  branches: BranchInfo[];
+  dirty: boolean;
+}
+
+export interface DiffChange {
+  kind: 'node_added' | 'node_removed' | 'node_changed' | 'edge_added' | 'edge_removed' | 'edge_changed' | 'flow_hash_changed';
+  node_id?: string;
+  edge_id?: string;
+  path?: string;
+  before?: unknown;
+  after?: unknown;
+}
+
+export interface DiffResult {
+  from_commit: string;
+  to_commit: string;
+  from_flow_hash: string;
+  to_flow_hash: string;
+  changes: DiffChange[];
+}
+
+export async function initializeDesignHistory(projectId: string): Promise<{ commit_id: string }> {
+  const { data } = await api.post(`/projects/${projectId}/history/initialize`);
+  return data;
+}
+
+export async function getDesignHistory(projectId: string): Promise<DesignHistoryStatus> {
+  const { data } = await api.get(`/projects/${projectId}/history`);
+  return data;
+}
+
+export async function listDesignCommits(
+  projectId: string,
+  branch?: string,
+  limit = 50,
+  offset = 0,
+): Promise<DesignCommitLogEntry[]> {
+  const { data } = await api.get(`/projects/${projectId}/history/commits`, {
+    params: { branch, limit, offset },
+  });
+  return data;
+}
+
+export async function createDesignCommit(
+  projectId: string,
+  message: string,
+  reason = 'manual_design_commit',
+): Promise<{ commit_id: string }> {
+  const { data } = await api.post(`/projects/${projectId}/history/commits`, { message, reason });
+  return data;
+}
+
+export async function getDesignDiff(
+  projectId: string,
+  fromCommit: string,
+  toCommit: string,
+): Promise<DiffResult> {
+  const { data } = await api.get(`/projects/${projectId}/history/diff`, {
+    params: { from_commit: fromCommit, to_commit: toCommit },
+  });
+  return data;
+}
+
+export async function createDesignBranch(
+  projectId: string,
+  name: string,
+  fromCommitId?: string,
+): Promise<BranchInfo> {
+  const { data } = await api.post(`/projects/${projectId}/history/branches`, {
+    name,
+    from_commit_id: fromCommitId,
+  });
+  return data;
+}
+
+export async function deleteDesignBranch(projectId: string, name: string): Promise<void> {
+  await api.delete(`/projects/${projectId}/history/branches/${name}`);
+}
+
+export async function checkoutDesignBranch(
+  projectId: string,
+  target: string,
+): Promise<{ flow: Record<string, unknown>; target: string }> {
+  const { data } = await api.post(`/projects/${projectId}/history/checkout`, { target });
+  return data;
+}
+
+export interface MigrationReport {
+  snapshots_imported: number;
+  snapshots_skipped: number;
+  revisions_imported: number;
+  revisions_skipped: number;
+  objects_deduplicated: number;
+  warnings: string[];
+  errors: string[];
+  success: boolean;
+}
+
+export async function migrateDesignHistory(projectId: string): Promise<MigrationReport> {
+  const { data } = await api.post(`/projects/${projectId}/history/migrate`);
+  return data;
+}
+
+// --- AI Draft Review ---
+
+export type AIDraftScenario =
+  | 'task'
+  | 'resting_state'
+  | 'machine_learning'
+  | 'real_world'
+  | 'hyperscanning'
+  | 'multi_site';
+
+export interface AIGenerationMetadata {
+  generated_by: string;
+  model: string;
+  created_at: string;
+  input_summary: string;
+  assumptions: string[];
+  requires_user_confirmation: string[];
+  confirmed_parameters: string[];
+  confirmed_by: string;
+  confirmed_at: string;
+  not_used_for_execution: boolean;
+}
+
+export interface AIDraftFlow extends Record<string, unknown> {
+  flow_id: string;
+  name: string;
+  description: string;
+  nodes: Array<Record<string, unknown>>;
+  edges: Array<Record<string, unknown>>;
+  metadata: {
+    ai_generation: AIGenerationMetadata;
+    [key: string]: unknown;
+  };
+}
+
+export interface GenerateAIDraftRequest {
+  scenario: AIDraftScenario;
+  study_name?: string;
+  data_format?: string;
+  conditions?: string[];
+}
+
+export interface DraftReadiness {
+  status: 'Ready' | 'Needs Attention' | 'Blocked';
+  checks: Array<{ name: string; status: 'pass' | 'warn' | 'fail' | 'skip'; message: string }>;
+}
+
+export interface AIDraftValidation {
+  status: 'draft_validated';
+  flow_id: string;
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  risks: Array<{
+    risk_id: string;
+    code: string;
+    severity: string;
+    domain: string;
+    message: string;
+    suggested_action: string;
+  }>;
+  readiness: DraftReadiness;
+}
+
+export async function generateProjectAIDraft(
+  projectId: string,
+  request: GenerateAIDraftRequest,
+): Promise<AIDraftFlow> {
+  await api.post(`/projects/${projectId}/ai/draft-flow`, request);
+  const draft = await getProjectAIDraft(projectId);
+  if (!draft) throw new Error('Draft was generated but could not be loaded');
+  return draft;
+}
+
+export async function getProjectAIDraft(projectId: string): Promise<AIDraftFlow | null> {
+  try {
+    const { data } = await api.get(`/projects/${projectId}/ai/draft`);
+    return data.draft;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return null;
+    throw error;
+  }
+}
+
+export async function validateProjectAIDraft(projectId: string): Promise<AIDraftValidation> {
+  const { data } = await api.post(`/projects/${projectId}/ai/validate-draft`);
+  return data;
+}
+
+export async function confirmProjectAIDraft(
+  projectId: string,
+  confirmedParameters: string[],
+  confirmedBy: string,
+): Promise<{ status: string; flow_id: string; confirmed_by: string; confirmed_count: number }> {
+  const { data } = await api.post(`/projects/${projectId}/ai/confirm-draft`, {
+    confirmed_parameters: confirmedParameters,
+    confirmed_by: confirmedBy,
+  });
+  return data;
+}
+
+export async function discardProjectAIDraft(projectId: string): Promise<void> {
+  await api.delete(`/projects/${projectId}/ai/draft`);
+}

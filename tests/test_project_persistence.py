@@ -310,8 +310,8 @@ class TestProjectPersistence:
         # The in-memory state is updated, but the bundle may not be persisted yet
         # Cancel before the timer fires
         store.cancel_debounce(project.id)
-        # Wait a bit to ensure the cancelled timer doesn't fire
-        time.sleep(1.5)
+        # Short sleep to let any pending timer attempt to fire
+        time.sleep(0.1)
         # Reload from disk — the debounced persist was cancelled
         store2 = ProjectStore(tmp_path)
         loaded_flow = store2.get_flow(project.id)

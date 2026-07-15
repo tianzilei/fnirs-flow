@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -17,9 +18,9 @@ def setup_store(tmp_path):
     """Use a temporary store for each test."""
     import fnirs_flow.api.app as api_module
 
-    api_module._store = ProjectStore(tmp_path)
-    yield
-    api_module._store = None
+    store = ProjectStore(tmp_path)
+    with patch.object(api_module, "_store", store):
+        yield
 
 
 def _create_and_compile_flow(client, tmp_path):
@@ -156,7 +157,7 @@ def test_imported_project_is_read_only_and_fork_owns_package(tmp_path):
     fork_output = api_module.get_store().get_output_dir(fork_id)
     assert (fork_output / "compiled" / "plan.json").exists()
     fork_status = client.get(f"/api/projects/{fork_id}/import-status").json()
-    assert fork_status["read_only"] is False
+    assert not fork_status["read_only"]
 
 
 def test_relink_imported_data_updates_manifest(tmp_path):
@@ -261,8 +262,10 @@ class TestRerunPackage:
 
         result = relink_package_data(tmp_path, new_root)
         manifest = json.loads((tmp_path / "data_manifest.json").read_text())
+        bindings = json.loads((tmp_path / "uri_bindings.json").read_text())
 
         assert result["missing_paths"] == []
+        assert bindings["bindings"]["dataset"] == str(new_root.resolve())
         assert manifest["subject_session_runs"][0]["path"] == (
             "external-data://dataset/sub-01/nirs/sub-01_task-test_run-01_nirs.snirf"
         )
@@ -291,8 +294,41 @@ class TestRerunPackage:
             json.dumps({"local_root": "/nonexistent/path"}),
             encoding="utf-8",
         )
-        with pytest.raises(ValueError, match="local_root is invalid"):
+        with pytest.raises(ValueError, match="no valid local_root or external-data binding"):
             rerun_package(tmp_path)
+
+    def test_rerun_uses_external_data_binding_when_local_root_is_empty(self, tmp_path, monkeypatch):
+        from fnirs_flow.api.uri import URIBindingStore
+        from fnirs_flow.exporters.package_importer import rerun_package
+
+        data_root = tmp_path / "data"
+        data_root.mkdir()
+        (tmp_path / "plan.json").write_text("{}", encoding="utf-8")
+        (tmp_path / "data_manifest.json").write_text(
+            json.dumps({"dataset_id": "dataset", "local_root": ""}),
+            encoding="utf-8",
+        )
+        URIBindingStore(tmp_path).bind("dataset", data_root)
+
+        class FakeResult:
+            attempt_id = "attempt-1"
+            total_runs = 1
+            successful_runs = 1
+            failed_runs = 0
+            skipped_runs = 0
+            reports = {}
+            failure_ids = []
+
+        class FakeExecutionService:
+            def execute(self, request):
+                assert request.data_root == str(data_root.resolve())
+                return FakeResult()
+
+        monkeypatch.setattr("fnirs_flow.execution.service.ExecutionService", FakeExecutionService)
+
+        result = rerun_package(tmp_path)
+
+        assert result["successful_runs"] == 1
 
     def test_rerun_quarantined_atoms(self, tmp_path):
         from fnirs_flow.exporters.package_importer import rerun_package

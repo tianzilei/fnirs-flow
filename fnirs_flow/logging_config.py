@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import logging.handlers
 import os
@@ -79,8 +80,6 @@ class _JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
-        import json
-
         log_data = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
@@ -92,7 +91,7 @@ class _JsonFormatter(logging.Formatter):
         }
 
         # Add exception info if present
-        if record.exc_info and record.exc_info[1]:
+        if record.exc_info and record.exc_info[0] is not None and record.exc_info[1]:
             log_data["exception"] = {
                 "type": record.exc_info[0].__name__,
                 "message": str(record.exc_info[1]),

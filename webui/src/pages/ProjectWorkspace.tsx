@@ -4,6 +4,7 @@ import { Archive, Boxes, Copy, Database, Play, Download, ShieldCheck } from 'luc
 import { useStore } from '../store';
 import type { Project } from '../api/client';
 import { VersionHistoryPanel } from '../components/VersionHistoryPanel';
+import { DesignHistoryPanel } from '../components/DesignHistoryPanel';
 
 export function ProjectWorkspace() {
   const navigate = useNavigate();
@@ -189,6 +190,7 @@ export function ProjectWorkspace() {
                   </button>
                 </div>
                 <VersionHistoryPanel projectId={proj.id} onRestored={handleRestored} />
+                <DesignHistoryPanel projectId={proj.id} />
               </div>
             )}
           </div>

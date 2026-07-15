@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -16,9 +17,9 @@ def setup_store(tmp_path):
     """Use a temporary store for each test."""
     import fnirs_flow.api.app as api_module
 
-    api_module._store = ProjectStore(tmp_path)
-    yield
-    api_module._store = None
+    store = ProjectStore(tmp_path)
+    with patch.object(api_module, "_store", store):
+        yield
 
 
 def test_health():
@@ -229,9 +230,9 @@ def test_project_status_survives_store_reload_and_requires_real_data(tmp_path):
     assert client.post(f"/api/projects/{pid}/compile").status_code == 200
 
     before = client.get(f"/api/projects/{pid}/status").json()
-    assert before["validated"] is True
-    assert before["compiled"] is True
-    assert before["data_discovered"] is False
+    assert before["validated"]
+    assert before["compiled"]
+    assert not before["data_discovered"]
     execution_response = client.post(f"/api/projects/{pid}/execute")
     assert execution_response.status_code == 409
     assert execution_response.json()["detail"] == {
@@ -268,7 +269,7 @@ def test_project_status_survives_store_reload_and_requires_real_data(tmp_path):
     )
     api_module.get_store().bind_dataset("status-test", tmp_path)
     ready = client.get(f"/api/projects/{pid}/status").json()
-    assert ready["data_discovered"] is True
+    assert ready["data_discovered"]
     assert ready["runnable_runs"] == 1
 
 
@@ -451,8 +452,8 @@ def test_atom_templates():
 
     client = TestClient(app)
     resp = client.get("/api/atom-templates")
-    # Endpoint may not be fully implemented
-    assert resp.status_code in (200, 404, 500)
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), (dict, list))
 
 
 def test_cors_headers():
@@ -469,6 +470,7 @@ def test_cors_headers():
     )
     # CORS should be handled
     assert resp.status_code in (200, 405)
+    assert "access-control-allow-origin" in resp.headers
 
 
 def test_request_size_limit():
@@ -477,19 +479,46 @@ def test_request_size_limit():
 
     client = TestClient(app)
 
-    # Create a large payload
+    # Create a large payload (under 1MB FlowUpdate limit)
     large_flow = {"flow_id": "f1", "nodes": [{"id": f"n{i}"} for i in range(10000)], "edges": []}
 
     resp = client.post("/api/projects", json={"name": "Test"})
     pid = resp.json()["id"]
 
-    # This should work (under 10MB)
+    # This should work (under 1MB)
     resp = client.put(f"/api/projects/{pid}/flow", json={"flow": large_flow})
     assert resp.status_code == 200
 
 
-def test_concurrent_project_creation():
-    """Test creating multiple projects."""
+def test_remote_api_without_key_is_rejected():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app, client=("203.0.113.10", 50000))
+    assert client.get("/api/health").status_code == 200
+    resp = client.get("/api/projects")
+    assert resp.status_code == 403
+    assert "FNIRS_API_KEY" in resp.json()["detail"]
+
+
+def test_participant_table_api_rejects_path_outside_allowed_roots(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    pid = client.post("/api/projects", json={"name": "Path Guard"}).json()["id"]
+    outside_root = tmp_path.parent / f"{tmp_path.name}_outside_allowed_roots"
+    table = outside_root / "participants.tsv"
+    table.parent.mkdir()
+    table.write_text("participant_id\tinclude\nsub-01\t1\n", encoding="utf-8")
+    resp = client.post(
+        f"/api/projects/{pid}/participant-table",
+        json={"path": str(table), "id_column": "participant_id"},
+    )
+    assert resp.status_code == 403
+    assert "allowed local roots" in resp.json()["detail"]
+
+
+def test_sequential_project_creation():
+    """Test creating multiple projects sequentially."""
     from fastapi.testclient import TestClient
 
     client = TestClient(app)
@@ -530,3 +559,161 @@ def test_flow_snapshot_and_restore():
     # Verify flow was updated
     resp = client.get(f"/api/projects/{pid}/flow")
     assert resp.json()["flow_id"] == "v2"
+
+
+class TestAIDraftWorkflow:
+    def test_generate_draft_does_not_overwrite_flow(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "Draft Test"})
+        pid = resp.json()["id"]
+
+        # Set initial flow
+        flow1 = {"flow_id": "original", "nodes": [], "edges": []}
+        client.put(f"/api/projects/{pid}/flow", json={"flow": flow1})
+
+        # Generate AI draft
+        resp = client.post(f"/api/projects/{pid}/ai/draft-flow", json={"scenario": "task"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "draft_pending"
+
+        # Original flow should be unchanged
+        resp = client.get(f"/api/projects/{pid}/flow")
+        assert resp.json()["flow_id"] == "original"
+
+    def test_confirm_draft_applies_flow(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "Confirm Test"})
+        pid = resp.json()["id"]
+
+        # Generate and confirm draft
+        client.post(f"/api/projects/{pid}/ai/draft-flow", json={"scenario": "task"})
+        resp = client.post(f"/api/projects/{pid}/ai/confirm-draft")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "draft_confirmed"
+
+        # Flow should now be the draft
+        resp = client.get(f"/api/projects/{pid}/flow")
+        assert "ai_generation" in resp.json().get("metadata", {})
+
+    def test_reviewed_confirmation_records_human_audit_metadata(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "Reviewed Draft Test"})
+        pid = resp.json()["id"]
+
+        client.post(f"/api/projects/{pid}/ai/draft-flow", json={"scenario": "task"})
+        draft = client.get(f"/api/projects/{pid}/ai/draft").json()["draft"]
+        required = draft["metadata"]["ai_generation"]["requires_user_confirmation"]
+        resp = client.post(
+            f"/api/projects/{pid}/ai/confirm-draft",
+            json={"confirmed_parameters": required, "confirmed_by": "reviewer@example.org"},
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["confirmed_count"] == len(required)
+        flow = client.get(f"/api/projects/{pid}/flow").json()
+        ai = flow["metadata"]["ai_generation"]
+        assert ai["confirmed_parameters"] == required
+        assert ai["confirmed_by"] == "reviewer@example.org"
+        assert ai["confirmed_at"]
+        assert ai["not_used_for_execution"] is False
+
+    def test_reviewed_confirmation_rejects_missing_items(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "Incomplete Review Test"})
+        pid = resp.json()["id"]
+        client.post(f"/api/projects/{pid}/ai/draft-flow", json={"scenario": "task"})
+
+        resp = client.post(
+            f"/api/projects/{pid}/ai/confirm-draft",
+            json={"confirmed_parameters": [], "confirmed_by": "reviewer@example.org"},
+        )
+
+        assert resp.status_code == 422
+        assert resp.json()["detail"]["code"] == "AI_CONFIRMATIONS_INCOMPLETE"
+        assert client.get(f"/api/projects/{pid}/ai/draft").status_code == 200
+
+    def test_discard_draft_removes_draft(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "Discard Test"})
+        pid = resp.json()["id"]
+
+        # Generate and discard draft
+        client.post(f"/api/projects/{pid}/ai/draft-flow", json={"scenario": "task"})
+        resp = client.delete(f"/api/projects/{pid}/ai/draft")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "draft_discarded"
+
+        # No draft should exist
+        resp = client.get(f"/api/projects/{pid}/ai/draft")
+        assert resp.status_code == 404
+
+    def test_get_draft_returns_pending(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "Get Draft Test"})
+        pid = resp.json()["id"]
+
+        # No draft initially
+        resp = client.get(f"/api/projects/{pid}/ai/draft")
+        assert resp.status_code == 404
+
+        # Generate draft
+        client.post(f"/api/projects/{pid}/ai/draft-flow", json={"scenario": "task"})
+
+        # Get draft
+        resp = client.get(f"/api/projects/{pid}/ai/draft")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "draft_exists"
+
+    def test_confirm_without_draft_returns_404(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "No Draft Test"})
+        pid = resp.json()["id"]
+
+        resp = client.post(f"/api/projects/{pid}/ai/confirm-draft")
+        assert resp.status_code == 404
+
+    def test_validate_draft_returns_risks_and_readiness(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "Validate Draft Test"})
+        pid = resp.json()["id"]
+
+        # Generate draft
+        client.post(f"/api/projects/{pid}/ai/draft-flow", json={"scenario": "task"})
+
+        # Validate draft
+        resp = client.post(f"/api/projects/{pid}/ai/validate-draft")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "draft_validated"
+        assert "valid" in body
+        assert "errors" in body
+        assert "risks" in body
+        assert "readiness" in body
+        # Draft should have AI confirmation risk
+        assert any(r["code"] == "AI_CONFIRMATION_REQUIRED" for r in body["risks"])
+
+    def test_validate_draft_without_draft_returns_404(self):
+        from fastapi.testclient import TestClient
+
+        client = TestClient(app)
+        resp = client.post("/api/projects", json={"name": "No Draft Validate Test"})
+        pid = resp.json()["id"]
+
+        resp = client.post(f"/api/projects/{pid}/ai/validate-draft")
+        assert resp.status_code == 404

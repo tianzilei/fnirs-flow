@@ -495,7 +495,13 @@ def validate_custom_node_safety(node: FlowAtom) -> list[RiskItem]:
 
     # Check file access paths
     for path in manifest.file_access:
-        if path.startswith("/") or ".." in path:
+        _is_abs = (
+            path.startswith("/")
+            or path.startswith("\\")
+            or (len(path) >= 2 and path[1] == ":")
+            or ".." in path
+        )
+        if _is_abs:
             risks.append(
                 RiskItem(
                     risk_id=f"safety-path-{node.id}",

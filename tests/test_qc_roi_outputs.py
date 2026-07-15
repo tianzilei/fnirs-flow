@@ -116,7 +116,7 @@ class TestROIMapping:
         mgr = ROIMappingManager()
         mgr.create_mapping("test")
         roi = ROIDefinition(roi_id="roi1", name="ROI 1", channels=["ch1", "ch2"])
-        assert mgr.add_roi("test", roi) is True
+        assert mgr.add_roi("test", roi)
         mapping = mgr.get_mapping("test")
         assert len(mapping.rois) == 1
 
@@ -139,7 +139,7 @@ class TestROIMapping:
     def test_assign_channels(self):
         mgr = ROIMappingManager()
         mgr.create_from_template("motor", "motor")
-        assert mgr.assign_channels("motor", "left_motor", ["ch1", "ch2"]) is True
+        assert mgr.assign_channels("motor", "left_motor", ["ch1", "ch2"])
 
     def test_validate_mapping(self):
         mgr = ROIMappingManager()

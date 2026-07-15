@@ -80,6 +80,12 @@ def test_parser_rejects_noncanonical_or_unsafe_uris(uri: str) -> None:
 
 
 def test_uri_resolution_does_not_escape_through_symlink(tmp_path: Path) -> None:
+    import sys
+
+    if sys.platform == "win32":
+        import pytest
+
+        pytest.skip("Symlink creation requires elevated privileges on Windows")
     project_dir = tmp_path / "project"
     outside = tmp_path / "outside"
     project_dir.mkdir()

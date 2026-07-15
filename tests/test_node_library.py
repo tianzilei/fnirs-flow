@@ -26,9 +26,9 @@ class TestNodeTemplate:
             atom_type="test",
             tags=["data", "input"],
         )
-        assert template.matches_tags(["data"]) is True
-        assert template.matches_tags(["output"]) is False
-        assert template.matches_tags(["data", "output"]) is True
+        assert template.matches_tags(["data"])
+        assert not template.matches_tags(["output"])
+        assert template.matches_tags(["data", "output"])
 
 
 class TestNodeLibrary:

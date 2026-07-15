@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { useStore } from '../store';
+import { AIDraftReviewPanel } from '../components/AIDraftReviewPanel';
 import { FlowCanvas } from '../components/FlowCanvas';
 import { Sidebar } from '../components/Sidebar';
 import { ValidationPanel } from '../components/ValidationPanel';
 
 export function FlowBuilder() {
+  const [showAIDraft, setShowAIDraft] = useState(false);
+  const project = useStore((s) => s.project);
   const flow = useStore((s) => s.flow);
   const setFlow = useStore((s) => s.setFlow);
   const validation = useStore((s) => s.validation);
@@ -15,7 +19,17 @@ export function FlowBuilder() {
       <div className="canvas-container">
         <FlowCanvas flow={flow} onChange={setFlow} readOnly={readOnly} />
       </div>
-      <ValidationPanel result={validation} />
+      {showAIDraft && project ? (
+        <AIDraftReviewPanel
+          projectId={project.id}
+          projectName={project.name}
+          currentFlow={flow}
+          onApplied={setFlow}
+          onClose={() => setShowAIDraft(false)}
+        />
+      ) : (
+        <ValidationPanel result={validation} onOpenAIDraft={() => setShowAIDraft(true)} />
+      )}
     </div>
   );
 }

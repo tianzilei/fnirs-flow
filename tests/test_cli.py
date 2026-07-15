@@ -51,3 +51,13 @@ class TestCLI:
     def test_dry_run_missing_dag(self, tmp_path):
         result = main(["dry-run", str(tmp_path), "--outdir", str(tmp_path / "dry")])
         assert result == 1
+
+    def test_generate_flow_draft_cli(self, tmp_path):
+        out = tmp_path / "draft.json"
+        result = main(["generate-flow-draft", "task", "--output", str(out)])
+        assert result == 0
+        assert out.exists()
+        data = json.loads(out.read_text())
+        assert data["flow_id"].startswith("draft-task-")
+        assert "ai_generation" in data["metadata"]
+        assert data["metadata"]["ai_generation"]["not_used_for_execution"]

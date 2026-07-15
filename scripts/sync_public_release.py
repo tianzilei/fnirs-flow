@@ -43,6 +43,7 @@ REQUIRED_ROOT_FILES = [
 ]
 
 DIRS = [
+    "config",
     "configs",
     "fnirs_flow",
     "schemas",
@@ -53,12 +54,14 @@ WEBUI_FILES = [
     "webui/index.html",
     "webui/package.json",
     "webui/package-lock.json",
+    "webui/playwright.config.ts",
     "webui/tsconfig.json",
     "webui/tsconfig.node.json",
     "webui/vite.config.ts",
 ]
 
 WEBUI_DIRS = [
+    "webui/e2e",
     "webui/src",
 ]
 
@@ -67,6 +70,19 @@ PUBLIC_DOC_FILES = [
     "docs/specs/fnirs_flow_public_api.md",
     "docs/specs/package_profile_spec.md",
     "docs/specs/mvp_task_glm_acceptance_checklist.md",
+]
+
+# These scripts are part of the public test/runtime contract.  Keep this list
+# explicit so private analysis and manuscript automation are not copied by
+# broadening the whitelist to the entire scripts directory.
+PUBLIC_SCRIPT_FILES = [
+    "scripts/analyze_ds007738_qc_sensitivity.py",
+    "scripts/audit_ds007738_outputs.py",
+    "scripts/benchmark_performance.py",
+    "scripts/build_ds007738_exclusion_manifests.py",
+    "scripts/compare_ds007738_golden_rerun.py",
+    "scripts/run_ds007738_full_analysis.py",
+    "scripts/sync_public_release.py",
 ]
 
 EXCLUDED_NAMES = {
@@ -97,6 +113,14 @@ EXCLUDED_SUFFIXES = (
     ".swp",
     ".swo",
 )
+
+# The public repository owns these paths. A clean sync must preserve them
+# instead of replacing release-specific Git attributes or CI configuration.
+PRESERVED_TARGET_NAMES = {
+    ".git",
+    ".gitattributes",
+    ".github",
+}
 
 FORBIDDEN_PUBLIC_PATHS = (
     ".agents",
@@ -203,7 +227,7 @@ def iter_files(root: Path, rel_dir: str) -> list[Path]:
 def build_copy_plan(root: Path, target: Path) -> list[CopyItem]:
     plan: list[CopyItem] = []
 
-    for rel in ROOT_FILES + WEBUI_FILES + PUBLIC_DOC_FILES:
+    for rel in ROOT_FILES + WEBUI_FILES + PUBLIC_DOC_FILES + PUBLIC_SCRIPT_FILES:
         source = root / rel
         if is_forbidden_public_rel(Path(rel)):
             continue
@@ -279,7 +303,7 @@ def clean_target(target: Path, dry_run: bool) -> None:
         return
 
     for child in sorted(target.iterdir()):
-        if child.name == ".git":
+        if child.name in PRESERVED_TARGET_NAMES:
             continue
         if dry_run:
             print(f"would remove {child}")
@@ -296,7 +320,10 @@ def copy_items(plan: list[CopyItem], dry_run: bool) -> None:
             print(f"would copy {item.source} -> {item.target}")
             continue
         item.target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(item.source, item.target)
+        # Copy content without inheriting filesystem-specific executable bits.
+        # The private working tree can live on a volume that reports every file
+        # as executable; propagating that metadata creates noisy public diffs.
+        shutil.copyfile(item.source, item.target)
 
 
 def init_git(target: Path, dry_run: bool) -> None:

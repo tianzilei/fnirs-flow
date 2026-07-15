@@ -84,9 +84,9 @@ class TestDiscovery:
         assert (tmp_path / "compiled" / "run_table.csv").exists()
 
     def test_discover_local_bids_nirs_tapping(self, tmp_path):
-        sample_root = Path(__file__).resolve().parents[1] / "Sample" / "BIDS-NIRS-Tapping-master"
-        if not sample_root.exists():
-            pytest.skip("private sample dataset is not included in the public release")
+        dataset_root = Path(__file__).resolve().parents[1] / BUILTIN_DATASETS["bids-nirs-tapping"].folder_name
+        if not dataset_root.is_dir():
+            pytest.skip("Private BIDS-NIRS-Tapping sample dataset is not included in the public release")
         manifest = discover_dataset("bids-nirs-tapping", tmp_path)
         assert manifest.dataset_id == "bids-nirs-tapping"
         assert len([f for f in manifest.files if f.role == "raw_snirf"]) == 5

@@ -265,8 +265,8 @@ class DependencyResolver:
 
             return True
         except (ValueError, IndexError):
-            # If we can't parse, assume compatible
-            return True
+            # If we can't parse, assume incompatible (fail closed)
+            return False
 
     def _create_environment_action(
         self,

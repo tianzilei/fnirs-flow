@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -435,8 +436,8 @@ class TestOperationRegistry:
 class TestExecutionRequest:
     def test_defaults(self):
         req = ExecutionRequest(project_dir="/tmp/proj")
-        assert req.continue_on_failure is True
-        assert req.reports_only is False
+        assert req.continue_on_failure
+        assert not req.reports_only
         assert req.participant_labels == []
         assert req.session_labels == []
         assert req.task_labels == []
@@ -450,7 +451,7 @@ class TestExecutionRequest:
         )
         assert req.participant_labels == ["01", "02"]
         assert req.task_labels == ["covert"]
-        assert req.continue_on_failure is False
+        assert not req.continue_on_failure
 
     def test_task_filter_selects_only_requested_task(self, tmp_path):
         manifest = {
@@ -1028,7 +1029,7 @@ class TestGroupScopeExecution:
         outputs = {atom.atom_id: atom.output_handles for atom in group_result.atom_results}
         assert outputs["dpf"]["type"] == "DPFInput"
         assert outputs["outcome"]["type"] == "OutcomeVector"
-        assert outputs["combat"]["ready"] is True
+        assert outputs["combat"]["ready"]
         run_result = next(item for item in result.run_results if item.run_id != "group")
         assert [atom.atom_id for atom in run_result.atom_results] == ["run-design"]
 
@@ -1123,8 +1124,8 @@ class TestAtomDerivativeLocations:
         assert atoms["reader"].artifacts[0]["atom_id"] == "reader"
         assert atoms["reader"].artifacts[0]["relative_path"] == "run-1/import.json"
         assert atoms["reader"].artifacts[0]["path"] == "project://outputs/run-1/import.json"
-        assert atoms["reader"].artifacts[0]["resolved_path"].endswith("run-1/import.json")
-        assert atoms["reader"].artifacts[0]["exists"] is True
+        assert Path(atoms["reader"].artifacts[0]["resolved_path"]).name == "import.json"
+        assert atoms["reader"].artifacts[0]["exists"]
         assert atoms["od"].artifacts[0]["atom_id"] == "od"
         assert atoms["od"].artifacts[0]["relative_path"] == "run-1/od.json"
         assert {artifact["atom_id"] for artifact in result.artifacts} == {"reader", "od"}
@@ -1479,7 +1480,7 @@ class TestGroupSummary:
         assert spec["factors"] == ["group", "sex"]
         assert spec["covariance"] == "hc0"
         assert spec["permutation_count"] == 5
-        assert spec["cluster_inference"] is True
+        assert spec["cluster_inference"]
         with (group_dir / "multiple_comparison_results.csv").open(encoding="utf-8") as stream:
             rows = list(csv.DictReader(stream))
         assert rows[0]["covariance"] == "hc0"

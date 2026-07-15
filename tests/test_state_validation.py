@@ -468,13 +468,13 @@ class TestCustomNodeSafety:
 
 class TestStateTransition:
     def test_valid_readiness_transition(self):
-        assert validate_readiness_transition(ReadinessStatus.NOT_CONFIGURED, ReadinessStatus.CONFIGURED) is True
+        assert validate_readiness_transition(ReadinessStatus.NOT_CONFIGURED, ReadinessStatus.CONFIGURED)
 
     def test_invalid_readiness_transition(self):
-        assert validate_readiness_transition(ReadinessStatus.READY, ReadinessStatus.NOT_CONFIGURED) is False
+        assert not validate_readiness_transition(ReadinessStatus.READY, ReadinessStatus.NOT_CONFIGURED)
 
     def test_blocked_to_configured(self):
-        assert validate_readiness_transition(ReadinessStatus.BLOCKED, ReadinessStatus.CONFIGURED) is True
+        assert validate_readiness_transition(ReadinessStatus.BLOCKED, ReadinessStatus.CONFIGURED)
 
 
 class TestNodeApproval:

@@ -3,8 +3,22 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
+import os
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
+
+
+def _is_loopback_host(host: str) -> bool:
+    normalized = host.strip().lower()
+    if normalized == "localhost" or normalized.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
 
 
 def cmd_backends(args: argparse.Namespace) -> int:
@@ -721,6 +735,10 @@ def cmd_webui(args: argparse.Namespace) -> int:
 
         host = args.host or "127.0.0.1"
         port = args.port
+        if not _is_loopback_host(host) and not os.environ.get("FNIRS_API_KEY"):
+            print("Error: binding WebUI to a non-localhost host requires FNIRS_API_KEY.")
+            print("Set FNIRS_API_KEY or use --host 127.0.0.1 for local-only access.")
+            return 1
 
         if args.dev:
             # Dev mode: start Vite dev server + backend concurrently
@@ -730,7 +748,7 @@ def cmd_webui(args: argparse.Namespace) -> int:
             webui_dir = Path(__file__).parent / "webui"
             if not (webui_dir / "node_modules").exists():
                 print("Installing frontend dependencies...")
-                subprocess.run([sys.executable, "-m", "npm", "install"], cwd=webui_dir, check=True)
+                subprocess.run(["npm", "install"], cwd=webui_dir, check=True)
 
             print("Starting fnirs-flow in DEV mode")
             print(f"  Backend:  http://{host}:{port}")
@@ -760,7 +778,7 @@ def cmd_webui(args: argparse.Namespace) -> int:
                 webui_dir = Path(__file__).parent / "webui"
                 if not (webui_dir / "node_modules").exists():
                     print("Installing frontend dependencies...")
-                    subprocess.run([sys.executable, "-m", "npm", "install"], cwd=webui_dir, check=True)
+                    subprocess.run(["npm", "install"], cwd=webui_dir, check=True)
                 print("Building frontend...")
                 subprocess.run(["npm", "run", "build"], cwd=webui_dir, check=True)
                 print()
@@ -934,6 +952,47 @@ def main(argv: list[str] | None = None) -> int:
     p_export_az.add_argument("--output-dir", default="", help="Output directory path for R script save command")
     p_export_az.set_defaults(func=cmd_export_analyzir)
 
+    # AI draft flow generation
+    def cmd_generate_draft(args: argparse.Namespace) -> int:
+        import json as json_mod
+        import sys
+
+        from fnirs_flow.ai.draft_generator import generate_draft_flow
+
+        try:
+            flow = generate_draft_flow(
+                args.scenario,
+                study_name=args.name or "",
+                data_format=args.format,
+                conditions=args.conditions.split(",") if args.conditions else None,
+                model_name=args.model,
+            )
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        output = json_mod.dumps(flow, indent=2, ensure_ascii=False)
+        if args.output:
+            Path(args.output).write_text(output, encoding="utf-8")
+            print(f"Draft flow written to {args.output}")
+        else:
+            print(output)
+        return 0
+
+    p_draft = subparsers.add_parser(
+        "generate-flow-draft",
+        help="Generate a candidate flow from a scenario template (AI draft)",
+    )
+    p_draft.add_argument(
+        "scenario",
+        help="Scenario: task, resting_state, machine_learning, real_world, hyperscanning, multi_site",
+    )
+    p_draft.add_argument("--name", default="", help="Study name")
+    p_draft.add_argument("--format", default="snirf", help="Data format (default: snirf)")
+    p_draft.add_argument("--conditions", default="", help="Comma-separated experimental conditions")
+    p_draft.add_argument("--model", default="template_based", help="Model identifier")
+    p_draft.add_argument("--output", "-o", default="", help="Output file path (default: stdout)")
+    p_draft.set_defaults(func=cmd_generate_draft)
+
     p_webui = subparsers.add_parser("webui", help="Start the WebUI server")
     p_webui.add_argument("--host", default=None, help="Host to bind to (default: 127.0.0.1)")
     p_webui.add_argument("--port", type=int, default=8000, help="Port to listen on")
@@ -992,7 +1051,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
-    return args.func(args)
+    command = cast(Callable[[argparse.Namespace], int], args.func)
+    return command(args)
 
 
 if __name__ == "__main__":

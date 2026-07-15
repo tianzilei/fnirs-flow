@@ -56,7 +56,14 @@ def validate_flow_dict(flow_dict: dict[str, Any]) -> list[str]:
         except ValidationError as exc:
             errors.extend(str(err["msg"]) for err in exc.errors())
         return errors  # Fall back to built-in structural checks
-    schema = _load_schema("fnirs_flow.schema.json")
+    try:
+        schema = _load_schema("fnirs_flow.schema.json")
+    except FileNotFoundError:
+        try:
+            FlowGraph.model_validate(flow_dict)
+        except ValidationError as exc:
+            errors.extend(str(err["msg"]) for err in exc.errors())
+        return errors
     validator = jsonschema.Draft202012Validator(schema)
     errors.extend(err.message for err in validator.iter_errors(flow_dict))
     return errors

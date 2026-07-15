@@ -163,5 +163,5 @@ class TestAdapterModels:
             network=False,
             checksum="abc123",
         )
-        assert cap.network is False
-        assert cap.shell is False  # default
+        assert not cap.network
+        assert not cap.shell  # default

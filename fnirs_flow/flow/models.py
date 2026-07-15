@@ -146,10 +146,10 @@ class FlowGraph(BaseModel):
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Serialize with flow_atoms dual-write.
 
-        When flow_atoms is None, auto-populates it from nodes for v0.2 export.
+        When flow_atoms was not explicitly set, auto-populates it from nodes for v0.2 export.
         """
         result = super().model_dump(**kwargs)
-        # Auto-populate flow_atoms from nodes if not explicitly set
-        if result.get("flow_atoms") is None:
+        # Auto-populate flow_atoms from nodes only if not explicitly set by caller
+        if "flow_atoms" not in self.model_fields_set and result.get("flow_atoms") is None:
             result["flow_atoms"] = result.get("nodes", [])
         return result

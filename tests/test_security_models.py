@@ -27,8 +27,8 @@ class TestExecutableTrustLevel:
 class TestCapabilityManifest:
     def test_default_manifest(self):
         cap = CapabilityManifest()
-        assert cap.network is False
-        assert cap.shell is False
+        assert not cap.network
+        assert not cap.shell
         assert cap.allowed_operations == []
 
     def test_manifest_with_values(self):
@@ -40,7 +40,7 @@ class TestCapabilityManifest:
             checksum="sha256:abc",
         )
         assert len(cap.allowed_operations) == 2
-        assert cap.network is False
+        assert not cap.network
 
 
 class TestSecurityCheck:

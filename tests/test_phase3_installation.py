@@ -358,7 +358,7 @@ class TestDependencyInstaller:
         # Cancel
         success = installer.cancel("test-task")
         assert success
-        assert installer._cancel_flags["test-task"] is True
+        assert installer._cancel_flags["test-task"]
 
     def test_sanitize_command(self, tmp_path):
         """Verify command sanitization (§8.3)."""
@@ -401,7 +401,7 @@ class TestInstallationOrchestrator:
         orchestrator = InstallationOrchestrator(env_manager)
 
         result = orchestrator.check_environment("test-1.0", "nonexistent")
-        assert result["exists"] is False
+        assert not result["exists"]
         assert result["status"] == "not_found"
 
     def test_list_environments_empty(self, tmp_path):

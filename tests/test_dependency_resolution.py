@@ -427,17 +427,17 @@ class TestProbes:
 
         # pydantic should be installed
         result = probe_package_availability("pydantic", "pydantic")
-        assert result["installed"] is True
+        assert result["installed"]
         assert result["version"] is not None
-        assert result["importable"] is True
+        assert result["importable"]
 
     def test_probe_nonexistent_package(self):
         """Verify probing nonexistent package."""
         from fnirs_flow.dependencies.probes import probe_package_availability
 
         result = probe_package_availability("nonexistent-pkg-xyz", "nonexistent_pkg_xyz")
-        assert result["installed"] is False
-        assert result["importable"] is False
+        assert not result["installed"]
+        assert not result["importable"]
 
 
 @pytest.mark.core

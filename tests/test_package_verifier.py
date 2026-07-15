@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 import zipfile
 from pathlib import Path
 
@@ -50,7 +51,7 @@ class TestPackageVerifier:
             zf.writestr("manifest.json", manifest_data)
 
         result = verify_package(pkg_path)
-        assert result.valid is True
+        assert result.valid
         assert result.profile == "reproducibility_package"
 
     def test_verify_missing_manifest(self, tmp_path: Path) -> None:
@@ -61,7 +62,7 @@ class TestPackageVerifier:
             zf.writestr("plan.json", json.dumps({"test": True}))
 
         result = verify_package(pkg_path)
-        assert result.valid is False
+        assert not result.valid
         assert any("manifest.json" in e for e in result.errors)
 
     def test_verify_missing_required_file(self, tmp_path: Path) -> None:
@@ -85,7 +86,7 @@ class TestPackageVerifier:
             zf.writestr("plan.json", json.dumps({"test": True}))
 
         result = verify_package(pkg_path)
-        assert result.valid is False
+        assert not result.valid
         # Should have missing files for reproducibility_package profile
         assert len(result.missing_files) > 0
 
@@ -106,7 +107,7 @@ class TestPackageVerifier:
             zf.writestr("manifest.json", json.dumps(manifest))
 
         result = verify_package(pkg_path)
-        assert result.valid is False
+        assert not result.valid
         assert any("plan.json" in m for m in result.checksum_mismatches)
 
     def test_verify_profile_mismatch(self, tmp_path: Path) -> None:
@@ -134,7 +135,7 @@ class TestPackageVerifier:
         pkg_path.write_text("not a zip file")
 
         result = verify_package(pkg_path)
-        assert result.valid is False
+        assert not result.valid
         assert any("Invalid zip file" in e for e in result.errors)
 
     def test_verify_nonexistent_file(self, tmp_path: Path) -> None:
@@ -142,8 +143,35 @@ class TestPackageVerifier:
         pkg_path = tmp_path / "nonexistent.fnirsflow.zip"
 
         result = verify_package(pkg_path)
-        assert result.valid is False
+        assert not result.valid
         assert any("not found" in e for e in result.errors)
+
+    def test_verify_rejects_duplicate_paths(self, tmp_path: Path) -> None:
+        """Test verification fails closed on duplicate archive members."""
+        pkg_path = tmp_path / "duplicate.fnirsflow.zip"
+
+        with zipfile.ZipFile(pkg_path, "w") as zf:
+            zf.writestr("plan.json", "{}")
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                zf.writestr("plan.json", "{\"duplicate\": true}")
+            zf.writestr("manifest.json", json.dumps({"schema_version": "1.0.0", "files": {}}))
+
+        result = verify_package(pkg_path)
+        assert not result.valid
+        assert any("duplicate paths" in e for e in result.errors)
+
+    def test_verify_rejects_unsafe_paths(self, tmp_path: Path) -> None:
+        """Test verification rejects zip entries that escape the target tree."""
+        pkg_path = tmp_path / "unsafe.fnirsflow.zip"
+
+        with zipfile.ZipFile(pkg_path, "w") as zf:
+            zf.writestr("../plan.json", "{}")
+            zf.writestr("manifest.json", json.dumps({"schema_version": "1.0.0", "files": {}}))
+
+        result = verify_package(pkg_path)
+        assert not result.valid
+        assert any("Unsafe zip entry" in e for e in result.errors)
 
     def _compute_hash(self, data: dict) -> str:
         """Compute hash of JSON data."""

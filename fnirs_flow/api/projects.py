@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any
 
 from fnirs_flow.api.project_bundle import ProjectBundleError, ProjectBundleManager
 from fnirs_flow.api.uri import URIBindingStore
+from fnirs_flow.history.service import HistoryService
+from fnirs_flow.history.zip_json_store import ZipJsonHistoryStore
 
 if TYPE_CHECKING:
     from fnirs_flow.api.transaction import ProjectTransaction
@@ -299,7 +301,7 @@ class ProjectStore:
         if len(name) > 256:
             raise ValueError("Project name too long (max 256 characters)")
         # Sanitize: project IDs are UUIDs, so no path traversal risk
-        project_id = str(uuid.uuid4())[:8]
+        project_id = uuid.uuid4().hex[:12]
         project_dir = self._bundles.workspace_path(project_id)
         project_dir.mkdir(parents=True, exist_ok=True)
 
@@ -312,6 +314,7 @@ class ProjectStore:
                 "snapshots": [],
                 "attempts": [],
                 "state": {},
+                "pending_draft": None,
             }
             self._persist(project_id, reason="project_created")
 
@@ -423,6 +426,53 @@ class ProjectStore:
             self._projects[project_id].setdefault("state", {}).update(values)
             self._persist(project_id, reason="project_state_updated")
 
+    def save_draft(self, project_id: str, draft_flow: dict[str, Any]) -> bool:
+        """Save a draft flow without overwriting the current project flow.
+
+        The draft is stored as pending_draft until confirmed or discarded.
+        """
+        with self._lock:
+            if project_id not in self._projects:
+                return False
+            self._projects[project_id]["pending_draft"] = draft_flow
+            self._persist(project_id, reason="draft_saved")
+            return True
+
+    def get_draft(self, project_id: str) -> dict[str, Any] | None:
+        """Return the pending draft flow, or None if no draft exists."""
+        proj = self._projects.get(project_id)
+        if proj is None:
+            return None
+        return proj.get("pending_draft")
+
+    def confirm_draft(self, project_id: str) -> dict[str, Any] | None:
+        """Accept the pending draft as the current project flow.
+
+        Returns the confirmed flow, or None if no draft exists.
+        """
+        with self._lock:
+            if project_id not in self._projects:
+                return None
+            draft: dict[str, Any] | None = self._projects[project_id].get("pending_draft")
+            if draft is None:
+                return None
+            self._projects[project_id]["flow"] = draft
+            self._projects[project_id]["pending_draft"] = None
+            self._projects[project_id]["state"] = {}
+            self._persist(project_id, reason="draft_confirmed")
+            return draft
+
+    def discard_draft(self, project_id: str) -> bool:
+        """Discard the pending draft without applying it."""
+        with self._lock:
+            if project_id not in self._projects:
+                return False
+            if self._projects[project_id].get("pending_draft") is None:
+                return False
+            self._projects[project_id]["pending_draft"] = None
+            self._persist(project_id, reason="draft_discarded")
+            return True
+
     def commit_project(self, project_id: str, *, reason: str) -> None:
         """Save direct output-file mutations into the canonical bundle."""
         # Skip if a transaction is active — the transaction will persist on commit
@@ -440,7 +490,6 @@ class ProjectStore:
         if project_id not in self._projects:
             return None
         bundle = self._bundles.bundle_path(project_id)
-        manifest = self._bundles.verify(bundle, expected_project_id=project_id)
         versions = self._bundles.list_versions(project_id)
 
         busy_op: str | None = None
@@ -455,6 +504,7 @@ class ProjectStore:
         last_verified_at = None
         verification_scope = None
         integrity_error = None
+        manifest: dict[str, Any] = {}
 
         try:
             # Verify bundle integrity
@@ -541,6 +591,118 @@ class ProjectStore:
             flow_hash=flow_hash,
             created_at=snapshot.created_at,
         )
+
+    # -- Design History (FlowVCS) --
+
+    def _history_service(self, project_id: str) -> HistoryService:
+        """Return a HistoryService backed by the project's workspace."""
+        self.ensure_project_loaded(project_id)
+        workspace = self._bundles.workspace_path(project_id)
+        return HistoryService(ZipJsonHistoryStore(workspace))
+
+    def initialize_design_history(self, project_id: str) -> str:
+        """Initialize design history for a project. Returns root commit_id."""
+        self.ensure_project_loaded(project_id)
+        flow = self._projects[project_id].get("flow", {})
+        svc = self._history_service(project_id)
+        commit_id = svc.initialize(flow)
+        self._persist(project_id, reason="design_history_initialized")
+        return commit_id
+
+    def commit_design(
+        self,
+        project_id: str,
+        message: str = "",
+        *,
+        reason: str = "manual_design_commit",
+    ) -> str:
+        """Create a new design commit from the current flow."""
+        self.ensure_project_loaded(project_id)
+        flow = self._projects[project_id].get("flow", {})
+        svc = self._history_service(project_id)
+        commit_id = svc.commit(flow, message, reason=reason)
+        self._persist(project_id, reason="design_commit")
+        return commit_id
+
+    def create_design_branch(
+        self, project_id: str, name: str, from_commit_id: str | None = None
+    ) -> dict[str, Any]:
+        """Create a new design branch."""
+        svc = self._history_service(project_id)
+        branch = svc.create_branch(name, from_commit_id)
+        return branch.model_dump()
+
+    def delete_design_branch(self, project_id: str, name: str) -> None:
+        """Delete a design branch."""
+        svc = self._history_service(project_id)
+        svc.delete_branch(name)
+
+    def list_design_branches(self, project_id: str) -> list[dict[str, Any]]:
+        """List all design branches."""
+        svc = self._history_service(project_id)
+        return [b.model_dump() for b in svc.list_branches()]
+
+    def switch_design_branch(self, project_id: str, target: str) -> dict[str, Any]:
+        """Switch to a branch or commit. Returns the target flow."""
+        svc = self._history_service(project_id)
+        flow = svc.checkout(target)
+        # Update the working copy
+        with self._lock:
+            self._projects[project_id]["flow"] = flow
+            self._projects[project_id]["state"] = {}
+        self._persist(project_id, reason="design_checkout")
+        return flow
+
+    def list_design_commits(
+        self,
+        project_id: str,
+        branch: str | None = None,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List design commits."""
+        svc = self._history_service(project_id)
+        return [c.model_dump() for c in svc.list_commits(branch, limit=limit, offset=offset)]
+
+    def get_design_diff(
+        self, project_id: str, from_commit: str, to_commit: str
+    ) -> dict[str, Any]:
+        """Get structured diff between two design commits."""
+        svc = self._history_service(project_id)
+        return svc.diff(from_commit, to_commit).model_dump()
+
+    def is_design_dirty(self, project_id: str) -> bool:
+        """Check if the current flow differs from design HEAD."""
+        self.ensure_project_loaded(project_id)
+        flow = self._projects[project_id].get("flow", {})
+        svc = self._history_service(project_id)
+        if not svc.store.is_initialized():
+            return False
+        return svc.check_dirty(flow)
+
+    def get_design_head(self, project_id: str) -> dict[str, Any] | None:
+        """Get the HEAD design commit info."""
+        svc = self._history_service(project_id)
+        if not svc.store.is_initialized():
+            return None
+        return svc.get_head_commit().model_dump()
+
+    def migrate_snapshots_to_history(self, project_id: str) -> dict[str, Any]:
+        """Import legacy snapshots into design history. Returns migration report."""
+        self.ensure_project_loaded(project_id)
+        proj = self._projects[project_id]
+        snapshots = proj.get("snapshots", [])
+        current_flow = proj.get("flow", {})
+        svc = self._history_service(project_id)
+        # Initialize history if not already done
+        if not svc.store.is_initialized():
+            svc.initialize(current_flow)
+        from fnirs_flow.history.migration import migrate_snapshots_to_history
+        report = migrate_snapshots_to_history(svc, snapshots, current_flow=current_flow)
+        if report.success:
+            self._persist(project_id, reason="history_migration")
+        return report.model_dump()
 
     def get_lock_info(self, project_id: str) -> dict[str, Any]:
         """Return the current lock status for a project."""
@@ -789,7 +951,12 @@ def execute_project_runs(
         )
 
         # Auto-create ProjectSnapshot before execute if flow has changed
-        create_snapshot(store, project_id)
+        snap = create_snapshot(store, project_id)
+
+        # Capture design commit_id for provenance anchoring
+        design_head = store.get_design_head(project_id)
+        design_commit_id = design_head["commit_id"] if design_head else ""
+        snapshot_id = snap.snapshot_id if snap else ""
 
         # Create execution request
         manifest = _load_data_manifest(outdir / "compiled") or {}
@@ -800,6 +967,8 @@ def execute_project_runs(
             data_root=str(binding) if binding else None,
             outdir=str(outdir),
             attempt_id=attempt_id,
+            commit_id=design_commit_id,
+            snapshot_id=snapshot_id,
         )
 
         # Execute via ExecutionService

@@ -82,3 +82,37 @@ class TestValidationAPI:
         report = validate_flow(flow)
 
         assert not report.has_fatal_risks
+
+    def test_ai_confirmation_record_incomplete_when_empty(self, minimal_flow_dict):
+        flow = dict(minimal_flow_dict)
+        flow["metadata"] = {
+            "ai_generation": {
+                "requires_user_confirmation": ["filter band"],
+                "confirmed_parameters": ["filter band"],
+                "confirmed_by": "",
+                "confirmed_at": "",
+                "not_used_for_execution": True,
+            }
+        }
+
+        report = validate_flow(flow)
+
+        assert report.has_fatal_risks
+        assert any(r.code == "AI_CONFIRMATION_RECORD_INCOMPLETE" for r in report.risks)
+        assert report.readiness is not None
+        assert report.readiness.status == "Blocked"
+
+    def test_ai_not_used_for_execution_flag_recorded(self, minimal_flow_dict):
+        flow = dict(minimal_flow_dict)
+        flow["metadata"] = {
+            "ai_generation": {
+                "requires_user_confirmation": [],
+                "confirmed_parameters": [],
+                "not_used_for_execution": False,
+            }
+        }
+
+        report = validate_flow(flow)
+        # not_used_for_execution=False does not block by itself,
+        # but the flag is preserved for downstream consumers
+        assert not report.has_fatal_risks

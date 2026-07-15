@@ -37,8 +37,8 @@ def test_run_benchmark_records_valid_methodology(tmp_path: Path) -> None:
         work_dir=tmp_path,
     )
 
-    assert results["valid"] is True
-    assert results["methodology"]["canonical_bundle_verified"] is True
+    assert results["valid"]
+    assert results["methodology"]["canonical_bundle_verified"]
     assert results["methodology"]["payload_location"].startswith("managed .workspaces")
     assert results["benchmarks"]["1mb"]["payload"]["written_bytes"] == MIB
 

@@ -80,7 +80,7 @@ def execute_run_with_adapter(
         run_ctx.status = "completed"
         run_ctx.completed_at = datetime.now(timezone.utc).isoformat()
 
-    except Exception as exc:
+    except (OSError, ValueError, TypeError, RuntimeError, ImportError) as exc:
         run_ctx.status = "failed"
         run_ctx.errors.append(str(exc))
         run_ctx.completed_at = datetime.now(timezone.utc).isoformat()

@@ -214,13 +214,13 @@ class TestProjectLockRegistry:
         registry = ProjectLockRegistry(tmp_path / "locks")
         info = registry.get_lock_info("p1")
         assert info["project_id"] == "p1"
-        assert info["locked"] is False
+        assert not info["locked"]
 
     def test_get_lock_info_locked(self, tmp_path: Path) -> None:
         registry = ProjectLockRegistry(tmp_path / "locks")
         holder, cross = registry.acquire_write("p1", "compile", timeout=1.0)
         info = registry.get_lock_info("p1")
-        assert info["locked"] is True
+        assert info["locked"]
         assert info["operation"] == "compile"
         registry.release_write("p1", holder, cross)
 
@@ -455,7 +455,7 @@ class TestBackwardCompatibility:
         """update_flow() should work without transactions."""
         pid = project.id
         result = store.update_flow(pid, {"flow_id": "test"})
-        assert result is True
+        assert result
 
         proj = store.get(pid)
         assert proj is not None

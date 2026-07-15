@@ -527,14 +527,25 @@ class InstallationOrchestrator:
             for e in envs
         ]
 
+    def list_tasks(self) -> list[Any]:
+        """List all installation tasks."""
+        return self._installer.list_tasks()
 
-# Global orchestrator
+    def cancel(self, task_id: str) -> bool:
+        """Cancel an installation task."""
+        return self._installer.cancel(task_id)
+
+
+# Global orchestrator (thread-safe singleton)
 _orchestrator: InstallationOrchestrator | None = None
+_orchestrator_lock = __import__("threading").Lock()
 
 
 def get_installation_orchestrator() -> InstallationOrchestrator:
     """Get the global installation orchestrator."""
     global _orchestrator
     if _orchestrator is None:
-        _orchestrator = InstallationOrchestrator()
+        with _orchestrator_lock:
+            if _orchestrator is None:
+                _orchestrator = InstallationOrchestrator()
     return _orchestrator

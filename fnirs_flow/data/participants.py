@@ -235,6 +235,11 @@ SENSITIVE_NAME_HINTS = {
     "mrn",
 }
 
+ALLOWED_PARTICIPANT_TABLE_SUFFIXES = {".csv", ".tsv", ".txt"}
+MAX_PARTICIPANT_TABLE_BYTES = 10 * 1024**2
+MAX_PARTICIPANT_TABLE_ROWS = 100_000
+MAX_PARTICIPANT_TABLE_COLUMNS = 256
+
 
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -329,14 +334,36 @@ def read_participant_table(
     delimiter: str = "auto",
     encoding: str = "utf-8-sig",
     column_role_map: ColumnRoleMap | None = None,
+    max_bytes: int = MAX_PARTICIPANT_TABLE_BYTES,
+    max_rows: int = MAX_PARTICIPANT_TABLE_ROWS,
+    max_columns: int = MAX_PARTICIPANT_TABLE_COLUMNS,
 ) -> ParticipantTable:
     """Read a CSV/TSV participant or observation table with provenance."""
     table_path = Path(path)
+    suffix = table_path.suffix.lower()
+    if suffix not in ALLOWED_PARTICIPANT_TABLE_SUFFIXES:
+        allowed = ", ".join(sorted(ALLOWED_PARTICIPANT_TABLE_SUFFIXES))
+        raise ValueError(f"Participant table must be one of: {allowed}")
+    size_bytes = table_path.stat().st_size
+    if size_bytes > max_bytes:
+        raise ValueError(
+            f"Participant table is too large ({size_bytes} bytes, max {max_bytes} bytes)"
+        )
     actual_delimiter = detect_delimiter(table_path, encoding=encoding, requested=delimiter)
     with table_path.open(newline="", encoding=encoding) as stream:
         reader = csv.DictReader(stream, delimiter=actual_delimiter)
-        rows = [{key: _coerce_cell(value or "") for key, value in row.items()} for row in reader]
         fieldnames = list(reader.fieldnames or [])
+        if len(fieldnames) > max_columns:
+            raise ValueError(
+                f"Participant table has too many columns ({len(fieldnames)}, max {max_columns})"
+            )
+        rows = []
+        for index, row in enumerate(reader, start=1):
+            if index > max_rows:
+                raise ValueError(
+                    f"Participant table has too many rows (max {max_rows})"
+                )
+            rows.append({key: _coerce_cell(value or "") for key, value in row.items()})
 
     roles = column_role_map or ColumnRoleMap(id_column=id_column, include_column=include_column)
     source = TableFileReference(
@@ -347,7 +374,7 @@ def read_participant_table(
         encoding=encoding,
         delimiter="tab" if actual_delimiter == "\t" else actual_delimiter,
         sha256=file_sha256(table_path),
-        size_bytes=table_path.stat().st_size,
+        size_bytes=size_bytes,
     )
     model = ObservationTable if table_kind == "observation" else ParticipantTable
     return model(

@@ -204,6 +204,8 @@ class ExecutionJobRead(BaseModel):
 
     attempt_id: str
     project_id: str
+    commit_id: str = ""
+    snapshot_id: str = ""
     status: str
     created_at: str
     started_at: str = ""

@@ -1,6 +1,53 @@
 # Changelog
 
+## [1.2.0] - 2026-07-15
+
+### Added — FlowVCS (Design History)
+
+FlowVCS is a content-addressed version control system for `.fnirsflow` project files.
+Implemented in `fnirs_flow/history/` with no external dependencies (no Git CLI, no SQLite).
+
+- Commit, branch, checkout, diff, and restore operations for FlowGraph designs
+- SHA-256 content-addressed object storage with automatic deduplication
+- ZIP JSON store with sharded objects and state persistence
+- Legacy `ProjectSnapshot` migration into FlowVCS history
+- History API endpoints (initialize, commit, branch, checkout, diff, list)
+- WebUI Design History Panel for commit, branch, checkout, diff, and legacy migration
+- Transaction-level HEAD concurrency control
+- Cross-machine bundle preservation verified
+- **Phase 4 acceptance**: 10 MiB history budget, object dedup, fail-closed corruption, cross-platform reading
+
+Status: stable for the 1.2.0 release line; semantic merge remains deferred.
+
+### Added — AI Draft Contract
+
+- Independent draft state: `pending_draft` stored separately from current flow
+- Generate, get, validate, confirm, discard draft endpoints
+- Draft validation with risk/readiness assessment without confirming
+- CLI `generate-flow-draft` command
+- Schema-compliant draft generation with proper position, handle, and readiness fields
+- WebUI review panel with current-vs-draft diff, assumptions, validation risks, and explicit confirmations
+- Human reviewer, confirmation timestamp, and exact confirmed parameters recorded before applying a draft
+- Schema-compatible port wiring; task drafts now produce no schema or graph validation errors
+
+### Changed
+
+- Version boundary: v1.1.1 tag created at commit 6104137b
+- Version finalized as 1.2.0 after FlowVCS, AI Draft Review, package rerun, and ds007738 gates passed
+
+### Fixed
+
+- Imported package reruns now use local `external-data://` URI bindings when packaged `data_manifest.json` keeps `local_root` empty for portability.
+- API project relink no longer writes machine-local URI bindings into the bundled `outputs/` tree.
+
+### Deferred
+
+- Semantic merge support (Phase 5, optional)
+
 ## [1.1.1] - 2026-07-14
+
+> FlowVCS design history is implemented and tested but marked as a 1.2+ feature.
+> It is available in this release for evaluation; the API is not yet frozen.
 
 ### Fixed
 - Quarantine bundles (`corrupt-*.fnirsflow`) no longer consume retained revision slots

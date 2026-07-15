@@ -410,8 +410,9 @@ def process_run(run: RunRecord, index: int, total: int) -> dict[str, Any]:
     finally:
         payload["elapsed_seconds"] = round(time.time() - t0, 3)
         payload["finished_at"] = datetime.now(timezone.utc).isoformat()
-        payload["artifacts"] = [artifact.model_dump() for artifact in adapter.artifacts.all()]
-        payload["provenance"] = adapter.provenance.all()
+        if adapter is not None:
+            payload["artifacts"] = [artifact.model_dump() for artifact in adapter.artifacts.all()]
+            payload["provenance"] = adapter.provenance.all()
         RUN_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         result_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         with PROGRESS_PATH.open("a", encoding="utf-8") as f:

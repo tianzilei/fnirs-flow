@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, Field
+
+MAX_PACKAGE_BYTES = 10 * 1024**2
+MAX_UNCOMPRESSED_BYTES = 10 * 1024**2
+MAX_MEMBER_BYTES = 8 * 1024**2
+MAX_PACKAGE_FILES = 5_000
+MAX_COMPRESSION_RATIO = 1_000
+MAX_MANIFEST_BYTES = 1024**2
 
 
 class VerificationResult(BaseModel):
@@ -46,8 +54,16 @@ def verify_package(package_path: str | Path, expected_profile: str | None = None
         result.errors.append(f"Package must be a .zip file: {package_path}")
         return result
 
+    if package_path.stat().st_size > MAX_PACKAGE_BYTES:
+        result.valid = False
+        result.errors.append("Package exceeds the 10 MiB size limit")
+        return result
+
     try:
         with zipfile.ZipFile(package_path, "r") as zf:
+            if not _validate_archive_bounds(zf, result):
+                result.valid = False
+                return result
             # Check for manifest (exact match for "manifest.json")
             manifest_path = None
             for name in zf.namelist():
@@ -62,7 +78,12 @@ def verify_package(package_path: str | Path, expected_profile: str | None = None
 
             # Read and validate manifest
             try:
-                manifest_data = json.loads(zf.read(manifest_path))
+                manifest_info = zf.getinfo(manifest_path)
+                if manifest_info.file_size > MAX_MANIFEST_BYTES:
+                    result.valid = False
+                    result.errors.append("manifest.json exceeds the 1 MiB size limit")
+                    return result
+                manifest_data = json.loads(zf.read(manifest_info))
             except json.JSONDecodeError as e:
                 result.valid = False
                 result.errors.append(f"Invalid manifest.json: {e}")
@@ -155,11 +176,64 @@ def _get_required_files(profile: str) -> list[str]:
     return required
 
 
+def _is_safe_member_path(name: str) -> bool:
+    if not name or "\\" in name or name.startswith(("/", "~/", "//")):
+        return False
+    if len(name) >= 3 and name[0].isalpha() and name[1:3] in {":/", ":\\"}:
+        return False
+    path = PurePosixPath(name.rstrip("/"))
+    return (
+        not path.is_absolute()
+        and bool(path.parts)
+        and not any(part in {"", ".", ".."} for part in path.parts)
+    )
+
+
+def _validate_archive_bounds(zf: zipfile.ZipFile, result: VerificationResult) -> bool:
+    infos = zf.infolist()
+    names = [info.filename for info in infos]
+    if len(names) != len(set(names)):
+        result.errors.append("Package contains duplicate paths")
+        return False
+    if len(names) > MAX_PACKAGE_FILES:
+        result.errors.append("Package contains too many files")
+        return False
+
+    total_uncompressed = 0
+    for info in infos:
+        if not _is_safe_member_path(info.filename):
+            result.errors.append(f"Unsafe zip entry: {info.filename}")
+            return False
+        mode = info.external_attr >> 16
+        if stat.S_ISLNK(mode):
+            result.errors.append(f"Symbolic links are not allowed: {info.filename}")
+            return False
+        if info.is_dir():
+            continue
+        if info.file_size > MAX_MEMBER_BYTES:
+            result.errors.append(f"Package member exceeds the 8 MiB size limit: {info.filename}")
+            return False
+        total_uncompressed += info.file_size
+        if total_uncompressed > MAX_UNCOMPRESSED_BYTES:
+            result.errors.append("Package exceeds the 10 MiB extracted-size limit")
+            return False
+        if info.file_size and info.compress_size == 0:
+            result.errors.append(f"Package member has an invalid compressed size: {info.filename}")
+            return False
+        if info.compress_size and info.file_size / info.compress_size > MAX_COMPRESSION_RATIO:
+            result.errors.append(f"Package member compression ratio is too high: {info.filename}")
+            return False
+    return True
+
+
 def _compute_file_hash(zf: zipfile.ZipFile, file_path: str) -> str:
     """Compute SHA256 hash of a file in the zip archive."""
     try:
-        data = zf.read(file_path)
-        return hashlib.sha256(data).hexdigest()
+        digest = hashlib.sha256()
+        with zf.open(file_path) as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
     except Exception:
         return ""
 

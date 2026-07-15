@@ -277,7 +277,7 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       await api.updateFlow(project.id, flow);
       const readiness = await api.getProjectStatus(project.id);
-      set({ readiness, loading: false, error: { message: 'Flow saved', detail: '' } });
+      set({ readiness, loading: false, error: { message: 'Flow saved' } });
     } catch (e: any) {
       set({ error: { message: 'Failed to save flow', detail: api.formatApiError(e) }, loading: false });
     }

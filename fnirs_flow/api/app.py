@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import ipaddress
 import json
 import logging
 import os
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -82,7 +85,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         get_lock_registry(lock_dir=lock_dir)
     except ValueError:
-        pass  # Already initialized with different lock_dir
+        import logging
+
+        logging.getLogger(__name__).debug("Lock registry already initialized with different lock_dir")
 
     yield
     # Shutdown (nothing to do)
@@ -125,6 +130,42 @@ app.add_middleware(RequestSizeLimitMiddleware)
 # --- API key authentication (optional, enabled via FNIRS_API_KEY env var) ---
 _API_KEY = os.environ.get("FNIRS_API_KEY", "")
 _PUBLIC_PATHS = {"/api/health", "/docs", "/openapi.json", "/redoc"}
+
+
+def _is_loopback_host(host: str | None) -> bool:
+    """Return True for local clients, including FastAPI's in-process test client."""
+    if not host:
+        return True
+    normalized = host.strip().lower()
+    if normalized in {"localhost", "testclient"} or normalized.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+class LocalOnlyWithoutAPIKeyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if _API_KEY:
+            return await call_next(request)
+        if request.url.path in _PUBLIC_PATHS:
+            return await call_next(request)
+        client_host = request.client.host if request.client else None
+        if not _is_loopback_host(client_host):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "detail": (
+                        "Remote API access requires FNIRS_API_KEY. "
+                        "Bind to localhost or set FNIRS_API_KEY before exposing the server."
+                    )
+                },
+            )
+        return await call_next(request)
+
+
+app.add_middleware(LocalOnlyWithoutAPIKeyMiddleware)
 
 
 class APIKeyAuthMiddleware(BaseHTTPMiddleware):
@@ -204,6 +245,48 @@ def get_job_manager():
 
                 _job_manager = ExecutionJobManager(store, progress_callback=push_progress)
     return _job_manager
+
+
+def _configured_allowed_roots() -> list[Path]:
+    roots: list[Path] = []
+    raw = os.environ.get("FNIRS_ALLOWED_PATH_ROOTS", "")
+    for item in raw.split(os.pathsep):
+        if not item.strip():
+            continue
+        roots.append(Path(item).expanduser().resolve())
+    return roots
+
+
+def _local_path_roots(project_id: str) -> list[Path]:
+    """Roots from which API clients may ask the server to read local files."""
+    store = get_store()
+    roots = [
+        store._base_dir.resolve(),  # Project bundles and exported packages.
+        store._bundles.workspace_path(project_id).resolve(),
+        store.get_output_dir(project_id).resolve(),
+    ]
+    roots.extend(path.resolve() for path in store.list_dataset_bindings().values())
+    roots.extend(_configured_allowed_roots())
+    return roots
+
+
+def _resolve_allowed_local_file(value: str, project_id: str, *, label: str) -> Path:
+    if not value or not value.strip():
+        raise HTTPException(status_code=422, detail=f"{label} is required")
+    path = Path(value).expanduser().resolve()
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"{label} does not exist or is not a file")
+    roots = _local_path_roots(project_id)
+    if not any(path.is_relative_to(root) for root in roots):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"{label} is outside the allowed local roots. "
+                "Move it into the project workspace, bind its dataset root, "
+                "or set FNIRS_ALLOWED_PATH_ROOTS."
+            ),
+        )
+    return path
 
 
 def _api_error(
@@ -492,11 +575,12 @@ async def import_participant_table_endpoint(project_id: str, data: ParticipantTa
             recoverable=False,
             suggested_action="Select an existing project",
         )
+    table_path = _resolve_allowed_local_file(data.path, project_id, label="Participant table path")
     try:
         result = import_project_participant_table(
             get_store(),
             project_id,
-            data.path,
+            str(table_path),
             table_kind=data.table_kind,
             id_column=data.id_column,
             include_column=data.include_column,
@@ -699,6 +783,362 @@ async def project_bundle_status_endpoint(project_id: str):
     return result
 
 
+# --- Design History (FlowVCS) ---
+
+
+@app.post("/api/projects/{project_id}/history/initialize")
+async def initialize_design_history_endpoint(project_id: str):
+    """Initialize design history for a project."""
+    try:
+        commit_id = get_store().initialize_design_history(project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return {"commit_id": commit_id}
+
+
+@app.get("/api/projects/{project_id}/history")
+async def get_design_history_endpoint(project_id: str):
+    """Get design history status (HEAD, branches, dirty)."""
+    store = get_store()
+    head = store.get_design_head(project_id)
+    branches = store.list_design_branches(project_id)
+    dirty = store.is_design_dirty(project_id)
+    return {
+        "head": head,
+        "branches": branches,
+        "dirty": dirty,
+    }
+
+
+@app.get("/api/projects/{project_id}/history/commits")
+async def list_design_commits_endpoint(
+    project_id: str,
+    branch: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List design commits."""
+    return get_store().list_design_commits(project_id, branch, limit=limit, offset=offset)
+
+
+@app.get("/api/projects/{project_id}/history/commits/{commit_id}")
+async def get_design_commit_endpoint(project_id: str, commit_id: str):
+    """Get a specific design commit."""
+    from fnirs_flow.history.errors import CommitNotFound
+
+    try:
+        svc = get_store()._history_service(project_id)
+        commit = svc.get_commit(commit_id)
+        return commit.model_dump()
+    except CommitNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/api/projects/{project_id}/history/commits")
+async def create_design_commit_endpoint(project_id: str, body: dict[str, Any]):
+    """Create a new design commit."""
+    message = body.get("message", "")
+    reason = body.get("reason", "manual_design_commit")
+    try:
+        commit_id = get_store().commit_design(project_id, message, reason=reason)
+        return {"commit_id": commit_id}
+    except Exception as exc:
+        from fnirs_flow.history.errors import NoChanges
+
+        if isinstance(exc, NoChanges):
+            raise _api_error(
+                409,
+                "NO_CHANGES",
+                str(exc),
+                "design_commit",
+                recoverable=True,
+                suggested_action="Modify the flow before committing",
+            ) from exc
+        raise
+
+
+@app.get("/api/projects/{project_id}/history/diff")
+async def design_diff_endpoint(
+    project_id: str,
+    from_commit: str = "",
+    to_commit: str = "",
+):
+    """Get structured diff between two design commits."""
+    if not from_commit or not to_commit:
+        raise HTTPException(status_code=422, detail="Both from_commit and to_commit are required")
+    try:
+        return get_store().get_design_diff(project_id, from_commit, to_commit)
+    except (ValueError, KeyError, OSError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/api/projects/{project_id}/history/branches")
+async def create_design_branch_endpoint(project_id: str, body: dict[str, Any]):
+    """Create a new design branch."""
+    name = body.get("name", "")
+    from_commit = body.get("from_commit_id")
+    try:
+        branch = get_store().create_design_branch(project_id, name, from_commit)
+        return branch
+    except Exception as exc:
+        from fnirs_flow.history.errors import BranchAlreadyExists, BranchNameInvalid
+
+        if isinstance(exc, BranchNameInvalid):
+            raise _api_error(
+                422,
+                "BRANCH_NAME_INVALID",
+                str(exc),
+                "branch_create",
+                recoverable=True,
+                suggested_action="Use a valid branch name",
+            ) from exc
+        if isinstance(exc, BranchAlreadyExists):
+            raise _api_error(
+                409,
+                "BRANCH_ALREADY_EXISTS",
+                str(exc),
+                "branch_create",
+                recoverable=True,
+                suggested_action="Use a different branch name",
+            ) from exc
+        raise
+
+
+@app.delete("/api/projects/{project_id}/history/branches/{name}")
+async def delete_design_branch_endpoint(project_id: str, name: str):
+    """Delete a design branch."""
+    try:
+        get_store().delete_design_branch(project_id, name)
+        return {"status": "deleted"}
+    except Exception as exc:
+        from fnirs_flow.history.errors import BranchNotFound
+
+        if isinstance(exc, BranchNotFound):
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise
+
+
+@app.post("/api/projects/{project_id}/history/checkout")
+async def checkout_design_branch_endpoint(project_id: str, body: dict[str, Any]):
+    """Switch to a design branch or commit."""
+    target = body.get("target", "")
+    try:
+        flow = get_store().switch_design_branch(project_id, target)
+        return {"flow": flow, "target": target}
+    except Exception as exc:
+        from fnirs_flow.history.errors import BranchNotFound
+
+        if isinstance(exc, BranchNotFound):
+            raise HTTPException(status_code=404, detail=str(exc))
+        raise
+
+
+@app.post("/api/projects/{project_id}/history/migrate")
+async def migrate_design_history_endpoint(project_id: str):
+    """Migrate legacy snapshots into design history."""
+    try:
+        report = get_store().migrate_snapshots_to_history(project_id)
+        return report
+    except Exception as exc:
+        raise _api_error(
+            500,
+            "MIGRATION_FAILED",
+            str(exc),
+            "history_migration",
+            recoverable=True,
+            suggested_action="Check project snapshots and retry",
+        ) from exc
+
+
+# --- AI Draft Flow Generation ---
+
+
+@app.post("/api/ai/draft-flow")
+async def generate_ai_draft_endpoint(body: dict[str, Any]):
+    """Generate a candidate flow from a scenario template."""
+    from fnirs_flow.ai.draft_generator import generate_draft_flow
+
+    scenario = body.get("scenario", "task")
+    try:
+        flow = generate_draft_flow(
+            scenario,
+            study_name=body.get("study_name", ""),
+            data_format=body.get("data_format", "snirf"),
+            conditions=body.get("conditions"),
+            model_name=body.get("model", "api_template"),
+            assumptions=body.get("assumptions"),
+            user_confirmations=body.get("user_confirmations"),
+        )
+        return flow
+    except ValueError as exc:
+        raise _api_error(
+            422,
+            "INVALID_SCENARIO",
+            str(exc),
+            "ai_draft",
+            recoverable=True,
+            suggested_action="Use one of: task, resting_state, machine_learning, real_world, hyperscanning, multi_site",
+        ) from exc
+
+
+@app.post("/api/projects/{project_id}/ai/draft-flow")
+async def generate_ai_draft_for_project_endpoint(project_id: str, body: dict[str, Any]):
+    """Generate a candidate flow and save it as a pending draft.
+
+    The draft does NOT overwrite the current project flow.
+    Use POST /api/projects/{id}/ai/confirm-draft to accept it,
+    or DELETE /api/projects/{id}/ai/draft to discard it.
+    """
+    from fnirs_flow.ai.draft_generator import generate_draft_flow
+
+    scenario = body.get("scenario", "task")
+    try:
+        flow = generate_draft_flow(
+            scenario,
+            study_name=body.get("study_name", ""),
+            data_format=body.get("data_format", "snirf"),
+            conditions=body.get("conditions"),
+            model_name=body.get("model", "api_template"),
+            assumptions=body.get("assumptions"),
+            user_confirmations=body.get("user_confirmations"),
+        )
+    except ValueError as exc:
+        raise _api_error(
+            422,
+            "INVALID_SCENARIO",
+            str(exc),
+            "ai_draft",
+            recoverable=True,
+            suggested_action="Use one of: task, resting_state, machine_learning, real_world, hyperscanning, multi_site",
+        ) from exc
+
+    store = get_store()
+    if store.get(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    store.save_draft(project_id, flow)
+    return {
+        "status": "draft_pending",
+        "flow_id": flow.get("flow_id"),
+        "ai_generation": flow.get("metadata", {}).get("ai_generation"),
+        "message": (
+            "Draft saved. Confirm with POST /api/projects/{id}/ai/confirm-draft"
+            " or discard with DELETE /api/projects/{id}/ai/draft"
+        ),
+    }
+
+
+@app.get("/api/projects/{project_id}/ai/draft")
+async def get_ai_draft_endpoint(project_id: str):
+    """Get the pending AI draft for a project, if any."""
+    store = get_store()
+    if store.get(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    draft = store.get_draft(project_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="No pending draft")
+    return {"status": "draft_exists", "draft": draft}
+
+
+@app.post("/api/projects/{project_id}/ai/validate-draft")
+async def validate_ai_draft_endpoint(project_id: str):
+    """Validate the pending AI draft without confirming it.
+
+    Returns validation errors, risks, warnings, and readiness assessment.
+    Does not modify the draft or project flow.
+    """
+    from fnirs_flow.validation.api import validate_flow
+
+    store = get_store()
+    if store.get(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    draft = store.get_draft(project_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="No pending draft to validate")
+
+    report = validate_flow(draft)
+    return {
+        "status": "draft_validated",
+        "flow_id": draft.get("flow_id"),
+        "valid": len(report.errors) == 0,
+        "errors": report.errors,
+        "warnings": report.warnings,
+        "risks": [
+            {
+                "risk_id": r.risk_id,
+                "code": r.code,
+                "severity": r.severity,
+                "domain": r.domain,
+                "message": r.message,
+                "suggested_action": r.suggested_action,
+            }
+            for r in report.risks
+        ],
+        "readiness": report.readiness,
+    }
+
+
+@app.post("/api/projects/{project_id}/ai/confirm-draft")
+async def confirm_ai_draft_endpoint(project_id: str, body: dict[str, Any] | None = None):
+    """Accept the pending AI draft as the current project flow.
+
+    Review-aware clients may submit the exact confirmation strings plus a
+    human reviewer. Calls without a body retain the original API behavior.
+    """
+    store = get_store()
+    if store.get(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    draft = store.get_draft(project_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="No pending draft to confirm")
+
+    if body:
+        ai_generation = draft.get("metadata", {}).get("ai_generation", {})
+        required = [str(item) for item in ai_generation.get("requires_user_confirmation", [])]
+        reviewed_parameters = list(dict.fromkeys(str(item) for item in body.get("confirmed_parameters", [])))
+        confirmed_by = str(body.get("confirmed_by", "")).strip()
+        missing = [item for item in required if item not in set(reviewed_parameters)]
+        if missing or (required and not confirmed_by):
+            detail = "All AI confirmation items and a human reviewer are required"
+            if missing:
+                detail += f"; missing: {'; '.join(missing)}"
+            raise _api_error(
+                422,
+                "AI_CONFIRMATIONS_INCOMPLETE",
+                detail,
+                "ai_draft_review",
+                recoverable=True,
+                suggested_action="Review every listed item and identify the human reviewer",
+            )
+        ai_generation["confirmed_parameters"] = reviewed_parameters
+        ai_generation["confirmed_by"] = confirmed_by
+        ai_generation["confirmed_at"] = datetime.now(timezone.utc).isoformat()
+        ai_generation["not_used_for_execution"] = False
+
+    confirmed = store.confirm_draft(project_id)
+    if confirmed is None:
+        raise HTTPException(status_code=404, detail="No pending draft to confirm")
+    ai_generation = confirmed.get("metadata", {}).get("ai_generation", {})
+    return {
+        "status": "draft_confirmed",
+        "flow_id": confirmed.get("flow_id"),
+        "confirmed_by": ai_generation.get("confirmed_by", ""),
+        "confirmed_count": len(ai_generation.get("confirmed_parameters", [])),
+    }
+
+
+@app.delete("/api/projects/{project_id}/ai/draft")
+async def discard_ai_draft_endpoint(project_id: str):
+    """Discard the pending AI draft without applying it."""
+    store = get_store()
+    if store.get(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    discarded = store.discard_draft(project_id)
+    if not discarded:
+        raise HTTPException(status_code=404, detail="No pending draft to discard")
+    return {"status": "draft_discarded"}
+
+
 @app.post("/api/projects/{project_id}/bundle/restore/{revision}", response_model=ProjectRead)
 async def restore_project_bundle_endpoint(project_id: str, revision: int):
     """Restore a retained full-project version as a new revision."""
@@ -807,14 +1247,16 @@ async def import_package_endpoint(project_id: str, package_path: str, data_root:
     store = get_store()
     if store.get(project_id) is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    resolved_package_path = _resolve_allowed_local_file(package_path, project_id, label="Package path")
     outdir = store.get_output_dir(project_id)
     try:
         result = do_import(
-            package_path,
+            resolved_package_path,
             str(outdir),
             relink_data=data_root is not None,
             data_root=data_root,
             project_layout=True,
+            persist_binding=False,
         )
         imported_flow = load_flow_from_compiled_package(outdir / "compiled")
         if data_root is not None:
@@ -831,10 +1273,10 @@ async def import_package_endpoint(project_id: str, package_path: str, data_root:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except OSError as e:
         logger.error("Import IO error: %s", e)
-        raise HTTPException(status_code=500, detail=f"File system error: {e}") from e
+        raise HTTPException(status_code=500, detail="File system error during import") from e
     except Exception as e:
         logger.exception("Unexpected error during import")
-        raise HTTPException(status_code=500, detail=f"Import failed: {e}") from e
+        raise HTTPException(status_code=500, detail="Import failed due to an internal error") from e
 
 
 @app.post("/api/projects/{project_id}/fork")
@@ -856,10 +1298,10 @@ async def fork_project_endpoint(project_id: str, fork_name: str = ""):
         raise HTTPException(status_code=400, detail=str(e)) from e
     except OSError as e:
         logger.error("Fork IO error: %s", e)
-        raise HTTPException(status_code=500, detail=f"File system error: {e}") from e
+        raise HTTPException(status_code=500, detail="File system error during fork") from e
     except Exception as e:
         logger.exception("Unexpected error during fork")
-        raise HTTPException(status_code=500, detail=f"Fork failed: {e}") from e
+        raise HTTPException(status_code=500, detail="Fork failed due to an internal error") from e
 
 
 @app.post("/api/projects/{project_id}/trust-atom/{atom_id}")
@@ -881,14 +1323,12 @@ async def trust_atom_endpoint(project_id: str, atom_id: str):
 @app.get("/api/projects/{project_id}/import-status")
 async def import_status_endpoint(project_id: str):
     """Check if a project was imported and its restrictions."""
-    import json as json_mod
-
     store = get_store()
     outdir = store.get_output_dir(project_id)
     metadata_path = outdir / "import_metadata.json"
     if not metadata_path.exists():
         return {"imported": False, "read_only": False, "quarantined_atoms": []}
-    metadata = json_mod.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     return {
         "imported": True,
         "read_only": metadata.get("read_only", False),
@@ -911,7 +1351,7 @@ async def relink_project_data_endpoint(project_id: str, data_root: str):
     from fnirs_flow.exporters.package_importer import relink_package_data
 
     try:
-        relink_result = relink_package_data(outdir, root)
+        relink_result = relink_package_data(outdir, root, persist_binding=False)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Imported package has no data_manifest.json") from exc
     manifest_path = Path(relink_result["manifest_path"])
@@ -1007,9 +1447,7 @@ async def resolve_dependencies_endpoint(project_id: str):
         if not dag_path.exists():
             raise HTTPException(status_code=404, detail="execution_dag.json not found")
 
-        import json as json_mod
-
-        dag = json_mod.loads(dag_path.read_text(encoding="utf-8"))
+        dag = json.loads(dag_path.read_text(encoding="utf-8"))
 
         from fnirs_flow.dependencies.resolver import resolve_dependencies
 
@@ -1032,20 +1470,17 @@ async def get_dependency_plan(plan_id: str):
         compiled_dir = store.get_output_dir(proj.id) / "compiled"
         plan_path = compiled_dir / "dependency_plan.json"
         if plan_path.exists():
-            import json as json_mod
-
-            plan = json_mod.loads(plan_path.read_text(encoding="utf-8"))
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
             if plan.get("plan_id") == plan_id:
                 return plan
 
     raise HTTPException(status_code=404, detail="Plan not found")
 
 
-@app.post("/api/dependencies/plans/{plan_id}/approve")
-async def approve_dependency_plan(plan_id: str):
-    """Approve a dependency plan for installation.
+async def _record_dependency_plan_approval(plan_id: str):
+    """Record human approval for a dependency plan without starting installation.
 
-    §9.1: approve 校验计划指纹、来源策略和目标环境后，才创建安装任务
+    §9.1: approval records are separated from any future network install action.
     """
     from fnirs_flow.api.transaction import ProjectTransaction
 
@@ -1058,9 +1493,7 @@ async def approve_dependency_plan(plan_id: str):
         cd = store.get_output_dir(proj.id) / "compiled"
         plan_path = cd / "dependency_plan.json"
         if plan_path.exists():
-            import json as json_mod
-
-            plan = json_mod.loads(plan_path.read_text(encoding="utf-8"))
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
             if plan.get("plan_id") == plan_id:
                 plan_data = plan
                 owner_project_id = proj.id
@@ -1097,7 +1530,23 @@ async def approve_dependency_plan(plan_id: str):
             approval_path.write_text(approval.model_dump_json(indent=2), encoding="utf-8")
             tx.commit()
 
-    return {"status": "approved", "plan_id": plan_id, "fingerprint": plan.plan_fingerprint}
+    return {
+        "status": "approval_recorded",
+        "plan_id": plan_id,
+        "fingerprint": plan.plan_fingerprint,
+        "installation_started": False,
+        "message": "Approval was recorded; no download or installation was started.",
+    }
+
+
+@app.post("/api/dependencies/plans/{plan_id}/record-approval")
+async def record_dependency_plan_approval(plan_id: str):
+    return await _record_dependency_plan_approval(plan_id)
+
+
+@app.post("/api/dependencies/plans/{plan_id}/approve")
+async def approve_dependency_plan(plan_id: str):
+    return await _record_dependency_plan_approval(plan_id)
 
 
 @app.post("/api/dependencies/plans/{plan_id}/reject")
@@ -1111,9 +1560,7 @@ async def reject_dependency_plan(plan_id: str):
         compiled_dir = store.get_output_dir(proj.id) / "compiled"
         plan_path = compiled_dir / "dependency_plan.json"
         if plan_path.exists():
-            import json as json_mod
-
-            plan_data = json_mod.loads(plan_path.read_text(encoding="utf-8"))
+            plan_data = json.loads(plan_path.read_text(encoding="utf-8"))
             if plan_data.get("plan_id") == plan_id:
                 plan = DependencyPlan.model_validate(plan_data)
                 policy_manager = get_policy_manager()
@@ -1130,7 +1577,7 @@ async def get_installation_status(task_id: str):
 
     orchestrator = get_installation_orchestrator()
     # Search for task in orchestrator
-    for task in orchestrator._installer.list_tasks():
+    for task in orchestrator.list_tasks():
         if task.task_id == task_id:
             return task.model_dump()
 
@@ -1143,7 +1590,7 @@ async def cancel_installation(task_id: str):
     from fnirs_flow.dependencies.installer import get_installation_orchestrator
 
     orchestrator = get_installation_orchestrator()
-    success = orchestrator._installer.cancel(task_id)
+    success = orchestrator.cancel(task_id)
     if success:
         return {"status": "cancelled", "task_id": task_id}
     raise HTTPException(status_code=404, detail="Task not found or already completed")
@@ -1208,6 +1655,10 @@ def push_progress(project_id: str, event: dict) -> None:
         if len(_progress_events) > _MAX_PROJECTS:
             oldest = next(iter(_progress_events))
             del _progress_events[oldest]
+            # Clean up associated sequence counters
+            stale = [k for k in _progress_sequences if k[0] == oldest]
+            for k in stale:
+                del _progress_sequences[k]
 
 
 @app.get("/api/projects/{project_id}/progress")
@@ -1223,6 +1674,8 @@ async def progress_stream(project_id: str):
 
         # Wait for new events; stop cleanly on client disconnect
         last_idx = len(initial_events)
+        idle_ticks = 0
+        MAX_IDLE_TICKS = 600  # 5 minutes at 0.5s intervals
         try:
             while True:
                 await asyncio.sleep(0.5)
@@ -1232,6 +1685,18 @@ async def progress_stream(project_id: str):
                         for event in events[last_idx:]:
                             yield f"data: {json.dumps(event)}\n\n"
                         last_idx = len(events)
+                        idle_ticks = 0
+                    else:
+                        idle_ticks += 1
+
+                # Send heartbeat comment every 15s
+                if idle_ticks % 30 == 0:
+                    yield ": heartbeat\n\n"
+
+                # Terminate after prolonged inactivity
+                if idle_ticks >= MAX_IDLE_TICKS:
+                    yield f"data: {json.dumps({'type': 'stream_closed', 'reason': 'idle_timeout'})}\n\n"
+                    break
         except asyncio.CancelledError:
             pass
 

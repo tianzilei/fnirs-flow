@@ -124,7 +124,7 @@ def test_exclusion_manifest_distinguishes_qc_events_and_invalid_data(tmp_path):
 
     assert qc and (qc["category"], qc["reason_code"]) == ("quality_exclusion", "SCI_GATE_FAILED")
     assert missing_events and missing_events["reason_code"] == "EVENTS_FILE_MISSING"
-    assert missing_events["recoverable"] is True
+    assert missing_events["recoverable"]
     assert invalid and (invalid["category"], invalid["reason_code"]) == (
         "source_data_invalid",
         "SNIRF_METADATA_INVALID",

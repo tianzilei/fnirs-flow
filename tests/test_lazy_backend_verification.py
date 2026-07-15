@@ -334,7 +334,7 @@ class TestMissingCedalionNoFallback:
         # If cedalion is not installed, should require approval
         if not plan.is_satisfied():
             assert plan.status.value == "approval_required"
-            assert plan.requires_user_approval is True
+            assert plan.requires_user_approval
             assert len(plan.affected_atoms) > 0
             assert "cedalion-26.5" in plan.affected_atoms
 

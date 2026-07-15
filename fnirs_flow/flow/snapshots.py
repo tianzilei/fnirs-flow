@@ -33,6 +33,7 @@ class ActionAttempt(BaseModel):
 
     attempt_id: str
     snapshot_id: str
+    commit_id: str = ""
     action_type: str = Field(pattern="^(validate|compile|dry_run|execute|export|package)$")
     status: str = Field(default="pending", pattern="^(pending|running|completed|failed|cancelled)$")
     created_at: str

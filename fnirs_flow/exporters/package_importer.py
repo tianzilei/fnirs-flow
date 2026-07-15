@@ -4,12 +4,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import stat
 import zipfile
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
-from fnirs_flow.api.uri import ProjectURI, create_external_data_uri
+from fnirs_flow.api.uri import ProjectURI, URIBindingStore, create_external_data_uri
+
+MAX_PACKAGE_BYTES = 10 * 1024**2
+MAX_UNCOMPRESSED_BYTES = 10 * 1024**2
+MAX_MEMBER_BYTES = 8 * 1024**2
+MAX_PACKAGE_FILES = 5_000
+MAX_COMPRESSION_RATIO = 1_000
+MAX_MANIFEST_BYTES = 1024**2
 
 
 def _relative_data_path(value: str, old_root: Path | None = None) -> str:
@@ -83,7 +92,17 @@ def _relink_manifest(manifest: dict[str, Any], data_root: Path) -> dict[str, Any
     return {"data_root": str(root), "missing_paths": missing_paths}
 
 
-def relink_package_data(package_dir: str | Path, data_root: str | Path) -> dict[str, Any]:
+def _write_uri_binding(package_dir: Path, dataset_id: str, data_root: Path) -> None:
+    """Persist a local-only binding for imported package reruns."""
+    URIBindingStore(package_dir).bind(dataset_id, data_root)
+
+
+def relink_package_data(
+    package_dir: str | Path,
+    data_root: str | Path,
+    *,
+    persist_binding: bool = True,
+) -> dict[str, Any]:
     """Relink an imported package in root or project/compiled layout."""
     package_dir = Path(package_dir)
     manifest_path = package_dir / "data_manifest.json"
@@ -94,6 +113,8 @@ def relink_package_data(package_dir: str | Path, data_root: str | Path) -> dict[
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     result = _relink_manifest(manifest, Path(data_root))
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    if persist_binding:
+        _write_uri_binding(package_dir, str(manifest.get("dataset_id") or "dataset"), Path(data_root))
     metadata_path = package_dir / "import_metadata.json"
     if metadata_path.exists():
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -106,10 +127,99 @@ def relink_package_data(package_dir: str | Path, data_root: str | Path) -> dict[
 def _validate_zip_path(member: str, outdir: Path) -> bool:
     """Check that a zip member path doesn't escape the output directory."""
     try:
+        if not member or "\\" in member or member.startswith(("/", "~/", "//")):
+            return False
+        if len(member) >= 3 and member[0].isalpha() and member[1:3] in {":/", ":\\"}:
+            return False
+        path = PurePosixPath(member.rstrip("/"))
+        if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
+            return False
         target = (outdir / member).resolve()
         return target.is_relative_to(outdir.resolve())
     except (ValueError, OSError):
         return False
+
+
+def _hash_zip_member(zf: zipfile.ZipFile, member: str) -> str:
+    digest = hashlib.sha256()
+    with zf.open(member) as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _verify_declared_manifest(zf: zipfile.ZipFile, names: set[str]) -> None:
+    if "manifest.json" not in names:
+        return
+    manifest_info = zf.getinfo("manifest.json")
+    if manifest_info.file_size > MAX_MANIFEST_BYTES:
+        raise ValueError("manifest.json exceeds the 1 MiB size limit")
+    try:
+        manifest = json.loads(zf.read(manifest_info))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid manifest.json: {exc}") from exc
+    declared = manifest.get("files", {})
+    if not isinstance(declared, dict):
+        raise ValueError("manifest.json files field must be an object")
+    for member, details in declared.items():
+        if member == "manifest.json":
+            continue
+        if member not in names:
+            raise ValueError(f"Manifest declares missing file: {member}")
+        if not isinstance(details, dict):
+            raise ValueError(f"Manifest entry for {member} must be an object")
+        expected = str(details.get("sha256", ""))
+        if expected and _hash_zip_member(zf, member) != expected:
+            raise ValueError(f"Checksum mismatch for {member}")
+
+
+def _validate_zip_for_import(package_path: Path, zf: zipfile.ZipFile, extract_dir: Path) -> list[zipfile.ZipInfo]:
+    if package_path.stat().st_size > MAX_PACKAGE_BYTES:
+        raise ValueError("Package exceeds the 10 MiB size limit")
+    infos = zf.infolist()
+    names = [info.filename for info in infos]
+    if len(names) != len(set(names)):
+        raise ValueError("Package contains duplicate paths")
+    if len(names) > MAX_PACKAGE_FILES:
+        raise ValueError("Package contains too many files")
+
+    total_uncompressed = 0
+    file_infos: list[zipfile.ZipInfo] = []
+    for info in infos:
+        member = info.filename
+        if member.endswith("/"):
+            if not _validate_zip_path(member.rstrip("/"), extract_dir):
+                raise ValueError(f"Unsafe zip entry: {member}")
+            continue
+        if not _validate_zip_path(member, extract_dir):
+            raise ValueError(f"Unsafe zip entry: {member}")
+        mode = info.external_attr >> 16
+        if stat.S_ISLNK(mode):
+            raise ValueError(f"Symbolic links are not allowed in packages: {member}")
+        if info.file_size > MAX_MEMBER_BYTES:
+            raise ValueError(f"Package member exceeds the 8 MiB size limit: {member}")
+        total_uncompressed += info.file_size
+        if total_uncompressed > MAX_UNCOMPRESSED_BYTES:
+            raise ValueError("Package exceeds the 10 MiB extracted-size limit")
+        if info.file_size and info.compress_size == 0:
+            raise ValueError(f"Package member has an invalid compressed size: {member}")
+        if info.compress_size and info.file_size / info.compress_size > MAX_COMPRESSION_RATIO:
+            raise ValueError(f"Package member compression ratio is too high: {member}")
+        file_infos.append(info)
+
+    _verify_declared_manifest(zf, set(names))
+    return file_infos
+
+
+def _extract_validated_members(zf: zipfile.ZipFile, infos: list[zipfile.ZipInfo], extract_dir: Path) -> list[str]:
+    extracted: list[str] = []
+    for info in infos:
+        target = (extract_dir / info.filename).resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with zf.open(info) as source, target.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
+        extracted.append(info.filename)
+    return extracted
 
 
 def import_package(
@@ -118,6 +228,7 @@ def import_package(
     relink_data: bool = False,
     data_root: str | Path | None = None,
     project_layout: bool = False,
+    persist_binding: bool = True,
 ) -> dict[str, Any]:
     """Import a .fnirsflow.zip package.
 
@@ -139,13 +250,8 @@ def import_package(
     extracted_files: list[str] = []
 
     with zipfile.ZipFile(package_path, "r") as zf:
-        # Validate all paths before extraction (Zip Slip prevention)
-        for member in zf.namelist():
-            if not _validate_zip_path(member, extract_dir):
-                raise ValueError(f"Unsafe zip entry: {member}")
-
-        zf.extractall(extract_dir)
-        extracted_files = zf.namelist()
+        file_infos = _validate_zip_for_import(package_path, zf, extract_dir)
+        extracted_files = _extract_validated_members(zf, file_infos, extract_dir)
 
     # Relink data if requested
     relinked = False
@@ -155,6 +261,8 @@ def import_package(
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             _relink_manifest(manifest, Path(data_root))
             manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+            if persist_binding:
+                _write_uri_binding(outdir, str(manifest.get("dataset_id") or "dataset"), Path(data_root))
             relinked = True
 
     # Mark imported flow as read-only and quarantine custom atoms
@@ -346,8 +454,9 @@ def rerun_package(
 ) -> dict[str, Any]:
     """Rerun an imported package after data relink.
 
-    Validates that data_manifest.json has a valid local_root, then
-    triggers ExecutionService to re-execute the analysis pipeline.
+    Validates that data_manifest.json can be resolved through either the legacy
+    local_root field or a local uri_bindings.json entry, then triggers
+    ExecutionService to re-execute the analysis pipeline.
 
     Args:
         package_dir: Directory containing the imported package
@@ -362,7 +471,7 @@ def rerun_package(
 
     Raises:
         FileNotFoundError: If package_dir or required files don't exist
-        ValueError: If data_manifest.json is missing or local_root is invalid
+        ValueError: If data_manifest.json is missing or no valid data binding exists
     """
     from fnirs_flow.execution.service import ExecutionRequest, ExecutionService
 
@@ -382,10 +491,16 @@ def rerun_package(
         )
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    local_root = manifest.get("local_root", "")
-    if not local_root or not Path(local_root).exists():
+    local_root = str(manifest.get("local_root", "") or "")
+    data_root = Path(local_root) if local_root else None
+    if data_root is None or not data_root.exists():
+        dataset_id = str(manifest.get("dataset_id") or "dataset")
+        data_root = URIBindingStore(package_dir).get_binding(dataset_id)
+
+    if data_root is None or not data_root.exists():
         raise ValueError(
-            f"data_manifest.json local_root is invalid or missing: '{local_root}'. Relink data paths before rerunning."
+            "data_manifest.json has no valid local_root or external-data binding. "
+            "Relink data paths before rerunning."
         )
 
     # Check for quarantined atoms
@@ -408,7 +523,7 @@ def rerun_package(
         participant_labels=participant_labels or [],
         task_labels=task_labels or [],
         run_labels=run_labels or [],
-        data_root=local_root,
+        data_root=str(data_root),
         continue_on_failure=continue_on_failure,
     )
     result = service.execute(request)

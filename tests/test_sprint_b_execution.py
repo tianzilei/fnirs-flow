@@ -38,7 +38,7 @@ class TestFailureRecord:
             recoverable=True,
         )
         assert rec.failure_id == "fail-sub01_ses01_run01_atom-1"
-        assert rec.recoverable is True
+        assert rec.recoverable
 
     def test_failure_record_to_dict(self):
         rec = FailureRecord(
@@ -174,11 +174,11 @@ class TestPackageProfiles:
 
     def test_submission_excludes_provenance(self):
         p = get_package_profile("submission_package")
-        assert p.include_provenance is False
+        assert not p.include_provenance
 
     def test_reviewer_includes_provenance(self):
         p = get_package_profile("reviewer_package")
-        assert p.include_provenance is True
+        assert p.include_provenance
 
 
 # ============================================================================

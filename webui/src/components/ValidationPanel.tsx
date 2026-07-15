@@ -1,14 +1,18 @@
+import { Sparkles } from 'lucide-react';
 import type { ValidationResult } from '../api/client';
 
 interface ValidationPanelProps {
   result: ValidationResult | null;
+  onOpenAIDraft?: () => void;
 }
 
-export function ValidationPanel({ result }: ValidationPanelProps) {
+export function ValidationPanel({ result, onOpenAIDraft }: ValidationPanelProps) {
   if (!result) {
     return (
       <aside className="validation-panel">
-        <h3>Validation</h3>
+        <div className="validation-heading"><h3>Validation</h3>
+          {onOpenAIDraft ? <button className="ghost-button compact" onClick={onOpenAIDraft}><Sparkles size={14} />AI Draft</button> : null}
+        </div>
         <p className="muted">Click Validate to check the flow.</p>
       </aside>
     );
@@ -16,7 +20,9 @@ export function ValidationPanel({ result }: ValidationPanelProps) {
 
   return (
     <aside className="validation-panel">
-      <h3>Validation</h3>
+      <div className="validation-heading"><h3>Validation</h3>
+        {onOpenAIDraft ? <button className="ghost-button compact" onClick={onOpenAIDraft}><Sparkles size={14} />AI Draft</button> : null}
+      </div>
       <div className={`status ${result.is_valid ? 'valid' : 'invalid'}`}>
         {result.is_valid ? 'Valid' : 'Invalid'}
       </div>

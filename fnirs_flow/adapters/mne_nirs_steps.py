@@ -212,8 +212,9 @@ def compute_coefficient_of_variation(
 
     for ch in range(n_channels):
         signal = data[ch, :]
-        if np.mean(signal) > 0:
-            cv_values[ch] = np.std(signal) / np.mean(signal)
+        mean_val = np.mean(signal)
+        if mean_val != 0:
+            cv_values[ch] = np.std(signal) / abs(mean_val)
         else:
             cv_values[ch] = np.inf
 

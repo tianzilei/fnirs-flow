@@ -54,6 +54,8 @@ class ExecutionRequest(BaseModel):
     continue_on_failure: bool = True
     reports_only: bool = False
     attempt_id: str = ""
+    commit_id: str = ""
+    snapshot_id: str = ""
 
 
 class ExecutionCancelledError(RuntimeError):
@@ -141,6 +143,9 @@ class ExecutionService:
             self.progress_callback(event)
         except Exception:
             # Observability must never alter scientific execution semantics.
+            import logging
+
+            logging.getLogger(__name__).debug("Progress callback error", exc_info=True)
             return
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:
@@ -177,6 +182,11 @@ class ExecutionService:
         run_results: list[RunExecutionResult] = []
         artifact_store = ArtifactStore()
         provenance = ProvenanceRecord()
+        if request.commit_id or request.snapshot_id:
+            provenance.set_design_anchor(
+                commit_id=request.commit_id,
+                snapshot_id=request.snapshot_id,
+            )
         failure_store = FailureStore()
         group_atom_results = self._execute_group_scope_atoms(dag, outdir)
 
@@ -931,8 +941,7 @@ class ExecutionService:
             else []
         )
 
-        # Build atom map from DAG
-        atoms_list = dag.get("atoms", dag.get("nodes", []))
+        # Build atom map from DAG (reuse atoms_list from above)
         atom_map = {a.get("atom_id") or a.get("step_id"): a for a in atoms_list}
 
         # Get execution layers
@@ -962,19 +971,41 @@ class ExecutionService:
                     needs_split = True
                     break
             if needs_split:
-                # Split: execute dependencies first, then dependents
-                dep_atoms = []
-                non_dep_atoms = []
+                # Build intra-layer dependency subgraph
+                intra_deps: dict[str, set[str]] = {}
                 for atom_id in layer:
-                    deps_in_layer = dep_map.get(atom_id, set()) & layer_set
-                    if not deps_in_layer:
-                        dep_atoms.append(atom_id)
-                    else:
-                        non_dep_atoms.append(atom_id)
-                if dep_atoms:
-                    fixed_layers.append(sorted(dep_atoms))
-                if non_dep_atoms:
-                    fixed_layers.append(sorted(non_dep_atoms))
+                    intra_deps[atom_id] = dep_map.get(atom_id, set()) & layer_set
+
+                # Topological sort within the layer
+                sorted_atoms = []
+                remaining = set(layer)
+                while remaining:
+                    # Find atoms with no unresolved intra-layer deps
+                    ready = [a for a in remaining if not (intra_deps.get(a, set()) & remaining)]
+                    if not ready:
+                        # Cycle detected within a layer — fall back to original order
+                        sorted_atoms.extend(sorted(remaining))
+                        break
+                    ready.sort()
+                    sorted_atoms.extend(ready)
+                    remaining -= set(ready)
+
+                # Group into sub-layers: each sub-layer contains atoms that can
+                # run in parallel (no dependencies on each other)
+                placed: set[str] = set()
+                while placed < set(sorted_atoms):
+                    batch = []
+                    for atom_id in sorted_atoms:
+                        if atom_id in placed:
+                            continue
+                        deps = intra_deps.get(atom_id, set())
+                        if not (deps - placed):
+                            batch.append(atom_id)
+                    if not batch:
+                        break  # safety
+                    batch.sort()
+                    fixed_layers.append(batch)
+                    placed |= set(batch)
             else:
                 fixed_layers.append(layer)
         layers = fixed_layers
@@ -1086,6 +1117,7 @@ class ExecutionService:
 
                 adapter = None
                 artifact_offset = 0
+                result = None
                 try:
                     # Inject outputs only from this atom's actual DAG predecessors.
                     self._inject_edge_dependencies(

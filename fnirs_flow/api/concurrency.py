@@ -152,7 +152,7 @@ class CrossProcessLock:
                         self._lock_path.unlink()
                     except FileNotFoundError:
                         pass
-                time.sleep(min(0.2, remaining))
+                time.sleep(min(0.2, max(0, deadline - time.monotonic())))
 
     def release(self) -> None:
         """Release the cross-process lock."""

@@ -100,14 +100,24 @@ def portable_json_value(value: Any) -> Any:
     return value
 
 
-def find_absolute_path_records(path: Path) -> list[str]:
-    """Return logical locations containing machine-local paths in a text artifact."""
-    if path.suffix.lower() not in TEXT_EXTENSIONS:
+def find_absolute_path_records(path: Path, *, content: bytes | None = None) -> list[str]:
+    """Return logical locations containing machine-local paths in a text artifact.
+
+    If *content* is provided the bytes are decoded directly instead of reading from *path*.
+    """
+    suffix = path.suffix.lower() if path.suffix else ""
+    if suffix not in TEXT_EXTENSIONS:
         return []
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return ["<not-valid-utf8>"]
+    if content is not None:
+        try:
+            text = content.decode("utf-8")
+        except (UnicodeDecodeError, ValueError):
+            return ["<not-valid-utf8>"]
+    else:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return ["<not-valid-utf8>"]
 
     suffix = path.suffix.lower()
     if suffix == ".json":
@@ -130,11 +140,15 @@ def find_absolute_path_records(path: Path) -> list[str]:
     if suffix in {".csv", ".tsv"}:
         delimiter = "\t" if suffix == ".tsv" else ","
         findings = []
-        csv.field_size_limit(max(csv.field_size_limit(), 10 * 1024**2))
-        for row_number, row in enumerate(csv.reader(text.splitlines(), delimiter=delimiter), start=1):
-            for column_number, value in enumerate(row, start=1):
-                if is_absolute_local_path(value) or _EMBEDDED_LOCAL_PATH.search(value):
-                    findings.append(f"row {row_number}, column {column_number}")
+        _original_limit = csv.field_size_limit()
+        csv.field_size_limit(max(_original_limit, 10 * 1024**2))
+        try:
+            for row_number, row in enumerate(csv.reader(text.splitlines(), delimiter=delimiter), start=1):
+                for column_number, value in enumerate(row, start=1):
+                    if is_absolute_local_path(value) or _EMBEDDED_LOCAL_PATH.search(value):
+                        findings.append(f"row {row_number}, column {column_number}")
+        finally:
+            csv.field_size_limit(_original_limit)
         return findings
     return ["text"] if _EMBEDDED_LOCAL_PATH.search(text) else []
 

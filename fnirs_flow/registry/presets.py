@@ -16,6 +16,7 @@ class ParameterPreset(BaseModel):
     reference: str = ""
     recommended_sensitivity: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    applicable_atom_types: list[str] = Field(default_factory=list)
 
 
 class PresetLibrary:
@@ -49,6 +50,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Conservative quality thresholds for high-quality data",
         warnings=["May exclude more channels than standard thresholds"],
+        applicable_atom_types=["bad_channel_detection", "site_level_qc"],
     ),
     ParameterPreset(
         preset_id="standard_task_glm",
@@ -60,6 +62,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "drift_order": 3,
         },
         rationale="Standard GLM parameters for task-based fNIRS",
+        applicable_atom_types=["design_matrix", "first_level_glm"],
     ),
     ParameterPreset(
         preset_id="tddr_motion",
@@ -71,6 +74,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Robust motion correction without user parameters",
         reference="MNE-NIRS TDDR implementation",
+        applicable_atom_types=["motion_correction"],
     ),
     ParameterPreset(
         preset_id="basic_bandpass",
@@ -84,6 +88,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Standard bandpass filter for task-based fNIRS",
         warnings=["May need adjustment for resting-state or high-frequency analysis"],
+        applicable_atom_types=["filtering"],
     ),
     ParameterPreset(
         preset_id="short_channel_regression",
@@ -95,6 +100,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Remove systemic physiological noise using short-separation channels",
         warnings=["Requires short-separation channels in the montage"],
+        applicable_atom_types=["short_channel_regression"],
     ),
     ParameterPreset(
         preset_id="resting_state_bandpass",
@@ -108,6 +114,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Standard bandpass filter for resting-state connectivity analysis",
         warnings=["Frequency band may need adjustment for specific connectivity analyses"],
+        applicable_atom_types=["filtering"],
     ),
     ParameterPreset(
         preset_id="real_world_qc",
@@ -121,6 +128,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Relaxed QC thresholds for real-world/free movement recordings",
         warnings=["Lower SCI threshold due to motion artifacts in naturalistic settings"],
+        applicable_atom_types=["bad_channel_detection", "site_level_qc"],
     ),
     ParameterPreset(
         preset_id="ml_leakage_safe",
@@ -134,6 +142,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Settings that prevent data leakage in ML analysis",
         warnings=["Always use subject-wise or group-wise splits for fNIRS ML"],
+        applicable_atom_types=["cross_validation"],
     ),
     # Multi-site presets
     ParameterPreset(
@@ -154,6 +163,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "May attenuate biological signals if site is confounded with outcome",
         ],
         recommended_sensitivity=["mixed_effects_comparison", "covariate_comparison"],
+        applicable_atom_types=["multi_site_harmonization"],
     ),
     ParameterPreset(
         preset_id="mixed_effects_site",
@@ -173,6 +183,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "Convergence issues possible with small site counts",
         ],
         recommended_sensitivity=["combat_comparison", "site_covariate_comparison"],
+        applicable_atom_types=["multi_site_harmonization"],
     ),
     ParameterPreset(
         preset_id="site_covariate_fixed",
@@ -189,6 +200,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "Assumes site effect is constant across conditions",
         ],
         recommended_sensitivity=["mixed_effects_comparison", "combat_comparison"],
+        applicable_atom_types=["multi_site_harmonization"],
     ),
     ParameterPreset(
         preset_id="site_qc_strict",
@@ -205,6 +217,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "May exclude entire sites with poor data quality",
             "Verify site exclusion does not introduce selection bias",
         ],
+        applicable_atom_types=["site_level_qc"],
     ),
     # Evidence-derived presets from literature extraction
     ParameterPreset(
@@ -222,6 +235,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "ICA component selection may require manual inspection",
             "Not all components may be motion-related",
         ],
+        applicable_atom_types=["motion_correction"],
     ),
     ParameterPreset(
         preset_id="wavelet_motion",
@@ -237,6 +251,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         warnings=[
             "Wavelet level may need adjustment for different sampling rates",
         ],
+        applicable_atom_types=["motion_correction"],
     ),
     ParameterPreset(
         preset_id="spline_motion",
@@ -249,6 +264,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Widely used automated motion correction (95 studies)",
         reference="Scholkmann et al. 2010; HOMER3",
+        applicable_atom_types=["motion_correction"],
     ),
     ParameterPreset(
         preset_id="pca_motion",
@@ -264,6 +280,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         warnings=[
             "Number of components to retain may need tuning",
         ],
+        applicable_atom_types=["motion_correction"],
     ),
     ParameterPreset(
         preset_id="mara_motion",
@@ -276,6 +293,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Hybrid spline-wavelet approach (60 studies)",
         reference="Scholkmann et al. 2010",
+        applicable_atom_types=["motion_correction"],
     ),
     ParameterPreset(
         preset_id="bandpass_task",
@@ -289,6 +307,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Standard bandpass for task-based fNIRS (97 studies report band-pass)",
         reference="MNE-Python: mne.filter.filter_data",
+        applicable_atom_types=["filtering"],
     ),
     ParameterPreset(
         preset_id="bandpass_resting",
@@ -303,6 +322,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         rationale="Standard bandpass for resting-state connectivity",
         reference="MNE-Python: mne.filter.filter_data",
         warnings=["Frequency band may need adjustment for specific connectivity analyses"],
+        applicable_atom_types=["filtering"],
     ),
     ParameterPreset(
         preset_id="pearson_connectivity",
@@ -313,6 +333,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "fisher_z_transform": True,
         },
         rationale="Most common connectivity metric (29/45 hyperscanning studies)",
+        applicable_atom_types=["connectivity_analysis"],
     ),
     ParameterPreset(
         preset_id="plv_connectivity",
@@ -325,6 +346,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Phase synchronization measure independent of amplitude",
         reference="Lachaux et al. 1999",
+        applicable_atom_types=["connectivity_analysis"],
     ),
     ParameterPreset(
         preset_id="wtc_connectivity",
@@ -337,6 +359,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Time-frequency connectivity for non-stationary signals",
         reference="Grinsted et al. 2004",
+        applicable_atom_types=["connectivity_analysis"],
     ),
     ParameterPreset(
         preset_id="leave_one_out_cv",
@@ -349,6 +372,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Gold standard CV for small-sample fNIRS ML (23 studies)",
         warnings=["Computationally expensive for large datasets"],
+        applicable_atom_types=["cross_validation"],
     ),
     ParameterPreset(
         preset_id="nested_cv",
@@ -361,6 +385,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Unbiased ML performance estimation (11 studies)",
         reference="scikit-learn: cross_val_score with GridSearchCV",
+        applicable_atom_types=["cross_validation"],
     ),
     ParameterPreset(
         preset_id="fdr_correction",
@@ -373,6 +398,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Standard multiple comparison correction",
         reference="Benjamini & Hochberg 1995",
+        applicable_atom_types=["multiple_comparison_correction"],
     ),
     # Evidence-backed acquisition presets
     ParameterPreset(
@@ -387,6 +413,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Most common CW-fNIRS acquisition parameters from literature",
         warnings=["Sampling rate often not reported; verify from raw data"],
+        applicable_atom_types=["dataset_discovery", "optical_density"],
     ),
     ParameterPreset(
         preset_id="nirx_nirscout_defaults",
@@ -399,6 +426,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "short_channel_distance_mm": 8,
         },
         rationale="NIRx NIRScout system defaults (66 studies)",
+        applicable_atom_types=["dataset_discovery", "optical_density"],
     ),
     ParameterPreset(
         preset_id="hitachi_etg4000_defaults",
@@ -410,5 +438,14 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
             "source_detector_distance_mm": 30,
         },
         rationale="Hitachi ETG-4000 system defaults (58 studies)",
+        applicable_atom_types=["dataset_discovery", "optical_density"],
     ),
 ]
+
+
+def create_builtin_preset_library() -> PresetLibrary:
+    """Create a PresetLibrary with all built-in presets."""
+    library = PresetLibrary()
+    for preset in BUILTIN_PRESETS:
+        library.register(preset)
+    return library

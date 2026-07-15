@@ -66,12 +66,14 @@ class ProjectTransaction:
         reason: str,
         *,
         base_revision: int | None = None,
+        expected_head_commit_id: str | None = None,
         lock_timeout: float = 30.0,
     ) -> None:
         self._store = store
         self._project_id = project_id
         self._reason = reason
         self._base_revision = base_revision
+        self._expected_head_commit_id = expected_head_commit_id
         self._lock_timeout = lock_timeout
 
         self._staging_dir: Path | None = None
@@ -126,6 +128,10 @@ class ProjectTransaction:
                         current_revision=current,
                         requested_revision=self._base_revision,
                     )
+
+            # 2b. Check expected HEAD commit (FlowVCS branch concurrency)
+            if self._expected_head_commit_id is not None:
+                self._check_expected_head()
 
             # 3. Copy workspace → staging
             workspace = bundles.workspace_path(self._project_id)
@@ -185,6 +191,10 @@ class ProjectTransaction:
                     requested_revision=self._base_revision,
                 )
 
+        # 1b. Defense-in-depth expected HEAD check
+        if self._expected_head_commit_id is not None:
+            self._check_expected_head()
+
         # 2. Flush in-memory metadata to staging
         proj_meta = self._store._projects.get(self._project_id)
         if proj_meta is not None:
@@ -219,6 +229,27 @@ class ProjectTransaction:
     @property
     def _base_dir(self) -> Path:
         return self._store._bundles.base_dir
+
+    def _check_expected_head(self) -> None:
+        """Verify the design history HEAD matches the expected commit."""
+        from fnirs_flow.history.errors import BranchHeadConflict
+        from fnirs_flow.history.zip_json_store import ZipJsonHistoryStore
+
+        if self._expected_head_commit_id is None:
+            raise ProjectTransactionError(
+                "Cannot check HEAD: no expected commit ID set"
+            )
+        workspace = self._store._bundles.workspace_path(self._project_id)
+        store = ZipJsonHistoryStore(workspace)
+        if not store.is_initialized():
+            return  # no history yet — no conflict possible
+        state = store.get_state()
+        actual_head = state.head.commit_id
+        if actual_head != self._expected_head_commit_id:
+            raise BranchHeadConflict(
+                f"Design HEAD changed concurrently: expected "
+                f"{self._expected_head_commit_id[:16]}, got {actual_head[:16]}"
+            )
 
     def _cleanup_staging(self) -> None:
         if self._staging_dir is not None and self._staging_dir.exists():

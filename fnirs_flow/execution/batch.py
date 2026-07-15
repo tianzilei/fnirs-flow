@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ from fnirs_flow.execution.failures import ActionAttempt, FailureStore
 
 
 class BatchResult:
-    def __init__(self):
+    def __init__(self) -> None:
         self.successful: list[RunContext] = []
         self.failed: list[RunContext] = []
         self.total: int = 0
@@ -33,7 +34,7 @@ class BatchResult:
 
 def run_batch(
     dry_result: DryRunResult,
-    execute_fn: Any = None,
+    execute_fn: Callable[[RunContext], None] | None = None,
     continue_on_failure: bool = True,
 ) -> BatchResult:
     """Run a batch of planned runs. In dry-run mode, just validates the plan."""

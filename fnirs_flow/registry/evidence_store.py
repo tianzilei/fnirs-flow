@@ -53,24 +53,28 @@ class EvidenceStore:
         count = 0
         if not path.exists():
             return 0
+        grouped: dict[str, dict[str, Any]] = {}
         with open(path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                self._records.append(
-                    EvidenceRecord(
-                        record_id=row.get("record_id", f"rec-{count}"),
-                        paper_title=row.get("paper_title", ""),
-                        paper_doi=row.get("paper_doi", ""),
-                        method_domain=row.get("method_domain", ""),
-                        items=[
-                            EvidenceItem(
-                                item_id=row.get("item_id", f"item-{count}"),
-                                field=row.get("field", ""),
-                                value=row.get("value", ""),
-                                confidence=row.get("confidence", "direct"),
-                            )
-                        ],
+                rid = row.get("record_id", f"rec-{count}")
+                if rid not in grouped:
+                    grouped[rid] = {
+                        "record_id": rid,
+                        "paper_title": row.get("paper_title", ""),
+                        "paper_doi": row.get("paper_doi", ""),
+                        "method_domain": row.get("method_domain", ""),
+                        "items": [],
+                    }
+                grouped[rid]["items"].append(
+                    EvidenceItem(
+                        item_id=row.get("item_id", f"item-{count}"),
+                        field=row.get("field", ""),
+                        value=row.get("value", ""),
+                        confidence=row.get("confidence", "direct"),
                     )
                 )
                 count += 1
+        for rec in grouped.values():
+            self._records.append(EvidenceRecord(**rec))
         return count

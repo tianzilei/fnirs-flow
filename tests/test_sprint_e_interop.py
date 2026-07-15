@@ -115,7 +115,7 @@ class TestComBatDiagnostics:
             manifest,
             biological_covariates=["age", "sex"],
         )
-        assert result.ready is True
+        assert result.ready
         assert result.site_summary["n_sites"] == 2
 
     def test_preflight_fatal_when_no_site(self):
@@ -125,7 +125,7 @@ class TestComBatDiagnostics:
         ]
         manifest = self._make_manifest(runs)
         result = validate_combat_preflight(manifest)
-        assert result.ready is False
+        assert not result.ready
         assert any(r.severity == "fatal" for r in result.risks)
 
     def test_preflight_warns_few_samples(self):
@@ -136,14 +136,14 @@ class TestComBatDiagnostics:
         ]
         manifest = self._make_manifest(runs)
         result = validate_combat_preflight(manifest, min_samples_per_site=5)
-        assert result.ready is True
+        assert result.ready
         assert any("site_B" in r.message for r in result.risks)
 
     def test_preflight_warns_no_covariates(self):
         runs = [{"subject": f"sub-{i:02d}", "site": "site_A"} for i in range(10)]
         manifest = self._make_manifest(runs)
         result = validate_combat_preflight(manifest, biological_covariates=[])
-        assert result.ready is True
+        assert result.ready
         assert any(r.risk_id == "combat-no-covariates" for r in result.risks)
 
     def test_preflight_detects_confounding(self):

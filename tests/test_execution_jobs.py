@@ -73,7 +73,7 @@ def test_running_job_can_be_cancelled(tmp_path):
     assert cancelling is not None
     assert cancelling.status in {"cancelling", "cancelled"}
     cancelled = _wait_for(manager, project.id, job.attempt_id, "cancelled")
-    assert cancelled.cancel_requested is True
+    assert cancelled.cancel_requested
     manager.shutdown()
 
 

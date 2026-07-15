@@ -89,7 +89,6 @@ class EnvironmentLock:
                     0o644,
                 )
                 os.write(fd, f"{os.getpid()}\n".encode())
-                os.close(fd)
                 self._lock_fd = fd
                 return True
             except FileExistsError:
@@ -104,6 +103,12 @@ class EnvironmentLock:
 
     def release(self) -> None:
         """Release the lock."""
+        if self._lock_fd is not None:
+            try:
+                os.close(self._lock_fd)
+            except OSError:
+                pass
+            self._lock_fd = None
         try:
             self._lock_path.unlink(missing_ok=True)
         except OSError:

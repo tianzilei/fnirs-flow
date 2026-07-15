@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 import zipfile
 
 import pytest
@@ -96,6 +97,18 @@ class TestPackageExportImport:
         assert len(result["extracted_files"]) > 0
         assert (import_dir / "plan.json").exists()
 
+    def test_import_package_rejects_duplicate_members(self, tmp_path):
+        pkg_path = tmp_path / "duplicate.fnirsflow.zip"
+        with zipfile.ZipFile(pkg_path, "w") as archive:
+            archive.writestr("plan.json", "{}")
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                archive.writestr("plan.json", "{\"duplicate\": true}")
+            archive.writestr("execution_dag.json", "{}")
+
+        with pytest.raises(ValueError, match="duplicate paths"):
+            import_package(pkg_path, tmp_path / "imported")
+
     def test_import_with_relink(self, tmp_path):
         outdir = self._setup_output_dir(tmp_path)
         # Add data manifest
@@ -109,7 +122,7 @@ class TestPackageExportImport:
         data_root = tmp_path / "new-data"
         data_root.mkdir()
         result = import_package(pkg_path, import_dir, relink_data=True, data_root=data_root)
-        assert result["relinked"] is True
+        assert result["relinked"]
 
         imported_manifest = json.loads((import_dir / "data_manifest.json").read_text())
         assert imported_manifest["local_root"] == ""
@@ -142,7 +155,7 @@ class TestPackageExportImport:
             manifest = json.loads(archive.read("data_manifest.json"))
         serialized = json.dumps(manifest)
         assert manifest["local_root"] == ""
-        assert manifest["requires_data_binding"] is True
+        assert manifest["requires_data_binding"]
         assert manifest["access_instructions"] == (
             "Bind external-data://portable-dataset/ to a local dataset directory before rerunning."
         )
@@ -256,8 +269,8 @@ class TestPackageExportImport:
         export_package(outdir, pkg_path)
 
         result = check_package_integrity(pkg_path)
-        assert result["valid"] is True
+        assert result["valid"]
 
     def test_check_missing_package(self, tmp_path):
         result = check_package_integrity(tmp_path / "nonexistent.zip")
-        assert result["valid"] is False
+        assert not result["valid"]

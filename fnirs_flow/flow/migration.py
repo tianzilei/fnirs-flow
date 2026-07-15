@@ -7,6 +7,7 @@ preserving backward compatibility.
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 
@@ -25,7 +26,7 @@ def migrate_flow_schema_v0_1_to_v0_2(flow_dict: dict[str, Any]) -> dict[str, Any
     Returns:
         Migrated v0.2 flow dictionary (original is not mutated)
     """
-    result = dict(flow_dict)
+    result = copy.deepcopy(flow_dict)
     result["schema_version"] = "0.2.0"
 
     # Dual-write: keep nodes, add flow_atoms

@@ -3,6 +3,8 @@ from __future__ import annotations
 import csv
 import json
 
+import pytest
+
 from fnirs_flow.data.manifest import DataManifest, SubjectSessionRun
 from fnirs_flow.data.participants import (
     build_group_design_matrix,
@@ -54,6 +56,25 @@ def test_participant_table_read_validate_and_artifacts(tmp_path):
     assert report.join_preview.excluded_subjects == ["sub-03"]
     assert bundle.validation_report.warnings
     assert (tmp_path / "compiled" / "participant_join_audit.csv").exists()
+
+
+def test_participant_table_rejects_unsupported_suffix(tmp_path):
+    table_path = tmp_path / "participants.json"
+    table_path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Participant table must be one of"):
+        read_participant_table(table_path)
+
+
+def test_participant_table_rejects_too_many_rows(tmp_path):
+    table_path = tmp_path / "participants.tsv"
+    table_path.write_text(
+        "participant_id\tinclude\nsub-01\t1\nsub-02\t1\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="too many rows"):
+        read_participant_table(table_path, max_rows=1)
 
 
 def test_join_and_projection_helpers(tmp_path):
@@ -196,8 +217,8 @@ def test_group_metadata_risk_validators():
         {"participant_id": "sub-03", "group": "control", "site": "site_B"},
         {"participant_id": "sub-04", "group": "patient", "site": "site_B"},
     ]
-    assert validate_site_group_confound(confounded_rows) is True
-    assert validate_site_group_confound(balanced_rows) is False
+    assert validate_site_group_confound(confounded_rows)
+    assert not validate_site_group_confound(balanced_rows)
 
     validate_subject_split_no_leakage(["sub-01"], ["sub-02"])
     try:
