@@ -11,6 +11,7 @@ def generate_methods_section(
     qc_summary: dict[str, Any] | None = None,
     preprocessing_params: dict[str, Any] | None = None,
     analysis_params: dict[str, Any] | None = None,
+    evidence_refs: list[str] | None = None,
 ) -> str:
     """Generate a methods section for fNIRS manuscript.
 
@@ -19,6 +20,7 @@ def generate_methods_section(
         qc_summary: QC metrics summary
         preprocessing_params: Preprocessing parameters
         analysis_params: Analysis parameters
+        evidence_refs: List of evidence references
 
     Returns:
         Methods section text in markdown
@@ -46,6 +48,18 @@ def generate_methods_section(
         "",
         _format_reproducibility(plan),
     ]
+
+    # Add evidence references if provided
+    if evidence_refs:
+        lines.extend([
+            "",
+            "### Evidence References",
+            "",
+            "The following evidence sources informed the analysis methodology:",
+            "",
+        ])
+        for ref in evidence_refs:
+            lines.append(f"- {ref}")
 
     return "\n".join(lines)
 
@@ -147,6 +161,7 @@ def write_methods_report(
     qc_summary: dict[str, Any] | None = None,
     preprocessing_params: dict[str, Any] | None = None,
     analysis_params: dict[str, Any] | None = None,
+    evidence_refs: list[str] | None = None,
 ) -> Path:
     """Write methods report to file.
 
@@ -156,6 +171,7 @@ def write_methods_report(
         qc_summary: QC metrics summary
         preprocessing_params: Preprocessing parameters
         analysis_params: Analysis parameters
+        evidence_refs: List of evidence references
 
     Returns:
         Path to the written file
@@ -165,6 +181,7 @@ def write_methods_report(
         qc_summary=qc_summary,
         preprocessing_params=preprocessing_params,
         analysis_params=analysis_params,
+        evidence_refs=evidence_refs,
     )
 
     outdir.mkdir(parents=True, exist_ok=True)

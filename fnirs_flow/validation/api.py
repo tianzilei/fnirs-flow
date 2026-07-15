@@ -8,7 +8,7 @@ from fnirs_flow.registry.validators import validate_scenario_constraints
 from fnirs_flow.security.validation import validate_security
 from fnirs_flow.validation.adapters import validate_adapters
 from fnirs_flow.validation.graph import validate_graph
-from fnirs_flow.validation.models import ValidationReport
+from fnirs_flow.validation.models import RiskItem, ValidationReport
 from fnirs_flow.validation.state import (
     validate_adapter_tags,
     validate_node_states,
@@ -44,7 +44,7 @@ def validate_flow(flow_dict: dict, scenario_id: str | None = None) -> Validation
     # 2. Parse to model
     try:
         flow = FlowGraph.model_validate(flow_dict)
-    except Exception as e:
+    except (ValueError, KeyError, TypeError) as e:
         report.errors.append(f"Flow model parsing failed: {e}")
         report.readiness = report.derive_readiness()
         return report
@@ -79,6 +79,40 @@ def validate_flow(flow_dict: dict, scenario_id: str | None = None) -> Validation
     if scenario_id:
         scenario_risks = validate_scenario_constraints(flow, scenario_id)
         report.risks.extend(scenario_risks)
+
+    # 10. AI-generated flow confirmation gate
+    ai_generation = flow.metadata.ai_generation
+    if ai_generation is not None:
+        pending = ai_generation.pending_confirmations
+        if pending:
+            report.risks.append(
+                RiskItem(
+                    risk_id="ai-user-confirmation-required",
+                    code="AI_CONFIRMATION_REQUIRED",
+                    severity="fatal",
+                    domain="reproducibility",
+                    affected_object=f"flow:{flow.flow_id}",
+                    message=("AI-generated flow has unconfirmed high-impact parameters: " + "; ".join(pending)),
+                    suggested_action=(
+                        "Review every item and record exact matches in "
+                        "metadata.ai_generation.confirmed_parameters with confirmed_by/confirmed_at"
+                    ),
+                )
+            )
+        elif ai_generation.requires_user_confirmation and (
+            not ai_generation.confirmed_by or not ai_generation.confirmed_at
+        ):
+            report.risks.append(
+                RiskItem(
+                    risk_id="ai-user-confirmation-audit-metadata-missing",
+                    code="AI_CONFIRMATION_RECORD_INCOMPLETE",
+                    severity="fatal",
+                    domain="reproducibility",
+                    affected_object=f"flow:{flow.flow_id}",
+                    message="AI confirmation record is missing confirmed_by or confirmed_at",
+                    suggested_action="Record the human reviewer and confirmation timestamp",
+                )
+            )
 
     report.readiness = report.derive_readiness()
     return report

@@ -12,11 +12,13 @@ export function ImportPackage() {
   const importPackage = useStore((s) => s.importPackage);
   const fork = useStore((s) => s.fork);
   const trustAtom = useStore((s) => s.trustAtom);
+  const relinkData = useStore((s) => s.relinkData);
 
   const [packagePath, setPackagePath] = useState('');
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [dataRoot, setDataRoot] = useState('');
 
   const handleImport = async () => {
     if (!packagePath.trim() || !project) return;
@@ -113,6 +115,31 @@ export function ImportPackage() {
                   </p>
                 </div>
               )}
+            </section>
+
+            <section className="import-form">
+              <h3>Relink Local Data</h3>
+              <div className="form-group">
+                <label htmlFor="data-root">Data Root</label>
+                <div className="input-with-button">
+                  <input
+                    id="data-root"
+                    type="text"
+                    value={dataRoot}
+                    onChange={(event) => setDataRoot(event.target.value)}
+                    placeholder="/path/to/local/dataset"
+                    disabled={loading}
+                  />
+                  <button
+                    className="primary-button"
+                    onClick={() => relinkData(dataRoot.trim())}
+                    disabled={!dataRoot.trim() || loading}
+                  >
+                    Relink
+                  </button>
+                </div>
+                {importStatus.relinked && <p className="help-text">Linked to {importStatus.data_root}</p>}
+              </div>
             </section>
 
             {importStatus.quarantined_atoms.length > 0 && (

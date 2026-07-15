@@ -9,7 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fnirs_flow.flow.atoms import AtomPort, MethodAtomCategory, MethodAtomOrigin
+from fnirs_flow.adapters.cedalion_bindings import (
+    get_cedalion_binding,
+    is_verified_cedalion_atom,
+)
+from fnirs_flow.flow.atoms import AtomPort, BackendBinding, MethodAtomCategory, MethodAtomOrigin
 from fnirs_flow.registry.node_library import MethodAtomTemplate
 
 PACKAGE_LIBRARY_DIR = Path(__file__).resolve().parent / "methodatom_lib"
@@ -143,9 +147,11 @@ def _write_runtime_state(state: dict[str, Any]) -> None:
 def _ports(row: dict[str, str]) -> list[AtomPort]:
     input_schema = _schema_type(row.get("input_schema", ""), "Any")
     output_schema = _schema_type(row.get("output_schema", ""), "Any")
+    input_name = row.get("input_port", "").strip() or row.get("required_input", "").strip() or "input"
+    output_name = row.get("output_port", "").strip() or row.get("produced_output", "").strip() or "output"
     return [
-        AtomPort(name="input", direction="in", schema=input_schema),
-        AtomPort(name="output", direction="out", schema=output_schema),
+        AtomPort(name=input_name, direction="in", schema=input_schema),
+        AtomPort(name=output_name, direction="out", schema=output_schema),
     ]
 
 
@@ -159,7 +165,12 @@ def _default_config(row: dict[str, str]) -> dict[str, Any]:
         "source_study_id": row.get("study_id", ""),
         "target_flow_slot": row.get("target_flow_slot", ""),
         "scenario": row.get("scenario", ""),
-        "readiness_status": row.get("readiness_status", ""),
+        "readiness_status": row.get("method_readiness", "").strip()
+        or row.get("readiness_status", ""),
+        "execution_readiness": row.get("execution_readiness", "").strip()
+        or row.get("readiness_status", ""),
+        "execution_scope": row.get("execution_scope", "").strip() or "run",
+        "missing_for_execution": row.get("missing_for_execution", "").strip(),
         "confidence": row.get("confidence", ""),
         "review_required": row.get("review_required", ""),
     }
@@ -186,12 +197,21 @@ def load_literature_method_atom_templates(
             operation = row.get("operation", "").strip() or None
             target_atom_type = row.get("target_atom_type", "").strip()
             atom_type = target_atom_type or operation or atom_id.lower()
+            backend_operation = get_cedalion_binding(atom_id)
+            default_config = _default_config(row)
+            if backend_operation and not is_verified_cedalion_atom(atom_id):
+                default_config["readiness_status"] = "needs_attention"
+                default_config["verification_status"] = "contract_test_required"
             tags = [
                 "literature_derived",
                 "methodatom_library",
                 domain,
                 row.get("scenario", "").strip(),
             ]
+            if backend_operation:
+                tags.append("cedalion")
+                if not is_verified_cedalion_atom(atom_id):
+                    tags.append("experimental")
             templates.append(
                 MethodAtomTemplate(
                     template_id=_template_id(atom_id),
@@ -200,12 +220,21 @@ def load_literature_method_atom_templates(
                     atom_type=atom_type,
                     operation=operation,
                     description=row.get("notes", "").strip(),
-                    default_config=_default_config(row),
+                    default_config=default_config,
                     ports=_ports(row),
                     origin=MethodAtomOrigin.EVIDENCE_DERIVED,
                     evidence_refs=evidence_refs_by_atom.get(atom_id) or _evidence_refs(row),
                     reference=row.get("evidence_refs", "").strip(),
                     tags=[tag for tag in tags if tag],
+                    backend_binding=(
+                        BackendBinding(
+                            backend_id="cedalion",
+                            operation=backend_operation,
+                            version_spec=">=26.5,<27",
+                        )
+                        if backend_operation
+                        else None
+                    ),
                 )
             )
     return templates

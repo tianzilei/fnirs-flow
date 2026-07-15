@@ -34,7 +34,15 @@ class DagNode(BaseModel):
     template_id: str | None = None
     operation: str | None = None
     category: str = ""
+    execution_scope: str = "run"
     adapter_id: str | None = None
+    backend_id: str | None = None
+    backend_operation: str | None = None
+    backend_version_spec: str | None = None
+    # Dependency declaration (MethodAtom-first dependency management)
+    dependency_profile_id: str | None = None
+    required_capabilities: list[str] = Field(default_factory=list)
+    dependency_optional: bool = False
     parameters: dict[str, Any] = Field(default_factory=dict)
     parameter_sources: dict[str, str] = Field(default_factory=dict)
     evidence_refs: list[str] = Field(default_factory=list)

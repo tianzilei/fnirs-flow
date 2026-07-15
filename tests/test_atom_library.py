@@ -1,5 +1,6 @@
 """Tests for MethodAtomTemplate and MethodAtomLibrary aliases."""
 
+from fnirs_flow.flow.atoms import ReadinessStatus
 from fnirs_flow.flow.models import NodeCategory, NodeOrigin
 from fnirs_flow.registry.atom_templates import (
     ALL_METHOD_ATOM_TEMPLATES,
@@ -104,3 +105,33 @@ class TestLiteratureDerivedMethodAtoms:
         state = refresh_method_atom_templates(force=True, write_state=False)
         assert state["loaded_templates"] == fingerprint["method_atoms_rows"]
         assert state["total_templates"] == len(HANDWRITTEN_ATOM_TEMPLATES) + fingerprint["method_atoms_rows"]
+
+    def test_cedalion_method_atoms_have_explicit_backend_bindings(self):
+        library = create_builtin_library()
+        template = library.get("atom_dot_image_recon")
+        assert template is not None
+        assert template.backend_binding is not None
+        assert template.backend_binding.backend_id == "cedalion"
+        assert template.backend_binding.operation == "reconstruct_image"
+        assert "experimental" in template.tags
+        assert template.default_config["verification_status"] == "contract_test_required"
+
+    def test_cedalion_binding_is_preserved_when_atom_is_created(self):
+        library = create_builtin_library()
+        atom = library.create_atom("atom_dot_image_recon", atom_id="dot-recon")
+        assert atom is not None
+        assert atom.backend_binding is not None
+        assert atom.backend_binding.backend_id == "cedalion"
+        assert atom.backend_binding.operation == "reconstruct_image"
+        assert atom.readiness_status == ReadinessStatus.NEEDS_ATTENTION
+
+    def test_verified_cedalion_atom_is_ready(self):
+        library = create_builtin_library()
+        template = library.get("atom_extinction_coefficients")
+        assert template is not None
+        assert "experimental" not in template.tags
+        atom = library.create_atom("atom_extinction_coefficients", atom_id="extinction")
+        assert atom is not None
+        assert atom.backend_binding is not None
+        assert atom.backend_binding.operation == "get_extinction_coefficients"
+        assert atom.readiness_status == ReadinessStatus.READY

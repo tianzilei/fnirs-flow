@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Boxes, Database, Play, Download } from 'lucide-react';
+import { Archive, Boxes, Copy, Database, Play, Download, ShieldCheck } from 'lucide-react';
 import { useStore } from '../store';
 import type { Project } from '../api/client';
+import { VersionHistoryPanel } from '../components/VersionHistoryPanel';
 
 export function ProjectWorkspace() {
   const navigate = useNavigate();
@@ -47,6 +48,14 @@ export function ProjectWorkspace() {
     } else {
       setDetailProject(proj);
     }
+  };
+
+  const handleRestored = async (restored: Project) => {
+    setDetailProject(restored);
+    if (project?.id === restored.id) {
+      await selectProject(restored);
+    }
+    await loadProjects();
   };
 
   return (
@@ -117,7 +126,8 @@ export function ProjectWorkspace() {
                 <span className="project-id-badge">{proj.id.slice(0, 8)}</span>
               </div>
               {proj.description && <p className="project-desc">{proj.description}</p>}
-              {proj.flow_id && <p className="flow-id">Flow: {proj.flow_id}</p>}
+                {proj.flow_id && <p className="flow-id">Flow: {proj.flow_id}</p>}
+                <p className="project-storage-badge"><Archive size={13} /> Single-file project · r{proj.revision}</p>
             </div>
 
             {detailProject?.id === proj.id && (
@@ -138,6 +148,26 @@ export function ProjectWorkspace() {
                     <span className="detail-value">{proj.flow_id}</span>
                   </div>
                 )}
+                <div className="detail-row">
+                  <span className="detail-label">Storage</span>
+                  <span className="detail-value project-storage-value">
+                    <ShieldCheck size={14} /> {proj.integrity_status === 'verified' ? 'Verified' : proj.integrity_status === 'failed' ? 'Integrity failed' : 'Not yet verified'} .fnirsflow bundle · revision {proj.revision}
+                  </span>
+                </div>
+                {proj.integrity_error && (
+                  <div className="project-integrity-error" role="alert">{proj.integrity_error}</div>
+                )}
+                <div className="detail-row project-package-row">
+                  <span className="detail-label">Project file</span>
+                  <span className="detail-value"><code>{proj.package_path}</code></span>
+                  <button
+                    className="ghost-button small"
+                    onClick={() => navigator.clipboard.writeText(proj.package_path)}
+                    title="Copy project package path"
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
                 <button
                   className="primary-button"
                   onClick={() => handleOpen(proj)}
@@ -158,6 +188,7 @@ export function ProjectWorkspace() {
                     <Download size={14} /> Export
                   </button>
                 </div>
+                <VersionHistoryPanel projectId={proj.id} onRestored={handleRestored} />
               </div>
             )}
           </div>

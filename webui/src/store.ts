@@ -8,6 +8,11 @@ import type {
   ExportResult,
   ProgressEvent,
   ImportStatus,
+  ProjectStatus,
+  ExecutionJob,
+  ArtifactSummary,
+  AtomExecutionSummary,
+  ParticipantTableImportResult,
 } from './api/client';
 
 interface ErrorInfo {
@@ -24,8 +29,8 @@ interface Run {
   run: string;
   started_at: string;
   completed_at: string;
-  atom_results?: Array<{ atom_id: string; status: string; error?: string }>;
-  artifacts?: Array<{ type: string; path: string; checksum: string }>;
+  atom_results?: AtomExecutionSummary[];
+  artifacts?: ArtifactSummary[];
 }
 
 interface ExecuteInfo {
@@ -41,6 +46,19 @@ interface Snapshot {
   created_at: string;
 }
 
+interface ParticipantRoleMapInput {
+  group_column?: string;
+  label_column?: string;
+  site_column?: string;
+  scanner_column?: string;
+  covariate_columns?: string[];
+  session_column?: string;
+  timepoint_column?: string;
+  pair_id_column?: string;
+  dyad_id_column?: string;
+  participant_role_column?: string;
+}
+
 interface StoreState {
   // Data
   projects: Project[];
@@ -49,9 +67,12 @@ interface StoreState {
   validation: ValidationResult | null;
   compileResult: CompileResult | null;
   discoverResult: DiscoverResult | null;
+  participantTableResult: ParticipantTableImportResult | null;
   runs: Run[];
   executeInfo: ExecuteInfo | null;
+  currentAttempt: ExecutionJob | null;
   importStatus: ImportStatus | null;
+  readiness: ProjectStatus | null;
   progressEvents: ProgressEvent[];
   exportResult: ExportResult | null;
   snapshot: Snapshot | null;
@@ -79,13 +100,21 @@ interface StoreState {
   validate: () => Promise<void>;
   compile: () => Promise<void>;
   discover: (datasetId: string) => Promise<DiscoverResult>;
+  importParticipantTable: (
+    path: string,
+    idColumn?: string,
+    includeColumn?: string,
+    roles?: ParticipantRoleMapInput,
+  ) => Promise<ParticipantTableImportResult>;
   dryRun: () => Promise<void>;
   execute: () => Promise<void>;
+  cancelExecution: () => Promise<void>;
   exportPackage: (options?: api.ExportOptions) => Promise<ExportResult>;
   importPackage: (projectId: string, packagePath: string) => Promise<void>;
   createSnapshot: () => Promise<void>;
   fork: () => Promise<void>;
   trustAtom: (atomId: string) => Promise<void>;
+  relinkData: (dataRoot: string) => Promise<void>;
   clearError: () => void;
   loadHealth: () => Promise<void>;
 }
@@ -98,9 +127,12 @@ export const useStore = create<StoreState>((set, get) => ({
   validation: null,
   compileResult: null,
   discoverResult: null,
+  participantTableResult: null,
   runs: [],
   executeInfo: null,
+  currentAttempt: null,
   importStatus: null,
+  readiness: null,
   progressEvents: [],
   exportResult: null,
   snapshot: null,
@@ -109,17 +141,17 @@ export const useStore = create<StoreState>((set, get) => ({
   healthStatus: null,
 
   projectStatus: () => {
-    const { project, flow, validation, compileResult, discoverResult, executeInfo } = get();
+    const { project, flow, validation, compileResult, discoverResult, executeInfo, readiness } = get();
     const hasFatalRisk = validation?.risks?.some(
       (r: Record<string, unknown>) => r.severity === 'fatal'
     ) ?? false;
     return {
       selected: !!project,
-      flowSaved: !!flow && Object.keys(flow).length > 0,
-      validated: !!validation,
-      compiled: !!compileResult,
-      dataDiscovered: !!discoverResult,
-      executed: !!executeInfo,
+      flowSaved: (!!flow && Object.keys(flow).length > 0) || !!readiness?.flow_saved,
+      validated: !!validation || !!readiness?.validated,
+      compiled: !!compileResult || !!readiness?.compiled,
+      dataDiscovered: !!discoverResult || !!readiness?.data_discovered,
+      executed: !!executeInfo || !!readiness?.executed,
       hasFatalRisk,
     };
   },
@@ -129,7 +161,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const projects = await api.listProjects();
       set({ projects });
     } catch (e: any) {
-      set({ error: { message: 'Failed to load projects', detail: e.message } });
+      set({ error: { message: 'Failed to load projects', detail: api.formatApiError(e) } });
     }
   },
 
@@ -144,9 +176,12 @@ export const useStore = create<StoreState>((set, get) => ({
         validation: null,
         compileResult: null,
         discoverResult: null,
+        participantTableResult: null,
         runs: [],
         executeInfo: null,
+        currentAttempt: null,
         importStatus: null,
+        readiness: null,
         progressEvents: [],
         exportResult: null,
         snapshot: null,
@@ -154,7 +189,7 @@ export const useStore = create<StoreState>((set, get) => ({
       }));
       return proj;
     } catch (e: any) {
-      set({ error: { message: 'Failed to create project', detail: e.message }, loading: false });
+      set({ error: { message: 'Failed to create project', detail: api.formatApiError(e) }, loading: false });
       throw e;
     }
   },
@@ -165,9 +200,12 @@ export const useStore = create<StoreState>((set, get) => ({
       validation: null,
       compileResult: null,
       discoverResult: null,
+      participantTableResult: null,
       runs: [],
       executeInfo: null,
+      currentAttempt: null,
       importStatus: null,
+      readiness: null,
       progressEvents: [],
       exportResult: null,
       snapshot: null,
@@ -185,9 +223,52 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch {
       // ignore
     }
+    try {
+      const readiness = await api.getProjectStatus(project.id);
+      set({ readiness });
+    } catch {
+      set({ readiness: null });
+    }
+    try {
+      const [latest] = await api.listExecutionAttempts(project.id);
+      if (latest) {
+        const result = latest.result;
+        set({
+          currentAttempt: latest,
+          runs: result?.runs || [],
+          executeInfo: result ? {
+            attempt_id: result.attempt_id,
+            successful: result.successful,
+            failed: result.failed,
+            failure_ids: result.failure_ids,
+          } : null,
+        });
+      }
+    } catch {
+      // Older servers may not expose persistent attempts.
+    }
   },
 
-  setFlow: (flow: Record<string, unknown>) => set({ flow }),
+  setFlow: (flow: Record<string, unknown>) => set({
+    flow,
+    validation: null,
+    compileResult: null,
+    runs: [],
+    executeInfo: null,
+    currentAttempt: null,
+    exportResult: null,
+    snapshot: null,
+    readiness: get().readiness ? {
+      ...get().readiness!,
+      validated: false,
+      compiled: false,
+      executed: false,
+      flow_hash: '',
+      compiled_flow_hash: '',
+      last_attempt_id: '',
+      last_execution_status: '',
+    } : null,
+  }),
 
   saveFlow: async () => {
     const { project, flow } = get();
@@ -195,9 +276,10 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       await api.updateFlow(project.id, flow);
-      set({ loading: false, error: { message: 'Flow saved', detail: '' } });
+      const readiness = await api.getProjectStatus(project.id);
+      set({ readiness, loading: false, error: { message: 'Flow saved', detail: '' } });
     } catch (e: any) {
-      set({ error: { message: 'Failed to save flow', detail: e.message }, loading: false });
+      set({ error: { message: 'Failed to save flow', detail: api.formatApiError(e) }, loading: false });
     }
   },
 
@@ -207,9 +289,10 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const result = await api.validateFlow(project.id);
-      set({ validation: result, loading: false });
+      const readiness = await api.getProjectStatus(project.id);
+      set({ validation: result, readiness, loading: false });
     } catch (e: any) {
-      set({ error: { message: 'Validation failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Validation failed', detail: api.formatApiError(e) }, loading: false });
     }
   },
 
@@ -220,9 +303,10 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       await api.updateFlow(project.id, flow);
       const result = await api.compileFlow(project.id);
-      set({ compileResult: result, loading: false });
+      const readiness = await api.getProjectStatus(project.id);
+      set({ compileResult: result, readiness, loading: false });
     } catch (e: any) {
-      set({ error: { message: 'Compilation failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Compilation failed', detail: api.formatApiError(e) }, loading: false });
     }
   },
 
@@ -232,10 +316,30 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ error: null });
     try {
       const result = await api.discoverData(project.id, datasetId);
-      set({ discoverResult: result });
+      const readiness = await api.getProjectStatus(project.id);
+      set({ discoverResult: result, readiness });
       return result;
     } catch (e: any) {
-      set({ error: { message: 'Data discovery failed', detail: e.message } });
+      set({ error: { message: 'Data discovery failed', detail: api.formatApiError(e) } });
+      throw e;
+    }
+  },
+
+  importParticipantTable: async (path: string, idColumn = 'participant_id', includeColumn = 'include', roles = {}) => {
+    const { project } = get();
+    if (!project) throw new Error('No project selected');
+    set({ error: null });
+    try {
+      const result = await api.importParticipantTable(project.id, {
+        path,
+        id_column: idColumn,
+        include_column: includeColumn,
+        ...roles,
+      });
+      set({ participantTableResult: result });
+      return result;
+    } catch (e: any) {
+      set({ error: { message: 'Participant table import failed', detail: api.formatApiError(e) } });
       throw e;
     }
   },
@@ -248,7 +352,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const data = await api.dryRun(project.id);
       set({ runs: data.planned_runs || [], executeInfo: null, loading: false });
     } catch (e: any) {
-      set({ error: { message: 'Dry-run failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Dry-run failed', detail: api.formatApiError(e) }, loading: false });
     }
   },
 
@@ -257,7 +361,22 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!project) return;
     set({ loading: true, error: null });
     try {
-      const data = await api.executeProject(project.id);
+      let job = await api.executeProject(project.id);
+      set({ currentAttempt: job });
+      while (!['completed', 'failed', 'cancelled'].includes(job.status)) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        job = await api.getExecutionAttempt(project.id, job.attempt_id);
+        set({ currentAttempt: job });
+      }
+      if (job.status === 'cancelled') {
+        set({ error: { message: 'Execution cancelled' }, loading: false });
+        return;
+      }
+      if (job.status !== 'completed' || !job.result) {
+        throw new Error(job.error || `Execution ${job.status}`);
+      }
+      const data = job.result;
+      const readiness = await api.getProjectStatus(project.id);
       set({
         runs: data.runs || [],
         executeInfo: {
@@ -266,10 +385,22 @@ export const useStore = create<StoreState>((set, get) => ({
           failed: data.failed,
           failure_ids: data.failure_ids,
         },
+        readiness,
         loading: false,
       });
     } catch (e: any) {
-      set({ error: { message: 'Execution failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Execution failed', detail: api.formatApiError(e) }, loading: false });
+    }
+  },
+
+  cancelExecution: async () => {
+    const { project, currentAttempt } = get();
+    if (!project || !currentAttempt) return;
+    try {
+      const job = await api.cancelExecutionAttempt(project.id, currentAttempt.attempt_id);
+      set({ currentAttempt: job, loading: false });
+    } catch (e: any) {
+      set({ error: { message: 'Cancellation failed', detail: api.formatApiError(e) } });
     }
   },
 
@@ -282,7 +413,7 @@ export const useStore = create<StoreState>((set, get) => ({
       set({ exportResult: result, loading: false });
       return result;
     } catch (e: any) {
-      set({ error: { message: 'Export failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Export failed', detail: api.formatApiError(e) }, loading: false });
       throw e;
     }
   },
@@ -294,7 +425,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const status = await api.getImportStatus(projectId);
       set({ importStatus: status, loading: false });
     } catch (e: any) {
-      set({ error: { message: 'Import failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Import failed', detail: api.formatApiError(e) }, loading: false });
       throw e;
     }
   },
@@ -307,7 +438,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const result = await api.createSnapshot(project.id);
       set({ snapshot: result, loading: false });
     } catch (e: any) {
-      set({ error: { message: 'Snapshot creation failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Snapshot creation failed', detail: api.formatApiError(e) }, loading: false });
     }
   },
 
@@ -317,19 +448,14 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const result = await api.forkProject(project.id, `${project.name}_editable`);
-      const newProject: Project = {
-        id: String(result.fork_project_id),
-        name: `${project.name}_editable`,
-        description: '',
-        flow_id: '',
-      };
+      const newProject = await api.getProject(String(result.fork_project_id));
       set((state) => ({
         projects: [...state.projects, newProject],
         loading: false,
         error: { message: 'Fork created', detail: `New project: ${result.fork_project_id}` },
       }));
     } catch (e: any) {
-      set({ error: { message: 'Fork failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Fork failed', detail: api.formatApiError(e) }, loading: false });
     }
   },
 
@@ -342,7 +468,24 @@ export const useStore = create<StoreState>((set, get) => ({
       const status = await api.getImportStatus(project.id);
       set({ importStatus: status, loading: false });
     } catch (e: any) {
-      set({ error: { message: 'Trust failed', detail: e.message }, loading: false });
+      set({ error: { message: 'Trust failed', detail: api.formatApiError(e) }, loading: false });
+    }
+  },
+
+  relinkData: async (dataRoot: string) => {
+    const { project } = get();
+    if (!project) return;
+    set({ loading: true, error: null });
+    try {
+      await api.relinkData(project.id, dataRoot);
+      const [importStatus, readiness] = await Promise.all([
+        api.getImportStatus(project.id),
+        api.getProjectStatus(project.id),
+      ]);
+      set({ importStatus, readiness, loading: false });
+    } catch (e: any) {
+      set({ error: { message: 'Relink failed', detail: api.formatApiError(e) }, loading: false });
+      throw e;
     }
   },
 

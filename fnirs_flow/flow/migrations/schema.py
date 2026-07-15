@@ -26,6 +26,15 @@ MIGRATION_TABLE: list[MigrationEntry] = [
             "add template_id field to each atom",
         ],
     ),
+    MigrationEntry(
+        from_version="0.2.0",
+        to_version="0.3.0",
+        description="Backend binding migration: add backend_binding to atoms",
+        rewrites=[
+            "add backend_binding field to each atom (optional)",
+            "default backend_binding to null for backward compatibility",
+        ],
+    ),
 ]
 
 

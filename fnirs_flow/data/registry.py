@@ -48,6 +48,15 @@ BUILTIN_DATASETS: dict[str, DatasetEntry] = {
         description="Local BIDS-NIRS finger tapping dataset with five participants.",
         folder_name="Sample/BIDS-NIRS-Tapping-master",
     ),
+    "ds007738": DatasetEntry(
+        dataset_id="ds007738",
+        name="OpenNeuro ds007738 BIDS-NIRS",
+        source_kind="local_bids_nirs",
+        url="https://openneuro.org/datasets/ds007738",
+        citation="OpenNeuro dataset ds007738",
+        description="Local multi-task BIDS-NIRS dataset used for the fnirs-flow real-data golden path.",
+        folder_name="Sample/ds007738-download",
+    ),
 }
 
 

@@ -21,7 +21,9 @@ def read_raw_snirf(filepath: str | Path, **kwargs: Any) -> Any:
 
         return mne.io.read_raw_snirf(str(filepath), **kwargs)
     except ImportError:
-        raise ImportError("MNE-Python is required for SNIRF reading. Install with: pip install fnirs-flow[mne]")
+        raise ImportError(
+            "MNE-Python is required for SNIRF reading. Install with: pip install fnirs-flow[mne]"
+        ) from None
 
 
 def read_raw_nirx(filepath: str | Path, **kwargs: Any) -> Any:
@@ -39,7 +41,9 @@ def read_raw_nirx(filepath: str | Path, **kwargs: Any) -> Any:
 
         return mne.io.read_raw_nirx(str(filepath), **kwargs)
     except ImportError:
-        raise ImportError("MNE-Python is required for NIRx reading. Install with: pip install fnirs-flow[mne]")
+        raise ImportError(
+            "MNE-Python is required for NIRx reading. Install with: pip install fnirs-flow[mne]"
+        ) from None
 
 
 def get_dataset_path(dataset_name: str = "fnirs_motor") -> Path:
@@ -56,7 +60,9 @@ def get_dataset_path(dataset_name: str = "fnirs_motor") -> Path:
 
         return Path(fnirs_motor.data_path())
     except ImportError:
-        raise ImportError("MNE-Python is required for dataset access. Install with: pip install fnirs-flow[mne]")
+        raise ImportError(
+            "MNE-Python is required for dataset access. Install with: pip install fnirs-flow[mne]"
+        ) from None
 
 
 def capture_versions() -> dict[str, str]:

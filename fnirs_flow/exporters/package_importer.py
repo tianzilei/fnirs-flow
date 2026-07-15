@@ -2,11 +2,105 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from fnirs_flow.api.uri import ProjectURI, create_external_data_uri
+
+
+def _relative_data_path(value: str, old_root: Path | None = None) -> str:
+    if not value:
+        return ""
+    if value.startswith("external-data://"):
+        try:
+            return ProjectURI(value).path.as_posix()
+        except ValueError:
+            return ""
+    path = Path(value)
+    if path.is_absolute():
+        if old_root is None:
+            return ""
+        try:
+            return path.relative_to(old_root).as_posix()
+        except ValueError:
+            return ""
+    return path.as_posix()
+
+
+def _relink_manifest(manifest: dict[str, Any], data_root: Path) -> dict[str, Any]:
+    """Bind portable data URIs to a local root without replacing stable identifiers."""
+    root = data_root.resolve()
+    if not root.is_dir():
+        raise ValueError(f"Data root does not exist or is not a directory: {root}")
+    old_root_text = str(manifest.get("local_root", ""))
+    old_root = Path(old_root_text) if old_root_text else None
+    dataset_id = str(manifest.get("dataset_id") or "dataset")
+    missing_paths = []
+    for run in manifest.get("subject_session_runs", []):
+        relative_text = str(run.get("relative_path", ""))
+        if not relative_text:
+            relative_text = _relative_data_path(str(run.get("uri") or run.get("path", "")), old_root)
+        if relative_text:
+            run_path = root / relative_text
+            run_uri = str(create_external_data_uri(dataset_id, relative_text))
+            run["relative_path"] = relative_text
+            run["path"] = run_uri
+            run["uri"] = run_uri
+            if not run_path.exists():
+                missing_paths.append(str(run_path))
+
+        events_text = str(run.get("events_uri") or run.get("events_path", ""))
+        events_relative = _relative_data_path(events_text, old_root)
+        if not events_relative and relative_text.endswith("_nirs.snirf"):
+            events_relative = relative_text.removesuffix("_nirs.snirf") + "_events.tsv"
+        if events_relative:
+            events_path = root / events_relative
+            events_uri = str(create_external_data_uri(dataset_id, events_relative))
+            run["events_path"] = events_uri if events_path.exists() else ""
+            run["events_uri"] = events_uri
+
+    for item in manifest.get("files", []):
+        relative = _relative_data_path(str(item.get("uri") or item.get("path", "")), old_root)
+        if relative:
+            uri = str(create_external_data_uri(dataset_id, relative))
+            item["path"] = uri
+            item["uri"] = uri
+
+    for table in manifest.get("metadata_tables", []):
+        relative = _relative_data_path(str(table.get("uri") or table.get("path", "")), old_root)
+        if relative:
+            uri = str(create_external_data_uri(dataset_id, relative))
+            table["path"] = uri
+            table["uri"] = uri
+
+    manifest["local_root"] = ""
+    manifest["external_data_uri_prefix"] = f"external-data://{dataset_id}/"
+    manifest["requires_data_binding"] = False
+    return {"data_root": str(root), "missing_paths": missing_paths}
+
+
+def relink_package_data(package_dir: str | Path, data_root: str | Path) -> dict[str, Any]:
+    """Relink an imported package in root or project/compiled layout."""
+    package_dir = Path(package_dir)
+    manifest_path = package_dir / "data_manifest.json"
+    if not manifest_path.exists():
+        manifest_path = package_dir / "compiled" / "data_manifest.json"
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"data_manifest.json not found in {package_dir}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    result = _relink_manifest(manifest, Path(data_root))
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    metadata_path = package_dir / "import_metadata.json"
+    if metadata_path.exists():
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        metadata["relinked"] = True
+        metadata.pop("data_root", None)
+        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    return {**result, "manifest_path": str(manifest_path)}
 
 
 def _validate_zip_path(member: str, outdir: Path) -> bool:
@@ -23,6 +117,7 @@ def import_package(
     outdir: str | Path,
     relink_data: bool = False,
     data_root: str | Path | None = None,
+    project_layout: bool = False,
 ) -> dict[str, Any]:
     """Import a .fnirsflow.zip package.
 
@@ -38,38 +133,42 @@ def import_package(
     package_path = Path(package_path)
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
+    extract_dir = outdir / "compiled" if project_layout else outdir
+    extract_dir.mkdir(parents=True, exist_ok=True)
 
     extracted_files: list[str] = []
 
     with zipfile.ZipFile(package_path, "r") as zf:
         # Validate all paths before extraction (Zip Slip prevention)
         for member in zf.namelist():
-            if not _validate_zip_path(member, outdir):
+            if not _validate_zip_path(member, extract_dir):
                 raise ValueError(f"Unsafe zip entry: {member}")
 
-        zf.extractall(outdir)
+        zf.extractall(extract_dir)
         extracted_files = zf.namelist()
 
     # Relink data if requested
     relinked = False
     if relink_data and data_root is not None:
-        manifest_path = outdir / "data_manifest.json"
+        manifest_path = extract_dir / "data_manifest.json"
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["local_root"] = str(data_root)
+            _relink_manifest(manifest, Path(data_root))
             manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
             relinked = True
 
     # Mark imported flow as read-only and quarantine custom atoms
     import_metadata: dict[str, Any] = {
         "imported_at": datetime.now(timezone.utc).isoformat(),
-        "source_package": str(package_path),
+        "source_package": package_path.name,
+        "source_package_sha256": hashlib.sha256(package_path.read_bytes()).hexdigest(),
         "read_only": True,
         "quarantined_atoms": [],
+        "relinked": relinked,
     }
 
     # Check for custom atoms in plan.json and mark them as quarantined
-    plan_path = outdir / "plan.json"
+    plan_path = extract_dir / "plan.json"
     if plan_path.exists():
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         for atom_chain in ["preprocessing_atoms", "analysis_atoms", "output_atoms"]:
@@ -96,6 +195,7 @@ def import_package(
         "quarantined_atoms": import_metadata["quarantined_atoms"],
         "package_path": str(package_path),
         "output_dir": str(outdir),
+        "compiled_dir": str(extract_dir),
     }
 
 
@@ -109,7 +209,8 @@ def fork_package(
     Args:
         package_dir: Directory containing the imported package
         fork_dir: New directory for the forked copy
-        unfork: If True, remove read-only and quarantine restrictions
+        unfork: If True, remove the read-only editing restriction. Quarantine
+            decisions remain intact and require explicit per-atom trust.
 
     Returns:
         Dict with fork results
@@ -132,14 +233,16 @@ def fork_package(
         if unfork:
             metadata["read_only"] = False
             metadata["forked_at"] = datetime.now(timezone.utc).isoformat()
-            metadata["quarantined_atoms"] = []
-            # Remove quarantine from plan.json
-            plan_path = fork_dir / "plan.json"
+            # Forking makes the project editable but does not implicitly trust code.
+            plan_path = fork_dir / "compiled" / "plan.json"
+            if not plan_path.exists():
+                plan_path = fork_dir / "plan.json"
             if plan_path.exists():
                 plan = json.loads(plan_path.read_text(encoding="utf-8"))
                 for atom_chain in ["preprocessing_atoms", "analysis_atoms", "output_atoms"]:
                     for atom in plan.get(atom_chain, []):
-                        atom.pop("security_status", None)
+                        if atom.get("atom_id") not in metadata.get("quarantined_atoms", []):
+                            atom.pop("security_status", None)
                 plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
         else:
             metadata["forked_at"] = datetime.now(timezone.utc).isoformat()
@@ -167,7 +270,9 @@ def trust_atom(
         Dict with trust result
     """
     project_dir = Path(project_dir)
-    plan_path = project_dir / "plan.json"
+    plan_path = project_dir / "compiled" / "plan.json"
+    if not plan_path.exists():
+        plan_path = project_dir / "plan.json"
 
     if not plan_path.exists():
         return {"error": "plan.json not found"}
@@ -185,6 +290,20 @@ def trust_atom(
 
     if found:
         plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
+        metadata_path = project_dir / "import_metadata.json"
+        if not metadata_path.exists() and project_dir.name == "compiled":
+            metadata_path = project_dir.parent / "import_metadata.json"
+        if metadata_path.exists():
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["quarantined_atoms"] = [item for item in metadata.get("quarantined_atoms", []) if item != atom_id]
+            metadata.setdefault("trust_decisions", []).append(
+                {
+                    "atom_id": atom_id,
+                    "decision": "trusted",
+                    "trusted_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
         return {"atom_id": atom_id, "status": "trusted"}
     else:
         return {"error": f"Atom not found: {atom_id}"}
@@ -221,6 +340,8 @@ def rerun_package(
     package_dir: str | Path,
     outdir: str | Path | None = None,
     participant_labels: list[str] | None = None,
+    task_labels: list[str] | None = None,
+    run_labels: list[str] | None = None,
     continue_on_failure: bool = True,
 ) -> dict[str, Any]:
     """Rerun an imported package after data relink.
@@ -232,6 +353,8 @@ def rerun_package(
         package_dir: Directory containing the imported package
         outdir: Output directory for results (defaults to package_dir)
         participant_labels: Filter by participant labels
+        task_labels: Filter by task labels
+        run_labels: Filter by run labels
         continue_on_failure: Continue processing if one run fails
 
     Returns:
@@ -262,8 +385,7 @@ def rerun_package(
     local_root = manifest.get("local_root", "")
     if not local_root or not Path(local_root).exists():
         raise ValueError(
-            f"data_manifest.json local_root is invalid or missing: '{local_root}'. "
-            "Relink data paths before rerunning."
+            f"data_manifest.json local_root is invalid or missing: '{local_root}'. Relink data paths before rerunning."
         )
 
     # Check for quarantined atoms
@@ -284,6 +406,9 @@ def rerun_package(
         project_dir=str(package_dir),
         outdir=str(outdir_path),
         participant_labels=participant_labels or [],
+        task_labels=task_labels or [],
+        run_labels=run_labels or [],
+        data_root=local_root,
         continue_on_failure=continue_on_failure,
     )
     result = service.execute(request)

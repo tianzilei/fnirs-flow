@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from fnirs_flow.adapters.mne_nirs_adapter import MneNirsAdapter
 from fnirs_flow.adapters.mne_nirs_io import capture_versions
+
+pytestmark = pytest.mark.full
 
 
 class TestMneNirsAdapter:
@@ -51,6 +55,17 @@ class TestMneNirsAdapter:
         assert "S1_D1 hbo" in content
         assert len(adapter.artifacts.all()) == 1
 
+    def test_task_is_part_of_reportlet_identity(self, tmp_path):
+        covert = MneNirsAdapter(subject="01", task="covert", run="01", outdir=tmp_path)
+        overt = MneNirsAdapter(subject="01", task="overt", run="01", outdir=tmp_path)
+
+        covert_path = covert._write_artifact_file("test", "summary", {"task": "covert"})
+        overt_path = overt._write_artifact_file("test", "summary", {"task": "overt"})
+
+        assert covert_path != overt_path
+        assert covert_path.name == "sub-01_task-covert_run-01_desc-summary.json"
+        assert overt_path.name == "sub-01_task-overt_run-01_desc-summary.json"
+
 
 class TestMneNirsStepsMocked:
     """Tests for adapter steps using mocked MNE functions."""
@@ -68,6 +83,8 @@ class TestMneNirsStepsMocked:
     def test_filter_raw_iir(self):
         """IIR method uses SciPy, not raw.filter()."""
         import numpy as np
+
+        pytest.importorskip("mne")
         from mne import create_info
         from mne.io import RawArray
 
@@ -99,3 +116,28 @@ class TestMneNirsStepsMocked:
         raw.copy.assert_called_once()
         raw_copy.filter.assert_called_once_with(l_freq=0.01, h_freq=0.2)
         assert result is raw_copy
+
+    def test_design_matrix_uses_duration_hrf_and_nuisance_regressors(self):
+        import numpy as np
+
+        from fnirs_flow.adapters.mne_nirs_steps import build_design_matrix
+
+        raw = MagicMock()
+        raw.times = np.arange(800) / 10.0
+        events = np.asarray([[10, 10, 1], [400, 50, 2]], dtype=int)
+        design = build_design_matrix(
+            raw,
+            events,
+            {"Left": 1, "Right": 2},
+            sfreq=10.0,
+            drift_order=1,
+            high_pass=0.01,
+        )
+
+        matrix = design["design_matrix"]
+        assert matrix.shape[0] == 800
+        assert design["regressor_names"][:2] == ["Left", "Right"]
+        assert design["regressor_names"][-1] == "constant"
+        assert matrix[:, 1].sum() > matrix[:, 0].sum()
+        assert abs(matrix[-1, 0]) < 1e-6
+        assert not np.allclose(matrix[:, 0], matrix[:, 1])

@@ -7,12 +7,13 @@ export function FlowBuilder() {
   const flow = useStore((s) => s.flow);
   const setFlow = useStore((s) => s.setFlow);
   const validation = useStore((s) => s.validation);
+  const readOnly = useStore((s) => s.importStatus?.read_only ?? false);
 
   return (
     <div className="canvas-layout">
       <Sidebar />
       <div className="canvas-container">
-        <FlowCanvas flow={flow} onChange={setFlow} />
+        <FlowCanvas flow={flow} onChange={setFlow} readOnly={readOnly} />
       </div>
       <ValidationPanel result={validation} />
     </div>

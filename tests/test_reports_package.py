@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import zipfile
+
+import pytest
 
 from fnirs_flow.exporters.package_exporter import export_package, get_package_contents
 from fnirs_flow.exporters.package_importer import check_package_integrity, import_package
@@ -103,11 +106,149 @@ class TestPackageExportImport:
         export_package(outdir, pkg_path)
 
         import_dir = tmp_path / "imported"
-        result = import_package(pkg_path, import_dir, relink_data=True, data_root="/new/path")
+        data_root = tmp_path / "new-data"
+        data_root.mkdir()
+        result = import_package(pkg_path, import_dir, relink_data=True, data_root=data_root)
         assert result["relinked"] is True
 
         imported_manifest = json.loads((import_dir / "data_manifest.json").read_text())
-        assert imported_manifest["local_root"] == "/new/path"
+        assert imported_manifest["local_root"] == ""
+
+    def test_exported_data_manifest_contains_only_portable_data_uris(self, tmp_path):
+        outdir = self._setup_output_dir(tmp_path)
+        old_root = tmp_path / "source-machine"
+        relative = "sub-01/nirs/run.snirf"
+        (outdir / "data_manifest.json").write_text(
+            json.dumps(
+                {
+                    "dataset_id": "portable-dataset",
+                    "local_root": str(old_root),
+                    "access_instructions": f"Local dataset expected at {old_root}",
+                    "subject_session_runs": [
+                        {
+                            "relative_path": relative,
+                            "path": str(old_root / relative),
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        package_path = tmp_path / "portable.fnirsflow.zip"
+
+        export_package(outdir, package_path)
+
+        with zipfile.ZipFile(package_path) as archive:
+            manifest = json.loads(archive.read("data_manifest.json"))
+        serialized = json.dumps(manifest)
+        assert manifest["local_root"] == ""
+        assert manifest["requires_data_binding"] is True
+        assert manifest["access_instructions"] == (
+            "Bind external-data://portable-dataset/ to a local dataset directory before rerunning."
+        )
+        assert manifest["subject_session_runs"][0]["path"] == (
+            "external-data://portable-dataset/sub-01/nirs/run.snirf"
+        )
+        assert str(old_root) not in serialized
+
+    def test_export_sanitizes_legacy_artifact_and_provenance_paths(self, tmp_path):
+        outdir = self._setup_output_dir(tmp_path)
+        derivative = outdir / "derivatives" / "result.csv"
+        derivative.parent.mkdir()
+        derivative.write_text("value\n1\n", encoding="utf-8")
+        (outdir / "artifact_manifest.json").write_text(
+            json.dumps(
+                {
+                    "artifacts": [
+                        {
+                            "path": str(derivative),
+                            "resolved_path": str(derivative),
+                            "relative_path": "derivatives/result.csv",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        (outdir / "provenance_log.json").write_text(
+            json.dumps([{"parameters": {"output": str(derivative)}}]),
+            encoding="utf-8",
+        )
+        package_path = tmp_path / "portable-json.fnirsflow.zip"
+
+        export_package(outdir, package_path)
+
+        with zipfile.ZipFile(package_path) as archive:
+            artifact_text = archive.read("artifact_manifest.json").decode()
+            provenance_text = archive.read("provenance_log.json").decode()
+        assert str(outdir) not in artifact_text
+        assert str(outdir) not in provenance_text
+        assert "project://outputs/derivatives/result.csv" in artifact_text
+        assert "project://outputs/derivatives/result.csv" in provenance_text
+
+    def test_reproducibility_package_prefers_runtime_manifest_and_results(self, tmp_path):
+        outdir = tmp_path / "output"
+        (outdir / "compiled").mkdir(parents=True)
+        (outdir / "logs").mkdir()
+        (outdir / "derivatives" / "channel").mkdir(parents=True)
+        (outdir / "compiled" / "plan.json").write_text("{}", encoding="utf-8")
+        (outdir / "compiled" / "execution_dag.json").write_text("{}", encoding="utf-8")
+        (outdir / "compiled" / "artifact_manifest.json").write_text('{"scope":"compile"}', encoding="utf-8")
+        (outdir / "logs" / "artifact_manifest.json").write_text('{"scope":"runtime"}', encoding="utf-8")
+        result_path = outdir / "derivatives" / "channel" / "result.csv"
+        result_path.write_text("beta\n1.0\n", encoding="utf-8")
+        package = tmp_path / "runtime.fnirsflow.zip"
+
+        export_package(outdir, package)
+
+        with zipfile.ZipFile(package) as archive:
+            assert json.loads(archive.read("artifact_manifest.json"))["scope"] == "runtime"
+            assert "derivatives/channel/result.csv" in archive.namelist()
+
+    def test_reproducibility_package_includes_group_metadata_artifacts(self, tmp_path):
+        outdir = tmp_path / "output"
+        (outdir / "compiled").mkdir(parents=True)
+        (outdir / "logs").mkdir()
+        group_dir = outdir / "derivatives" / "group"
+        group_dir.mkdir(parents=True)
+        (outdir / "compiled" / "plan.json").write_text("{}", encoding="utf-8")
+        (outdir / "compiled" / "execution_dag.json").write_text("{}", encoding="utf-8")
+        for name in [
+            "participant_table_manifest.json",
+            "analysis_table.csv",
+            "group_design_matrix.csv",
+            "contrast_matrix.csv",
+            "multiple_comparison_results.csv",
+            "sensitivity_analysis_results.csv",
+            "cluster_inference_results.csv",
+        ]:
+            content = "{}\n" if name.endswith(".json") else "placeholder\n"
+            (group_dir / name).write_text(content, encoding="utf-8")
+
+        package = tmp_path / "group.fnirsflow.zip"
+        export_package(outdir, package)
+
+        with zipfile.ZipFile(package) as archive:
+            names = set(archive.namelist())
+        assert "derivatives/group/participant_table_manifest.json" in names
+        assert "derivatives/group/analysis_table.csv" in names
+        assert "derivatives/group/group_design_matrix.csv" in names
+        assert "derivatives/group/contrast_matrix.csv" in names
+        assert "derivatives/group/multiple_comparison_results.csv" in names
+        assert "derivatives/group/sensitivity_analysis_results.csv" in names
+        assert "derivatives/group/cluster_inference_results.csv" in names
+
+    def test_export_package_rejects_more_than_ten_mib_uncompressed(self, tmp_path):
+        outdir = self._setup_output_dir(tmp_path)
+        result = outdir / "derivatives" / "group" / "large_statistics.txt"
+        result.parent.mkdir(parents=True, exist_ok=True)
+        result.write_text("x" * (10 * 1024**2), encoding="utf-8")
+        package = tmp_path / "oversized.fnirsflow.zip"
+
+        with pytest.raises(ValueError, match="10 MiB"):
+            export_package(outdir, package)
+
+        assert not package.exists()
 
     def test_check_package_integrity(self, tmp_path):
         outdir = self._setup_output_dir(tmp_path)

@@ -29,6 +29,7 @@ class ROIResult(BaseModel):
     """Result for a single ROI."""
 
     subject: str
+    source_atom_id: str = ""
     session: str = ""
     run: str = ""
     roi: str
@@ -48,6 +49,7 @@ class GroupSummary(BaseModel):
     """Group-level summary."""
 
     roi: str
+    source_atom_id: str = ""
     chromophore: str = ""
     contrast: str = ""
     n_subjects: int = 0
@@ -135,6 +137,7 @@ def export_roi_results(
                 "session",
                 "run",
                 "roi",
+                "source_atom_id",
                 "chromophore",
                 "condition",
                 "contrast",
@@ -153,6 +156,7 @@ def export_roi_results(
                     r.session,
                     r.run,
                     r.roi,
+                    r.source_atom_id,
                     r.chromophore,
                     r.condition,
                     r.contrast,
@@ -188,6 +192,7 @@ def export_group_summary(
         writer.writerow(
             [
                 "roi",
+                "source_atom_id",
                 "chromophore",
                 "contrast",
                 "n_subjects",
@@ -205,6 +210,7 @@ def export_group_summary(
             writer.writerow(
                 [
                     s.roi,
+                    s.source_atom_id,
                     s.chromophore,
                     s.contrast,
                     s.n_subjects,
@@ -239,20 +245,25 @@ def compute_group_statistics(
 
     exclude = set(exclude_subjects or [])
 
-    # Group by ROI + chromophore + contrast
-    groups: dict[tuple[str, str, str], list[ROIResult]] = {}
+    # Group by producing branch + ROI + chromophore + contrast.
+    groups: dict[tuple[str, str, str, str], list[ROIResult]] = {}
     for r in roi_results:
         if r.subject in exclude:
             continue
-        key = (r.roi, r.chromophore, r.contrast)
+        key = (r.source_atom_id, r.roi, r.chromophore, r.contrast)
         if key not in groups:
             groups[key] = []
         groups[key].append(r)
 
     summaries = []
-    for (roi, chromophore, contrast), results in groups.items():
-        betas = [r.beta for r in results]
-        t_stats = [r.t_stat for r in results]
+    for (source_atom_id, roi, chromophore, contrast), results in groups.items():
+        # Runs are repeated measurements, not independent subjects. Average
+        # within subject before group inference so run count cannot inflate n.
+        subject_results: dict[str, list[ROIResult]] = {}
+        for result in results:
+            subject_results.setdefault(result.subject, []).append(result)
+        betas = [float(np.mean([item.beta for item in items])) for items in subject_results.values()]
+        t_stats = [float(np.mean([item.t_stat for item in items])) for items in subject_results.values()]
 
         if not betas:
             continue
@@ -284,6 +295,7 @@ def compute_group_statistics(
         summaries.append(
             GroupSummary(
                 roi=roi,
+                source_atom_id=source_atom_id,
                 chromophore=chromophore,
                 contrast=contrast,
                 n_subjects=n,

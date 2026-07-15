@@ -1,25 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, Package } from 'lucide-react';
 import { useStore } from '../store';
+import { listPackageProfiles, type PackageProfile } from '../api/client';
 
-const EXPORT_PROFILES = [
+const FALLBACK_PROFILES: PackageProfile[] = [
   {
-    id: 'reproducibility_package',
+    profile_id: 'reproducibility_package',
     name: 'Reproducibility Package',
     description: 'Full package for reproducing analysis results',
-    includes: ['plan.json', 'execution_dag.json', 'adapter_manifest.json', 'risk_register.json', 'artifact_manifest.json', 'reproducibility_manifest.json', 'data_manifest.json'],
+    include_patterns: ['plan.json', 'execution_dag.json', 'adapter_manifest.json', 'risk_register.json', 'artifact_manifest.json', 'reproducibility_manifest.json', 'data_manifest.json'],
   },
   {
-    id: 'submission_package',
+    profile_id: 'submission_package',
     name: 'Submission Package',
     description: 'Package for journal submission',
-    includes: ['plan.json', 'execution_dag.json', 'reports'],
+    include_patterns: ['plan.json', 'risk_register.json', 'validation_report.md'],
   },
   {
-    id: 'reviewer_package',
+    profile_id: 'reviewer_package',
     name: 'Reviewer Package',
     description: 'Package for peer review with provenance',
-    includes: ['plan.json', 'execution_dag.json', 'provenance_log.json', 'reports'],
+    include_patterns: ['plan.json', 'execution_dag.json', 'provenance_log.json', 'reports'],
   },
 ];
 
@@ -30,8 +31,13 @@ export function ExportPackage() {
   const [exported, setExported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState('reproducibility_package');
+  const [profiles, setProfiles] = useState<PackageProfile[]>(FALLBACK_PROFILES);
 
-  const currentProfile = EXPORT_PROFILES.find((p) => p.id === selectedProfile);
+  useEffect(() => {
+    listPackageProfiles().then(setProfiles).catch(() => undefined);
+  }, []);
+
+  const currentProfile = profiles.find((p) => p.profile_id === selectedProfile);
 
   const handleExport = async () => {
     setError(null);
@@ -61,17 +67,17 @@ export function ExportPackage() {
         <section className="profile-selector">
           <h3>Export Profile</h3>
           <div className="profile-cards">
-            {EXPORT_PROFILES.map((profile) => (
+            {profiles.map((profile) => (
               <div
-                key={profile.id}
+                key={profile.profile_id}
                 role="button"
                 tabIndex={0}
-                className={`profile-card ${selectedProfile === profile.id ? 'selected' : ''}`}
-                onClick={() => setSelectedProfile(profile.id)}
+                className={`profile-card ${selectedProfile === profile.profile_id ? 'selected' : ''}`}
+                onClick={() => setSelectedProfile(profile.profile_id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    setSelectedProfile(profile.id);
+                    setSelectedProfile(profile.profile_id);
                   }
                 }}
               >
@@ -89,7 +95,7 @@ export function ExportPackage() {
           <section className="package-contents">
             <h3>Package Contents: {currentProfile.name}</h3>
             <ul>
-              {currentProfile.includes.map((item) => (
+              {(exportResult?.contents || currentProfile.include_patterns).map((item) => (
                 <li key={item}>
                   <CheckCircle2 size={14} />
                   <code>{item}</code>

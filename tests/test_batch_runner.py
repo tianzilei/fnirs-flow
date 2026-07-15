@@ -200,10 +200,17 @@ class TestArtifactStore:
 
     def test_write_manifest(self, tmp_path):
         store = ArtifactStore()
-        store.register(ArtifactRecord(artifact_id="a1", path="/out/qc.csv"))
+        store.register(
+            ArtifactRecord(
+                artifact_id="a1",
+                uri="project://outputs/qc.csv",
+                path="project://outputs/qc.csv",
+            )
+        )
         manifest = store.to_manifest()
         path = write_artifact_manifest(manifest, tmp_path)
         assert path.exists()
+        assert "/out/qc.csv" not in path.read_text(encoding="utf-8")
 
 
 class TestProvenance:
@@ -214,3 +221,16 @@ class TestProvenance:
         assert len(prov.all()) == 2
         path = prov.write(tmp_path)
         assert path.exists()
+
+    def test_write_replaces_project_absolute_paths_with_uri(self, tmp_path):
+        output = tmp_path / "derivatives" / "result.csv"
+        output.parent.mkdir()
+        output.write_text("value\n1\n", encoding="utf-8")
+        prov = ProvenanceRecord()
+        prov.log("write", {"output_path": str(output)})
+
+        path = prov.write(tmp_path / "logs", project_root=tmp_path)
+
+        content = path.read_text(encoding="utf-8")
+        assert "project://outputs/derivatives/result.csv" in content
+        assert str(tmp_path) not in content

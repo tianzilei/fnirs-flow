@@ -163,13 +163,13 @@ class TestMigrationTable:
         assert len(MIGRATION_TABLE) > 0
 
     def test_latest_version(self):
-        assert get_latest_version() == "0.2.0"
+        assert get_latest_version() == "0.3.0"
 
     def test_needs_migration_for_v01(self):
         assert needs_migration("0.1.0") is True
 
     def test_no_migration_for_latest(self):
-        assert needs_migration("0.2.0") is False
+        assert needs_migration("0.3.0") is False
 
     def test_migration_chain_versions(self):
         for entry in MIGRATION_TABLE:
@@ -192,7 +192,7 @@ class TestMigrateFlowRewrite:
     def test_v02_unchanged(self):
         v02 = _v0_2_flow_dict()
         result = migrate_flow(v02)
-        assert result["schema_version"] == "0.2.0"
+        assert result["schema_version"] == "0.3.0"
         assert len(result["flow_atoms"]) == 2
 
     def test_roundtrip_through_model(self):
@@ -200,7 +200,7 @@ class TestMigrateFlowRewrite:
         migrated = migrate_flow(v02)
         flow = FlowGraph.model_validate(migrated)
         dumped = flow.model_dump(exclude_none=True)
-        assert dumped["schema_version"] == "0.2.0"
+        assert dumped["schema_version"] == "0.3.0"
         assert len(dumped.get("flow_atoms", [])) == 2
         assert len(dumped.get("nodes", [])) == 2
 

@@ -8,10 +8,8 @@ submission/public repository:
 
 - Python packages and CLI
 - JSON schemas and demo configs
-- generative AI FlowGraph drafting guide
 - tests
 - WebUI source and package metadata
-- GitHub Actions verification workflow
 - selected public docs/specs
 - license and third-party notice files
 

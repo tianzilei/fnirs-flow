@@ -20,9 +20,22 @@ def write_adapter_manifest(flow: FlowGraph, outdir: Path) -> Path:
         adapter_dict = a.model_dump()
         adapters_data.append(adapter_dict)
 
+    # Collect backend bindings from atoms
+    backend_bindings = []
+    for node in flow.nodes:
+        if node.backend_binding:
+            backend_bindings.append({
+                "atom_id": node.id,
+                "atom_type": node.atom_type or node.type,
+                "backend_id": node.backend_binding.backend_id,
+                "operation": node.backend_binding.operation,
+                "version_spec": node.backend_binding.version_spec,
+            })
+
     data = {
-        "schema_version": "0.2.0",
+        "schema_version": "0.3.0",
         "adapters": adapters_data,
+        "backend_bindings": backend_bindings,
         "atom_edge_count": len(flow.edges),
     }
     path = outdir / "adapter_manifest.json"

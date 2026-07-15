@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import pytest
+
 from fnirs_flow.adapters.mne_nirs_io import capture_versions
 from fnirs_flow.execution.artifacts import ArtifactRecord, ArtifactStore
+
+pytestmark = pytest.mark.full
 
 # ============================================================================
 # Version capture tests

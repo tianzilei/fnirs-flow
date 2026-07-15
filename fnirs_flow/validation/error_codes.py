@@ -18,6 +18,11 @@ class ErrorCode(str, Enum):
     ADAPTER_SCHEMA_MISMATCH = "adapter-schema-mismatch"
     ADAPTER_AMBIGUOUS = "adapter-ambiguous"
 
+    # Backend
+    BACKEND_BRIDGE_REQUIRED = "backend-bridge-required"
+    BACKEND_UNAVAILABLE = "backend-unavailable"
+    BACKEND_VERSION_MISMATCH = "backend-version-mismatch"
+
     # Export
     PACKAGE_PROFILE_UNSUPPORTED = "package-profile-unsupported"
 
@@ -41,6 +46,12 @@ class ErrorCode(str, Enum):
     HARMONIZATION_SITE_CONFOUNDED = "harmonization-site-confounded"
     HARMONIZATION_INSUFFICIENT_SAMPLES = "harmonization-insufficient-samples"
 
+    # Execution
+    EXECUTION_FAILED = "execution-failed"
+    EXECUTION_IO_ERROR = "execution-io-error"
+    EXECUTION_TIMEOUT = "execution-timeout"
+    EXECUTION_VALIDATION_ERROR = "execution-validation-error"
+
 
 class ErrorSeverity(str, Enum):
     """Severity levels for typed error codes."""
@@ -61,6 +72,10 @@ ERROR_CODE_MAP: dict[ErrorCode, tuple[ErrorSeverity, str]] = {
     # Adapter
     ErrorCode.ADAPTER_SCHEMA_MISMATCH: (ErrorSeverity.HIGH, "adapter"),
     ErrorCode.ADAPTER_AMBIGUOUS: (ErrorSeverity.MEDIUM, "adapter"),
+    # Backend
+    ErrorCode.BACKEND_BRIDGE_REQUIRED: (ErrorSeverity.FATAL, "backend"),
+    ErrorCode.BACKEND_UNAVAILABLE: (ErrorSeverity.FATAL, "backend"),
+    ErrorCode.BACKEND_VERSION_MISMATCH: (ErrorSeverity.HIGH, "backend"),
     # Export
     ErrorCode.PACKAGE_PROFILE_UNSUPPORTED: (ErrorSeverity.FATAL, "export"),
     # Graph
@@ -78,6 +93,11 @@ ERROR_CODE_MAP: dict[ErrorCode, tuple[ErrorSeverity, str]] = {
     ErrorCode.HARMONIZATION_SITE_MISSING: (ErrorSeverity.FATAL, "harmonization"),
     ErrorCode.HARMONIZATION_SITE_CONFOUNDED: (ErrorSeverity.HIGH, "harmonization"),
     ErrorCode.HARMONIZATION_INSUFFICIENT_SAMPLES: (ErrorSeverity.HIGH, "harmonization"),
+    # Execution
+    ErrorCode.EXECUTION_FAILED: (ErrorSeverity.HIGH, "execution"),
+    ErrorCode.EXECUTION_IO_ERROR: (ErrorSeverity.HIGH, "execution"),
+    ErrorCode.EXECUTION_TIMEOUT: (ErrorSeverity.HIGH, "execution"),
+    ErrorCode.EXECUTION_VALIDATION_ERROR: (ErrorSeverity.MEDIUM, "execution"),
 }
 
 

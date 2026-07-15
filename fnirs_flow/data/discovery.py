@@ -11,9 +11,11 @@ from fnirs_flow.data.manifest import (
     DataFile,
     DataManifest,
     DataSource,
+    MetadataTableReference,
     SubjectSessionRun,
     write_data_manifest,
 )
+from fnirs_flow.data.participants import read_participant_table, write_participant_table_artifacts
 from fnirs_flow.data.registry import DatasetEntry, DatasetRegistry
 
 
@@ -35,6 +37,8 @@ def _discover_mne_dataset(entry: DatasetEntry, outdir: Path) -> DataManifest:
     except (ImportError, OSError, RuntimeError):
         local_root = Path.home() / "mne_data" / entry.folder_name
 
+    from fnirs_flow.api.uri import create_external_data_uri
+
     files: list[DataFile] = []
     subject_runs: list[SubjectSessionRun] = []
 
@@ -46,6 +50,7 @@ def _discover_mne_dataset(entry: DatasetEntry, outdir: Path) -> DataManifest:
             files.append(
                 DataFile(
                     path=rel_path,
+                    uri=str(create_external_data_uri(entry.dataset_id, rel_path)),
                     sha256=_compute_file_hash(f),
                     size_bytes=f.stat().st_size,
                     role="raw_snirf",
@@ -69,7 +74,9 @@ def _discover_mne_dataset(entry: DatasetEntry, outdir: Path) -> DataManifest:
                     subject=parts.get("subject", ""),
                     session=parts.get("session", ""),
                     run=parts.get("run", ""),
-                    path=str(f),
+                    path=str(f.relative_to(local_root)),
+                    uri=str(create_external_data_uri(entry.dataset_id, str(f.relative_to(local_root)))),
+                    relative_path=str(f.relative_to(local_root)),
                 )
             )
 
@@ -81,7 +88,9 @@ def _discover_mne_dataset(entry: DatasetEntry, outdir: Path) -> DataManifest:
             doi=entry.doi,
             citation=entry.citation,
         ),
-        local_root=str(local_root),
+        local_root="",
+        runtime_local_root=str(local_root),
+        external_data_uri_prefix=f"external-data://{entry.dataset_id}/",
         files=files,
         subject_session_runs=subject_runs,
         access_instructions=f"Data available at {entry.url}" if entry.url else "",
@@ -121,8 +130,11 @@ def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest
     """Discover local BIDS-NIRS files and generate a manifest."""
     local_root = (_find_workspace_root() / entry.folder_name).resolve()
 
+    from fnirs_flow.api.uri import create_external_data_uri
+
     files: list[DataFile] = []
     subject_runs: list[SubjectSessionRun] = []
+    metadata_tables: list[MetadataTableReference] = []
 
     if local_root.exists():
         for f in sorted(p for p in local_root.rglob("*") if p.is_file() and not _is_ignored_sidecar(p)):
@@ -140,9 +152,35 @@ def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest
             files.append(
                 DataFile(
                     path=rel_path,
+                    uri=str(create_external_data_uri(entry.dataset_id, rel_path)),
                     sha256=_compute_file_hash(f),
                     size_bytes=f.stat().st_size,
                     role=role,
+                )
+            )
+
+        participants_path = local_root / "participants.tsv"
+        if participants_path.exists() and not _is_ignored_sidecar(participants_path):
+            participant_table = read_participant_table(participants_path)
+            metadata_tables.append(
+                MetadataTableReference(
+                    path=participants_path.relative_to(local_root).as_posix(),
+                    uri=str(
+                        create_external_data_uri(
+                            entry.dataset_id,
+                            participants_path.relative_to(local_root).as_posix(),
+                        )
+                    ),
+                    table_kind="participant",
+                    format=participant_table.source.format,
+                    id_column=participant_table.source.id_column,
+                    include_column=participant_table.source.include_column,
+                    encoding=participant_table.source.encoding,
+                    delimiter=participant_table.source.delimiter,
+                    id_normalization=participant_table.source.id_normalization,
+                    sha256=participant_table.source.sha256,
+                    size_bytes=participant_table.source.size_bytes,
+                    columns=[column.model_dump() for column in participant_table.columns],
                 )
             )
 
@@ -160,7 +198,7 @@ def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest
                     and ef_entities.get("task") == entities.get("task")
                     and ef_entities.get("run") == entities.get("run")
                 ):
-                    events_path = str(ef)
+                    events_path = ef.relative_to(local_root).as_posix()
                     break
             subject_runs.append(
                 SubjectSessionRun(
@@ -168,11 +206,22 @@ def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest
                     session=entities.get("ses", ""),
                     run=entities.get("run", ""),
                     task=entities.get("task", ""),
-                    path=str(f),
+                    path=rel_path,
+                    uri=str(create_external_data_uri(entry.dataset_id, rel_path)),
                     relative_path=rel_path,
                     data_sha256=_compute_file_hash(f),
                     source_file_role="raw_snirf",
                     events_path=events_path,
+                    events_uri=(
+                        str(
+                            create_external_data_uri(
+                                entry.dataset_id,
+                                events_path,
+                            )
+                        )
+                        if events_path
+                        else ""
+                    ),
                 )
             )
 
@@ -184,10 +233,15 @@ def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest
             doi=entry.doi,
             citation=entry.citation,
         ),
-        local_root=str(local_root),
+        local_root="",
+        runtime_local_root=str(local_root),
+        external_data_uri_prefix=f"external-data://{entry.dataset_id}/",
         files=files,
         subject_session_runs=subject_runs,
-        access_instructions=f"Local BIDS-NIRS dataset expected at {local_root}",
+        metadata_tables=metadata_tables,
+        access_instructions=(
+            f"Bind external-data://{entry.dataset_id}/ to the local BIDS-NIRS dataset directory."
+        ),
         license=entry.license,
         created_at=datetime.now(timezone.utc).isoformat(),
     )
@@ -220,6 +274,17 @@ def discover_dataset(dataset_id: str, outdir: str | Path) -> DataManifest:
         )
 
     write_data_manifest(manifest, compiled_dir)
+    for metadata_table in manifest.metadata_tables:
+        table_path = Path(manifest.runtime_local_root) / metadata_table.path
+        if table_path.exists() and metadata_table.table_kind == "participant":
+            table = read_participant_table(
+                table_path,
+                id_column=metadata_table.id_column,
+                include_column=metadata_table.include_column,
+                delimiter=metadata_table.delimiter,
+                encoding=metadata_table.encoding,
+            )
+            write_participant_table_artifacts(table, compiled_dir, manifest=manifest)
 
     # Write run_table.csv to compiled/
     run_table_path = compiled_dir / "run_table.csv"
@@ -243,7 +308,7 @@ def discover_dataset(dataset_id: str, outdir: str | Path) -> DataManifest:
                     sr.session,
                     sr.run,
                     sr.task,
-                    sr.path,
+                    sr.uri or sr.path,
                     sr.relative_path,
                     sr.data_sha256,
                 ]

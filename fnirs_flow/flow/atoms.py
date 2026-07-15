@@ -171,7 +171,16 @@ class AIGenerationMetadata(BaseModel):
     input_summary: str = ""
     assumptions: list[str] = Field(default_factory=list)
     requires_user_confirmation: list[str] = Field(default_factory=list)
+    confirmed_parameters: list[str] = Field(default_factory=list)
+    confirmed_by: str = ""
+    confirmed_at: str = ""
     not_used_for_execution: bool = True
+
+    @property
+    def pending_confirmations(self) -> list[str]:
+        """Return required confirmation items not explicitly approved by a human."""
+        confirmed = set(self.confirmed_parameters)
+        return [item for item in self.requires_user_confirmation if item not in confirmed]
 
 
 class AdapterDefinition(BaseModel):
@@ -194,6 +203,18 @@ class AdapterInstance(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class BackendBinding(BaseModel):
+    """Binding to an execution backend."""
+
+    backend_id: str
+    operation: str = ""
+    version_spec: str = ""
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    # Dependency profile reference (MethodAtom-first dependency management)
+    dependency_profile_id: str | None = None
+    required_capabilities: set[str] = Field(default_factory=set)
+
+
 class FlowAtom(BaseModel):
     """Business-level flow atom instance.
 
@@ -213,6 +234,12 @@ class FlowAtom(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
     ports: list[AtomPort] = Field(default_factory=list)
     adapter_bindings: list[AdapterInstance] = Field(default_factory=list)
+    backend_binding: BackendBinding | None = None
+    # Dependency declaration (MethodAtom-first dependency management)
+    dependency_profile_id: str | None = None
+    required_capabilities: set[str] = Field(default_factory=set)
+    dependency_optional: bool = False
+    execution_scope: str = Field(default="run", pattern="^(run|subject|group|project)$")
     references: list[AtomReference] = Field(default_factory=list)
     execution_trust_level: ExecutableTrustLevel = ExecutableTrustLevel.BUILTIN_MANAGED
     capability_manifest: CapabilityManifest | None = None
@@ -249,6 +276,8 @@ class FlowAtom(BaseModel):
             self.metadata.setdefault("template_id", self.template_id)
         if self.operation is None:
             self.operation = self.config.get("operation")
+        if "execution_scope" in self.config:
+            self.execution_scope = str(self.config["execution_scope"])
         if not self.evidence_refs and "evidence_refs" in self.metadata:
             self.evidence_refs = list(self.metadata.get("evidence_refs", []))
         elif self.evidence_refs:

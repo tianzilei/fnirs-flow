@@ -5,6 +5,7 @@ Supports derivatives-style output layout and structured ActionAttempt tracking.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,6 +59,8 @@ def ensure_derivatives_layout(outdir: Path) -> dict[str, Path]:
         "work": outdir / "work",
         "derivatives": outdir / "derivatives",
         "reports": outdir / "derivatives" / "reports",
+        "channel": outdir / "derivatives" / "channel",
+        "roi": outdir / "derivatives" / "roi",
         "group": outdir / "derivatives" / "group",
         "logs": outdir / "logs",
         "export": outdir / "export",
@@ -67,8 +70,12 @@ def ensure_derivatives_layout(outdir: Path) -> dict[str, Path]:
     return dirs
 
 
-def _build_run_id(sr: dict[str, Any]) -> str:
-    """Build a stable run id from available BIDS entities."""
+def _build_run_id(sr: dict[str, Any], _seen: set[str] | None = None) -> str:
+    """Build a stable run id from available BIDS entities.
+
+    Appends a short path hash suffix if the BIDS-based ID would collide
+    with a previously generated ID in the same batch.
+    """
     parts = []
     if sr.get("subject"):
         parts.append(f"sub-{sr['subject']}")
@@ -78,7 +85,24 @@ def _build_run_id(sr: dict[str, Any]) -> str:
         parts.append(f"task-{sr['task']}")
     if sr.get("run"):
         parts.append(f"run-{sr['run']}")
-    return "_".join(parts) if parts else "run-unknown"
+
+    if parts:
+        run_id = "_".join(parts)
+    else:
+        # No BIDS entities: derive from path
+        path = sr.get("path") or sr.get("relative_path") or ""
+        suffix = hashlib.sha256(path.encode()).hexdigest()[:8] if path else "unknown"
+        run_id = f"run-{suffix}"
+
+    # Deduplicate within a batch
+    if _seen is not None:
+        if run_id in _seen:
+            path = sr.get("path") or sr.get("relative_path") or ""
+            suffix = hashlib.sha256(path.encode()).hexdigest()[:8]
+            run_id = f"{run_id}_{suffix}"
+        _seen.add(run_id)
+
+    return run_id
 
 
 def dry_run(
@@ -114,8 +138,9 @@ def dry_run(
 
     if Path(data_manifest_path).exists():
         manifest = json.loads(Path(data_manifest_path).read_text(encoding="utf-8"))
+        seen_run_ids: set[str] = set()
         for sr in manifest.get("subject_session_runs", []):
-            run_id = _build_run_id(sr)
+            run_id = _build_run_id(sr, _seen=seen_run_ids)
             steps = [n["step_id"] for n in dag.get("nodes", [])]
             runs.append(
                 RunContext(
@@ -180,7 +205,7 @@ def _write_run_report(outdir: Path, result: DryRunResult, plan_dir: Path) -> Non
     lines = [
         "# Dry-Run Report",
         "",
-        f"**Plan directory:** `{plan_dir}`",
+        "**Plan directory:** `project://outputs/compiled`",
         f"**Generated:** {datetime.now(timezone.utc).isoformat()}",
         "",
         "## Summary",
@@ -210,7 +235,14 @@ def _write_run_report(outdir: Path, result: DryRunResult, plan_dir: Path) -> Non
 def _write_run_json(outdir: Path, result: DryRunResult, plan_dir: Path) -> None:
     """Write run_report.json with full DryRunResult."""
     data = result.model_dump()
-    data["plan_dir"] = str(plan_dir)
+    for run in data.get("planned_runs", []):
+        if run.get("relative_path"):
+            run["data_path"] = run["relative_path"]
+        elif Path(str(run.get("data_path", ""))).is_absolute():
+            run["data_path"] = Path(str(run["data_path"])).name
+        if Path(str(run.get("events_path", ""))).is_absolute():
+            run["events_path"] = Path(str(run["events_path"])).name
+    data["plan_dir"] = "project://outputs/compiled"
     data["generated_at"] = datetime.now(timezone.utc).isoformat()
     (outdir / "run_report.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
 
@@ -224,7 +256,14 @@ def _append_run_history(logdir: Path, result: DryRunResult) -> None:
         "total_runs": result.total_runs,
         "dag_nodes": result.summary.get("dag_nodes", 0),
         "execution_layers": result.summary.get("execution_layers", 0),
-        "runs": [r.model_dump() for r in result.planned_runs],
+        "runs": [
+            {
+                **r.model_dump(),
+                "data_path": r.relative_path or Path(r.data_path).name,
+                "events_path": Path(r.events_path).name if r.events_path else "",
+            }
+            for r in result.planned_runs
+        ],
     }
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fnirs-flow"
-version = "1.0.2"
+version = "1.1.1"
 description = "GUI-enabled fNIRS toolbox + reproducibility framework with Flow-based orchestration"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -18,50 +18,59 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 dependencies = [
-    "pydantic>=2.0",
+    "pydantic>=2.0,<3.0",
 ]
 
 [project.optional-dependencies]
 api = [
-    "fastapi>=0.100",
-    "uvicorn>=0.23",
+    "fastapi>=0.100,<1.0",
+    "uvicorn>=0.23,<1.0",
 ]
 webui = [
     "fnirs-flow[api]",
 ]
 mne = [
-    "mne>=1.6",
-    "mne-nirs>=0.7",
-    "mne-bids>=0.15",
-    "numpy>=1.24",
+    "mne>=1.6,<2.0",
+    "mne-nirs>=0.7,<1.0",
+    "mne-bids>=0.15,<1.0",
+    "numpy>=1.24,<2.0",
 ]
 ml-motion = [
-    "numpy>=1.24",
-    "scipy>=1.10",
-    "scikit-learn>=1.3",
-    "PyWavelets>=1.4",
+    "numpy>=1.24,<2.0",
+    "scipy>=1.10,<2.0",
+    "scikit-learn>=1.3,<2.0",
+    "PyWavelets>=1.4,<2.0",
+]
+cedalion = [
+    "cedalion @ git+https://github.com/ibs-lab/cedalion.git@v26.5.1",
 ]
 dev = [
-    "pytest>=7.0",
-    "httpx2>=2.0.0",
+    "pytest>=9.0.3,<10.0",
+    "pytest-cov>=4.0,<6.0",
+    "mypy>=1.8,<2.0",
+    "pip-audit>=2.7,<3.0",
+    "pip-licenses>=5.0,<6.0",
+    "httpx2>=2.0,<3.0",
     "fnirs-flow[api,mne,ml-motion]",
 ]
 full = [
-    "fnirs-flow[api,mne,ml-motion]",
+    "fnirs-flow[dev,mne,ml-motion,api]",
 ]
 
 [project.scripts]
 fnirs-flow = "cli:main"
 
-[tool.hatch.build.targets.wheel.force-include]
-"cli.py" = "cli.py"
-"configs" = "configs"
-"schemas" = "schemas"
-"webui" = "webui"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+filterwarnings = ["error"]
+markers = [
+    "core: marks tests as core (no MNE/Cedalion required)",
+    "full: marks tests as full (requires MNE)",
+    "cedalion: marks tests as cedalion (requires Cedalion)",
+    "adapter: marks tests as adapter (requires MNE or Cedalion)",
+    "real_data: marks tests that use real local datasets",
+]
 
 [tool.ruff]
 target-version = "py310"
@@ -69,6 +78,15 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/extract_*.py" = ["E501"]
+"scripts/build_*.py" = ["E501"]
+"scripts/upgrade_schema_*.py" = ["E501"]
+"outputs/**/*.py" = ["E501"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.mypy]
 python_version = "3.10"

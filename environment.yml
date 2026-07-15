@@ -10,6 +10,7 @@ dependencies:
   - numpy
   - pydantic
   - pip:
-    - -e .[dev]
+    - fnirs-flow[api,mne,ml-motion]
     - ruff
+    - pytest
     - pytest-cov

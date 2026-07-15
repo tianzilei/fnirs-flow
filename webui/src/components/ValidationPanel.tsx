@@ -43,10 +43,30 @@ export function ValidationPanel({ result }: ValidationPanelProps) {
         <div className="section">
           <h4>Risks ({result.risks.length})</h4>
           {result.risks.map((r, i) => (
-            <div key={i} className="risk">
-              [{String(r.severity)}] {String(r.message)}
+            <div key={i} className={`risk ${String(r.severity || '')}`}>
+              <span className="risk-severity">[{String(r.severity || '')}]</span>
+              <span className="risk-message">{String(r.message || '')}</span>
+              {r.code ? <span className="risk-code">{String(r.code)}</span> : null}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Backend-specific risks */}
+      {result.risks.some(r => String(r.domain || '') === 'backend') && (
+        <div className="section backend-risks">
+          <h4>Backend Risks</h4>
+          {result.risks
+            .filter(r => String(r.domain || '') === 'backend')
+            .map((r, i) => (
+              <div key={i} className={`risk ${String(r.severity || '')}`}>
+                <span className="risk-severity">[{String(r.severity || '')}]</span>
+                <span className="risk-message">{String(r.message || '')}</span>
+                {r.suggested_action ? (
+                  <span className="risk-action">Action: {String(r.suggested_action)}</span>
+                ) : null}
+              </div>
+            ))}
         </div>
       )}
     </aside>

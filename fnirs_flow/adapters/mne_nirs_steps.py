@@ -25,7 +25,7 @@ def optical_density(raw: Any) -> Any:
 
         return _od(raw)
     except ImportError:
-        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]")
+        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]") from None
 
 
 def scalp_coupling_index(
@@ -48,7 +48,7 @@ def scalp_coupling_index(
 
         return _sci(raw, l_freq=l_freq, h_freq=h_freq)
     except ImportError:
-        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]")
+        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]") from None
 
 
 def temporal_derivative_distribution_repair(raw: Any) -> Any:
@@ -65,7 +65,7 @@ def temporal_derivative_distribution_repair(raw: Any) -> Any:
 
         return _tddr(raw)
     except ImportError:
-        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]")
+        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]") from None
 
 
 def beer_lambert_law(raw: Any, ppf: float = 6.0) -> Any:
@@ -83,7 +83,7 @@ def beer_lambert_law(raw: Any, ppf: float = 6.0) -> Any:
 
         return _bll(raw, ppf=ppf)
     except ImportError:
-        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]")
+        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]") from None
 
 
 def source_detector_distances(info: Any) -> Any:
@@ -100,7 +100,7 @@ def source_detector_distances(info: Any) -> Any:
 
         return _sdd(info)
     except ImportError:
-        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]")
+        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]") from None
 
 
 def short_channels(info: Any, threshold: float = 0.01) -> Any:
@@ -118,7 +118,7 @@ def short_channels(info: Any, threshold: float = 0.01) -> Any:
 
         return _sc(info, threshold=threshold)
     except ImportError:
-        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]")
+        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]") from None
 
 
 def filter_raw(
@@ -336,7 +336,7 @@ def wavelet_motion_correction(
     try:
         import pywt
     except ImportError:
-        raise ImportError("PyWavelets is required. Install with: pip install PyWavelets")
+        raise ImportError("PyWavelets is required. Install with: pip install PyWavelets") from None
 
     corrected = np.zeros_like(data)
     n_channels = data.shape[0]
@@ -431,7 +431,7 @@ def ica_motion_correction(
     try:
         from sklearn.decomposition import FastICA
     except ImportError:
-        raise ImportError("scikit-learn is required. Install with: pip install scikit-learn")
+        raise ImportError("scikit-learn is required. Install with: pip install scikit-learn") from None
 
     # Transpose for ICA (samples x channels)
     data_t = data.T
@@ -680,6 +680,22 @@ def block_averaging(
 # ============================================================================
 
 
+def _canonical_hrf(sfreq: float, model: str, duration: float = 32.0) -> np.ndarray:
+    """Return a normalized canonical double-gamma HRF sampled at ``sfreq``."""
+    from scipy.stats import gamma
+
+    times = np.arange(0.0, duration, 1.0 / sfreq)
+    if model == "spm":
+        hrf: np.ndarray = gamma.pdf(times, 6) - gamma.pdf(times, 16) / 6.0
+    elif model == "glover":
+        hrf = gamma.pdf(times, 6) - 0.35 * gamma.pdf(times, 12)
+    else:
+        raise ValueError(f"Unsupported HRF model: {model}")
+    scale = np.max(hrf)
+    result: np.ndarray = hrf / scale if scale else hrf
+    return result
+
+
 def build_design_matrix(
     raw: Any,
     events: np.ndarray,
@@ -703,27 +719,58 @@ def build_design_matrix(
     Returns:
         Dictionary with design matrix and metadata
     """
-    # Use manual implementation for speed (MNE's make_first_level_design_matrix
-    # is slow with long recordings)
+    if events.ndim != 2 or events.shape[1] < 3:
+        raise ValueError("events must be an (n_events, 3) array")
+    if sfreq <= 0:
+        raise ValueError("sfreq must be positive")
+
+    # Build duration-aware stimulus functions, then convolve with the selected
+    # canonical HRF. The second events column stores duration in samples for
+    # fnirs-flow; zero remains backward-compatible as a one-sample event.
     n_samples = len(raw.times)
     n_conditions = len(event_id)
-    X = np.zeros((n_samples, n_conditions + 1))  # +1 for intercept
+    hrf = _canonical_hrf(sfreq, hrf_model)
+    condition_columns: list[np.ndarray] = []
 
     for cond_name, cond_id in event_id.items():
-        cond_idx = list(event_id.keys()).index(cond_name)
+        stimulus = np.zeros(n_samples, dtype=float)
         mask = events[:, 2] == cond_id
-        for onset_sample in events[mask, 0]:
-            end_sample = min(onset_sample + n_samples, n_samples)
-            X[onset_sample:end_sample, cond_idx] = 1.0
+        for onset_sample, duration_samples in events[mask, :2]:
+            start = max(0, int(onset_sample))
+            duration_n = max(1, int(duration_samples))
+            end = min(start + duration_n, n_samples)
+            if start < n_samples:
+                stimulus[start:end] = 1.0
+        condition_columns.append(np.convolve(stimulus, hrf, mode="full")[:n_samples])
 
-    X[:, -1] = 1.0  # Intercept
+    regressor_names = list(event_id.keys())
+    nuisance_columns: list[np.ndarray] = []
+    sample_axis = np.linspace(-1.0, 1.0, n_samples)
+    for degree in range(1, max(0, drift_order) + 1):
+        nuisance_columns.append(sample_axis**degree)
+        regressor_names.append(f"drift_{degree}")
+
+    duration_seconds = n_samples / sfreq
+    n_cosines = max(0, int(np.floor(2 * duration_seconds * max(0.0, high_pass))))
+    sample_numbers = np.arange(n_samples, dtype=float) + 0.5
+    for harmonic in range(1, n_cosines + 1):
+        nuisance_columns.append(np.cos(np.pi * sample_numbers * harmonic / n_samples))
+        regressor_names.append(f"high_pass_{harmonic}")
+
+    columns = [*condition_columns, *nuisance_columns, np.ones(n_samples)]
+    regressor_names.append("constant")
+    X = np.column_stack(columns)
 
     return {
         "design_matrix": X,
         "n_samples": n_samples,
         "n_conditions": n_conditions,
         "conditions": list(event_id.keys()),
+        "regressor_names": regressor_names,
+        "n_regressors": X.shape[1],
         "hrf_model": hrf_model,
+        "drift_order": drift_order,
+        "high_pass": high_pass,
         "sfreq": sfreq,
     }
 
@@ -749,30 +796,34 @@ def first_level_glm(
     n_channels = data.shape[0]
     X = design_matrix["design_matrix"]
 
-    # Ordinary least squares
-    # beta = (X'X)^{-1} X'y
-    XtX = X.T @ X
-    XtX_inv = np.linalg.pinv(XtX)
+    if not np.isfinite(data).all():
+        raise ValueError("GLM input data contains non-finite values")
+    if not np.isfinite(X).all():
+        raise ValueError("GLM design matrix contains non-finite values")
+    if X.shape[0] <= X.shape[1]:
+        raise ValueError("GLM requires more samples than regressors")
 
-    betas = np.zeros((n_channels, X.shape[1]))
-    residuals = np.zeros_like(data)
-    t_stats = np.zeros((n_channels, X.shape[1]))
+    # Solve OLS directly instead of forming the normal equations for the beta
+    # estimate. Scaling prevents Accelerate/BLAS from emitting spurious
+    # floating-point warnings for haemoglobin signals expressed around 1e-6 M.
+    data_scale = float(np.max(np.abs(data)))
+    if data_scale == 0.0:
+        data_scale = 1.0
+    scaled_data = data / data_scale
+    scaled_betas = np.linalg.lstsq(X, scaled_data.T, rcond=None)[0].T
+    fitted = np.einsum("cr,sr->cs", scaled_betas, X, optimize=False)
+    scaled_residuals = scaled_data - fitted
+    betas = scaled_betas * data_scale
+    residuals = scaled_residuals * data_scale
 
-    for ch in range(n_channels):
-        y = data[ch, :]
-        beta = XtX_inv @ (X.T @ y)
-        betas[ch, :] = beta
-        y_hat = X @ beta
-        residuals[ch, :] = y - y_hat
-
-        # Compute t-statistics
-        n = X.shape[0]
-        p = X.shape[1]
-        rss = np.sum(residuals[ch, :] ** 2)
-        mse = rss / (n - p) if n > p else 1.0
-        se = np.sqrt(mse * np.diag(XtX_inv))
-        se[se == 0] = 1.0
-        t_stats[ch, :] = beta / se
+    XtX_inv = np.linalg.pinv(X.T @ X)
+    n = X.shape[0]
+    p = X.shape[1]
+    rss = np.sum(scaled_residuals**2, axis=1)
+    mse = rss / (n - p)
+    se = np.sqrt(mse[:, np.newaxis] * np.diag(XtX_inv)[np.newaxis, :])
+    se[se == 0] = 1.0
+    t_stats = scaled_betas / se
 
     return {
         "betas": betas,
@@ -780,7 +831,9 @@ def first_level_glm(
         "residuals": residuals,
         "n_channels": n_channels,
         "n_conditions": X.shape[1],
+        "n_regressors": X.shape[1],
         "conditions": design_matrix["conditions"],
+        "regressor_names": design_matrix.get("regressor_names", []),
         "df": X.shape[0] - X.shape[1],
         "hrf_model": hrf_model,
         "noise_model": noise_model,

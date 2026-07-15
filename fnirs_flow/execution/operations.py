@@ -113,4 +113,28 @@ def create_default_registry() -> OperationRegistry:
             )
         )
 
+    # Participant metadata and group-scope helper operations
+    for op_id, desc in [
+        ("participant_table_input", "Read participant CSV/TSV metadata"),
+        ("participant_metadata_validate", "Validate participant metadata joins"),
+        ("participant_metadata_join", "Join participant metadata to subject-level results"),
+        ("participant_label_projection", "Project participant metadata to ML labels"),
+        ("participant_site_projection", "Project participant metadata to site metadata"),
+        ("participant_covariate_projection", "Project participant metadata to covariate matrices"),
+        ("participant_dpf_projection", "Project participant age metadata to DPF inputs"),
+        ("participant_outcome_projection", "Project participant metadata to behavioral or clinical outcomes"),
+        ("combat_preflight", "Validate ComBat site and covariate metadata preconditions"),
+        ("observation_pairing_projection", "Project observation metadata to pairing and dyad structures"),
+        ("group_design_matrix", "Compile an SPM-style group design matrix"),
+        ("group_level_glm", "Fit group-level GLM"),
+        ("group_contrast", "Estimate group-level contrasts"),
+    ]:
+        registry.register(
+            OperationSpec(
+                operation_id=op_id,
+                category="group",
+                description=desc,
+            )
+        )
+
     return registry

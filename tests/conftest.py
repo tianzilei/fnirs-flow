@@ -22,6 +22,15 @@ os.environ.setdefault("MNE_HOME", str(MNE_HOME))
 os.environ.setdefault("MNE_DONTWRITE_HOME", "true")
 
 
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line("markers", "core: marks tests as core (no MNE/Cedalion required)")
+    config.addinivalue_line("markers", "full: marks tests as full (requires MNE)")
+    config.addinivalue_line("markers", "cedalion: marks tests as cedalion (requires Cedalion)")
+    config.addinivalue_line("markers", "adapter: marks tests as adapter (requires MNE or Cedalion)")
+    config.addinivalue_line("markers", "real_data: marks tests that use real local datasets")
+
+
 @pytest.fixture
 def minimal_flow_dict() -> dict:
     """Minimal valid flow dict for testing."""

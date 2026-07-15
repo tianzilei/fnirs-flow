@@ -12,9 +12,11 @@ class ArtifactRecord(BaseModel):
     artifact_id: str
     subject: str = ""
     session: str = ""
+    task: str = ""
     run: str = ""
     step_id: str = ""
     artifact_type: str = ""
+    uri: str = ""
     path: str = ""
     sha256: str = ""
     created_at: str = ""
@@ -46,7 +48,7 @@ class ArtifactStore:
 
 
 def write_artifact_manifest(manifest: ArtifactManifest, outdir: Path) -> Path:
-    """Write artifact_manifest.json."""
+    """Write a portable artifact manifest without machine-local resolved paths."""
     path = outdir / "artifact_manifest.json"
     path.write_text(json.dumps(manifest.model_dump(), indent=2), encoding="utf-8")
     return path

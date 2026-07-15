@@ -4,14 +4,20 @@ import * as api from '../api/client';
 
 export function SystemDiagnostics() {
   const [health, setHealth] = useState<api.HealthStatus | null>(null);
+  const [backends, setBackends] = useState<api.BackendDescription[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     setLoading(true);
-    api.getHealth()
-      .then(setHealth)
-      .catch((e) => setError(e.message || 'Backend unavailable'))
+    Promise.all([
+      api.getHealth().catch((e) => { setError(e.message || 'Backend unavailable'); return null; }),
+      api.getBackends().catch(() => null),
+    ])
+      .then(([healthData, backendsData]) => {
+        setHealth(healthData);
+        setBackends(backendsData);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -78,6 +84,32 @@ export function SystemDiagnostics() {
           </div>
         </div>
       </section>
+
+      {backends && (
+        <section className="backends-section">
+          <h3>Execution Backends</h3>
+          <div className="diagnostics-grid">
+            {backends.map((info) => (
+              <div key={info.backend_id} className={`diagnostic-card ${info.is_available ? 'healthy' : 'unhealthy'}`}>
+                <div className="diagnostic-icon">
+                  {info.is_available ? <CheckCircle2 size={24} /> : <XCircle size={24} />}
+                </div>
+                <div className="diagnostic-body">
+                  <h3>{info.display_name || info.backend_id}</h3>
+                  <span className="diagnostic-status">
+                    {info.is_available ? 'Available' : 'Not Available'}
+                  </span>
+                  {info.description && <span className="diagnostic-detail">{info.description}</span>}
+                  {info.dependency_profile_id && (
+                    <span className="diagnostic-detail">Profile: {info.dependency_profile_id}</span>
+                  )}
+                  <span className="diagnostic-detail">Loaded: {info.is_loaded ? 'Yes' : 'No'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {health && (
         <section className="health-raw">

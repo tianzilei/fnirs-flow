@@ -17,19 +17,27 @@ The public release depends on third-party packages listed in `pyproject.toml`,
 `environment.yml`, and `webui/package.json`. Those packages remain governed by
 their own licenses.
 
-Dependency license checks should be generated from the release environment
-before publication. The direct runtime and optional dependencies declared by
+Dependency license checks were generated from the 2026-07-14 release-candidate
+environment. The direct runtime and optional dependencies declared by
 the project include Pydantic, FastAPI, Uvicorn, MNE, MNE-NIRS, MNE-BIDS,
 NumPy, SciPy, scikit-learn, PyWavelets, pytest, React, React DOM,
 React Router, React Flow, Zustand, Axios, Lucide React, TypeScript, Vite, and
 the Vite React plugin. These dependencies are not vendored in this repository
 and remain under their upstream licenses.
 
-Release-time checks still required:
+Audit artifacts:
 
-- Confirm Python dependency licenses from the locked release environment.
-- Confirm WebUI dependency licenses from `webui/package-lock.json`.
-- Add the public release tag and archived source DOI after publication.
+- `docs/audit/python_licenses_2026-07-14.md` and `.json`: 77 installed Python packages.
+- `docs/audit/webui_licenses_2026-07-14.json`: 93 WebUI production packages.
+- `docs/audit/pip_audit_2026-07-14.json`: final Python vulnerability scan, 0 known vulnerabilities.
+- `npm audit --audit-level=moderate`: 0 vulnerabilities on 2026-07-14.
+
+No GPL, AGPL, commercial, or proprietary dependency license was found in these
+release environments. The WebUI inventory reports the private root package as
+`UNLICENSED`; this is the project itself, not a third-party dependency. The
+public release remains governed by the repository `LICENSE`.
+
+The public release tag and archived source DOI still need to be added after publication.
 
 ## Referenced External Toolboxes and Repositories
 

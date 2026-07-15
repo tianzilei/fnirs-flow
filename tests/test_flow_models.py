@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import copy
 
+import pytest
+
 from fnirs_flow.flow.atoms import (
     CapabilityManifest,
     Position,
@@ -19,6 +21,8 @@ from fnirs_flow.flow.models import (
     NodeReference,
 )
 from fnirs_flow.flow.schemas import flow_to_dict, load_flow_from_dict, validate_flow_dict
+
+pytestmark = pytest.mark.core
 
 
 class TestFlowNode:

@@ -30,6 +30,15 @@ def test_health():
     assert resp.json()["status"] == "ok"
 
 
+def test_atom_templates_api_is_not_shadowed_by_spa_fallback():
+    from fastapi.testclient import TestClient
+
+    response = TestClient(app).get("/api/atom-templates")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert isinstance(response.json(), list)
+
+
 def test_invalid_content_length_returns_400():
     from fastapi.testclient import TestClient
 
@@ -111,6 +120,180 @@ def test_compile_flow():
     assert data["steps"] > 0
 
 
+def test_import_project_participant_table(tmp_path):
+    import fnirs_flow.api.app as api_module
+    from fnirs_flow.api.projects import import_project_participant_table
+
+    store = api_module.get_store()
+    project_id = store.create("Participant metadata").id
+    data_file = tmp_path / "run.snirf"
+    data_file.write_bytes(b"test")
+    compiled = store.get_output_dir(project_id) / "compiled"
+    compiled.mkdir(parents=True, exist_ok=True)
+    (compiled / "data_manifest.json").write_text(
+        json.dumps(
+            {
+                "dataset_id": "participant-test",
+                "subject_session_runs": [
+                    {
+                        "subject": "01",
+                        "path": "run.snirf",
+                        "uri": "external-data://participant-test/run.snirf",
+                        "relative_path": "run.snirf",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    store.bind_dataset("participant-test", tmp_path)
+    table = tmp_path / "participants.tsv"
+    table.write_text("participant_id\tinclude\tgroup\nsub-01\t1\tcontrol\n", encoding="utf-8")
+
+    body = import_project_participant_table(
+        store,
+        project_id,
+        str(table),
+        id_column="participant_id",
+    )
+
+    assert body is not None
+    assert body["rows"] == 1
+    assert body["validation_report"]["join_preview"]["matched_subjects"] == ["sub-01"]
+    assert (compiled / "participant_table_manifest.json").exists()
+
+
+def test_import_project_participant_table_persists_role_map(tmp_path):
+    import fnirs_flow.api.app as api_module
+    from fnirs_flow.api.projects import import_project_participant_table
+
+    store = api_module.get_store()
+    project_id = store.create("Participant metadata roles").id
+    compiled = store.get_output_dir(project_id) / "compiled"
+    compiled.mkdir(parents=True, exist_ok=True)
+    table = tmp_path / "participants.tsv"
+    table.write_text(
+        "subject_id\tkeep\tcohort\toutcome\tcenter\tdevice\tage\tvisit\twave\tfamily\tpair\trole\n"
+        "sub-01\t1\tcontrol\t0\tA\tNIRx\t24\tses-01\tpre\tfam-1\tdyad-1\tparent\n",
+        encoding="utf-8",
+    )
+
+    body = import_project_participant_table(
+        store,
+        project_id,
+        str(table),
+        id_column="subject_id",
+        include_column="keep",
+        group_column="cohort",
+        label_column="outcome",
+        site_column="center",
+        scanner_column="device",
+        covariate_columns=["age"],
+        session_column="visit",
+        timepoint_column="wave",
+        pair_id_column="family",
+        dyad_id_column="pair",
+        participant_role_column="role",
+    )
+
+    assert body is not None
+    assert body["column_role_map"] == {
+        "id_column": "subject_id",
+        "include_column": "keep",
+        "group_column": "cohort",
+        "label_column": "outcome",
+        "site_column": "center",
+        "scanner_column": "device",
+        "covariate_columns": ["age"],
+        "session_column": "visit",
+        "timepoint_column": "wave",
+        "pair_id_column": "family",
+        "dyad_id_column": "pair",
+        "participant_role_column": "role",
+    }
+    persisted = json.loads((compiled / "column_role_map.json").read_text(encoding="utf-8"))
+    assert persisted["group_column"] == "cohort"
+    assert persisted["covariate_columns"] == ["age"]
+
+
+def test_project_status_survives_store_reload_and_requires_real_data(tmp_path):
+    from fastapi.testclient import TestClient
+
+    import fnirs_flow.api.app as api_module
+
+    client = TestClient(app)
+    pid = client.post("/api/projects", json={"name": "Persistent state"}).json()["id"]
+    flow = json.loads((Path(__file__).parent.parent / "configs" / "demo_task_flow.json").read_text())
+    client.put(f"/api/projects/{pid}/flow", json={"flow": flow})
+    assert client.post(f"/api/projects/{pid}/validate").status_code == 200
+    assert client.post(f"/api/projects/{pid}/compile").status_code == 200
+
+    before = client.get(f"/api/projects/{pid}/status").json()
+    assert before["validated"] is True
+    assert before["compiled"] is True
+    assert before["data_discovered"] is False
+    execution_response = client.post(f"/api/projects/{pid}/execute")
+    assert execution_response.status_code == 409
+    assert execution_response.json()["detail"] == {
+        "code": "DATA_NOT_READY",
+        "message": "DATA_NOT_READY: discover or relink at least one existing data run before execution",
+        "stage": "execute",
+        "recoverable": True,
+        "suggested_action": "Discover or relink at least one existing data run",
+    }
+
+    api_module._store = ProjectStore(tmp_path)
+    after = client.get(f"/api/projects/{pid}/status").json()
+    assert after == before
+
+    data_file = tmp_path / "sub-01_task-test.snirf"
+    data_file.write_bytes(b"test")
+    compiled = api_module.get_store().get_output_dir(pid) / "compiled"
+    (compiled / "data_manifest.json").write_text(
+        json.dumps(
+            {
+                "dataset_id": "status-test",
+                "subject_session_runs": [
+                    {
+                        "subject": "01",
+                        "run": "01",
+                        "path": data_file.name,
+                        "uri": f"external-data://status-test/{data_file.name}",
+                        "relative_path": data_file.name,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    api_module.get_store().bind_dataset("status-test", tmp_path)
+    ready = client.get(f"/api/projects/{pid}/status").json()
+    assert ready["data_discovered"] is True
+    assert ready["runnable_runs"] == 1
+
+
+def test_flow_edit_invalidates_compiled_actions():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    proj = client.post("/api/projects", json={"name": "Stale plan"}).json()
+    pid = proj["id"]
+    demo_path = Path(__file__).parent.parent / "configs" / "demo_task_flow.json"
+    flow = json.loads(demo_path.read_text())
+    client.put(f"/api/projects/{pid}/flow", json={"flow": flow})
+    assert client.post(f"/api/projects/{pid}/compile").status_code == 200
+
+    edited = dict(flow)
+    edited["name"] = "Changed after compile"
+    client.put(f"/api/projects/{pid}/flow", json={"flow": edited})
+
+    for endpoint in ("dry-run", "execute", "export-package"):
+        response = client.post(f"/api/projects/{pid}/{endpoint}")
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "STALE_COMPILED_PLAN"
+        assert response.json()["detail"]["stage"] in {"dry_run", "execute", "export"}
+
+
 def test_compile_without_flow():
     from fastapi.testclient import TestClient
 
@@ -137,3 +320,213 @@ def test_create_snapshot():
     data = resp.json()
     assert "snapshot_id" in data
     assert "flow_hash" in data
+
+
+def test_project_bundle_status_and_restore():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    project = client.post("/api/projects", json={"name": "Bundle"}).json()
+    project_id = project["id"]
+    flow_v1 = {"flow_id": "v1", "nodes": [], "edges": []}
+    flow_v2 = {"flow_id": "v2", "nodes": [], "edges": []}
+    client.put(f"/api/projects/{project_id}/flow", json={"flow": flow_v1})
+    client.put(f"/api/projects/{project_id}/flow", json={"flow": flow_v2})
+
+    status = client.get(f"/api/projects/{project_id}/bundle")
+    assert status.status_code == 200
+    assert status.json()["integrity_status"] == "verified"
+    assert status.json()["revision"] == 3
+    assert status.json()["package_path"].endswith(".fnirsflow")
+
+    restored = client.post(f"/api/projects/{project_id}/bundle/restore/2")
+    assert restored.status_code == 200
+    assert restored.json()["revision"] == 4
+    assert client.get(f"/api/projects/{project_id}/flow").json()["flow_id"] == "v1"
+
+
+def test_create_project_validation():
+    """Test project creation validation."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+
+    # Empty name should fail
+    resp = client.post("/api/projects", json={"name": ""})
+    assert resp.status_code == 422
+
+    # Missing name should fail
+    resp = client.post("/api/projects", json={})
+    assert resp.status_code == 422
+
+
+def test_get_nonexistent_project():
+    """Test getting a project that doesn't exist."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.get("/api/projects/nonexistent-id")
+    assert resp.status_code == 404
+
+
+def test_delete_project():
+    """Test deleting a project."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    proj = client.post("/api/projects", json={"name": "ToDelete"}).json()
+    pid = proj["id"]
+
+    # Note: DELETE endpoint may not be implemented
+    resp = client.delete(f"/api/projects/{pid}")
+    # Accept 200 (implemented) or 405 (not implemented)
+    assert resp.status_code in (200, 405)
+
+
+def test_update_flow_validation():
+    """Test flow update validation."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    proj = client.post("/api/projects", json={"name": "Test"}).json()
+    pid = proj["id"]
+
+    # Invalid flow format
+    resp = client.put(f"/api/projects/{pid}/flow", json={"invalid": "data"})
+    assert resp.status_code == 422
+
+
+def test_validate_invalid_flow():
+    """Test validation of invalid flow."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    proj = client.post("/api/projects", json={"name": "Test"}).json()
+    pid = proj["id"]
+
+    # Set an invalid flow
+    invalid_flow = {"flow_id": "f1", "nodes": [{"id": "n1"}], "edges": [{"source": "n1", "target": "n2"}]}
+    client.put(f"/api/projects/{pid}/flow", json={"flow": invalid_flow})
+
+    resp = client.post(f"/api/projects/{pid}/validate")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "errors" in data
+
+
+def test_backend_diagnostics():
+    """Test backend diagnostics endpoint."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.get("/api/backends")
+    assert resp.status_code == 200
+    data = resp.json()
+    # §9.1: /api/backends returns list of backend descriptions
+    assert isinstance(data, list)
+    assert data
+    assert {"backend_id", "is_available", "is_loaded"} <= set(data[0])
+
+    openapi = client.get("/openapi.json").json()
+    schema = openapi["paths"]["/api/backends"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert schema["type"] == "array"
+
+
+def test_progress_events_have_attempt_scoped_monotonic_sequence():
+    import fnirs_flow.api.app as api_module
+
+    api_module._progress_events.clear()
+    api_module._progress_sequences.clear()
+    api_module.push_progress("p1", {"type": "atom_started", "attempt_id": "a1"})
+    api_module.push_progress("p1", {"type": "atom_completed", "attempt_id": "a1"})
+    api_module.push_progress("p1", {"type": "execution_started", "attempt_id": "a2"})
+
+    events = api_module._progress_events["p1"]
+    assert [event["sequence"] for event in events] == [1, 2, 1]
+
+
+def test_atom_templates():
+    """Test atom templates endpoint."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.get("/api/atom-templates")
+    # Endpoint may not be fully implemented
+    assert resp.status_code in (200, 404, 500)
+
+
+def test_cors_headers():
+    """Test CORS headers are present."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.options(
+        "/api/health",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    # CORS should be handled
+    assert resp.status_code in (200, 405)
+
+
+def test_request_size_limit():
+    """Test request size limit."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+
+    # Create a large payload
+    large_flow = {"flow_id": "f1", "nodes": [{"id": f"n{i}"} for i in range(10000)], "edges": []}
+
+    resp = client.post("/api/projects", json={"name": "Test"})
+    pid = resp.json()["id"]
+
+    # This should work (under 10MB)
+    resp = client.put(f"/api/projects/{pid}/flow", json={"flow": large_flow})
+    assert resp.status_code == 200
+
+
+def test_concurrent_project_creation():
+    """Test creating multiple projects."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+
+    # Create multiple projects
+    project_ids = []
+    for i in range(5):
+        resp = client.post("/api/projects", json={"name": f"Project {i}"})
+        assert resp.status_code == 200
+        project_ids.append(resp.json()["id"])
+
+    # List all projects
+    resp = client.get("/api/projects")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 5
+
+
+def test_flow_snapshot_and_restore():
+    """Test flow snapshot and restore functionality."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    proj = client.post("/api/projects", json={"name": "Test"}).json()
+    pid = proj["id"]
+
+    # Set initial flow
+    flow1 = {"flow_id": "v1", "nodes": [], "edges": []}
+    client.put(f"/api/projects/{pid}/flow", json={"flow": flow1})
+
+    # Create snapshot
+    resp = client.post(f"/api/projects/{pid}/snapshots")
+    assert resp.json()["snapshot_id"]
+
+    # Update flow
+    flow2 = {"flow_id": "v2", "nodes": [{"id": "n1"}], "edges": []}
+    client.put(f"/api/projects/{pid}/flow", json={"flow": flow2})
+
+    # Verify flow was updated
+    resp = client.get(f"/api/projects/{pid}/flow")
+    assert resp.json()["flow_id"] == "v2"

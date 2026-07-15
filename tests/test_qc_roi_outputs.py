@@ -229,3 +229,15 @@ class TestOutputExport:
         ]
         summaries = compute_group_statistics(results, exclude_subjects=["s3"])
         assert summaries[0].n_subjects == 2
+
+    def test_compute_group_averages_repeated_runs_within_subject(self):
+        results = [
+            ROIResult(subject="s1", run="01", roi="r1", beta=1.0),
+            ROIResult(subject="s1", run="02", roi="r1", beta=3.0),
+            ROIResult(subject="s2", run="01", roi="r1", beta=6.0),
+        ]
+
+        summary = compute_group_statistics(results)[0]
+
+        assert summary.n_subjects == 2
+        assert summary.mean_beta == 4.0

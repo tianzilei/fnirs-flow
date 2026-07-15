@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fnirs_flow.flow.atoms import AtomPort, MethodAtomCategory
+from fnirs_flow.flow.atoms import AtomPort, BackendBinding, MethodAtomCategory
 from fnirs_flow.registry.node_library import MethodAtomTemplate
 
 # ============================================================================
@@ -1468,3 +1468,203 @@ ALL_NODE_TEMPLATES: list[MethodAtomTemplate] = [
     SITE_COVARIATE_GLM,
     BATCH_EFFECT_DIAGNOSTICS,
 ]
+
+# ============================================================================
+# CEDALION BACKEND TEMPLATES
+# ============================================================================
+
+CEDALION_SNIRF_READER = MethodAtomTemplate(
+    template_id="cedalion_snirf_reader",
+    name="Cedalion SNIRF Reader",
+    category=MethodAtomCategory.DATA,
+    atom_type="data_import",
+    operation="snirf_reader",
+    description="Read SNIRF format fNIRS data files using Cedalion backend",
+    default_config={"preload": False},
+    ports=[
+        AtomPort(name="file_path", direction="in", schema="FilePath"),
+        AtomPort(name="raw_data", direction="out", schema="RawData"),
+    ],
+    reference="Cedalion: cedalion.io.read_snirf",
+    tags=["data", "snirf", "cedalion"],
+    backend_binding=BackendBinding(
+        backend_id="cedalion",
+        operation="snirf_read",
+        version_spec=">=26.5,<27",
+    ),
+)
+
+CEDALION_OPTICAL_DENSITY = MethodAtomTemplate(
+    template_id="cedalion_optical_density",
+    name="Cedalion Optical Density",
+    category=MethodAtomCategory.PREPROCESSING,
+    atom_type="optical_density",
+    operation="optical_density",
+    description="Convert intensity to optical density using Cedalion backend",
+    default_config={"nonpositive_policy": "nan"},
+    ports=[
+        AtomPort(name="raw_data", direction="in", schema="RawData"),
+        AtomPort(name="od_data", direction="out", schema="OpticalDensityData"),
+    ],
+    reference="Cedalion: cedalion.nirs.cw.int2od",
+    tags=["preprocessing", "optical_density", "cedalion"],
+    backend_binding=BackendBinding(
+        backend_id="cedalion",
+        operation="int2od",
+        version_spec=">=26.5,<27",
+    ),
+)
+
+CEDALION_BEER_LAMBERT = MethodAtomTemplate(
+    template_id="cedalion_beer_lambert",
+    name="Cedalion Beer-Lambert Law",
+    category=MethodAtomCategory.PREPROCESSING,
+    atom_type="beer_lambert_law",
+    operation="beer_lambert_law",
+    description="Convert optical density to haemoglobin concentration using Cedalion backend",
+    default_config={"ppf": 6.0, "spectrum": "prahl"},
+    ports=[
+        AtomPort(name="od_data", direction="in", schema="OpticalDensityData"),
+        AtomPort(name="hb_data", direction="out", schema="HaemoglobinData"),
+    ],
+    reference="Cedalion: cedalion.nirs.cw.od2conc",
+    tags=["preprocessing", "beer_lambert", "cedalion"],
+    backend_binding=BackendBinding(
+        backend_id="cedalion",
+        operation="od2conc",
+        version_spec=">=26.5,<27",
+    ),
+)
+
+# Add Cedalion templates to ALL_NODE_TEMPLATES
+ALL_NODE_TEMPLATES.extend([
+    CEDALION_SNIRF_READER,
+    CEDALION_OPTICAL_DENSITY,
+    CEDALION_BEER_LAMBERT,
+])
+
+
+# ============================================================================
+# PARTICIPANT METADATA AND GROUP-SCOPE TEMPLATES
+# ============================================================================
+
+PARTICIPANT_TABLE_INPUT = MethodAtomTemplate(
+    template_id="participant_table_input",
+    name="Participant Table Input",
+    category=MethodAtomCategory.DATA,
+    atom_type="participant_table_input",
+    operation="participant_table_input",
+    description="Read CSV/TSV/BIDS participants.tsv into a typed participant metadata table",
+    default_config={
+        "path": "",
+        "id_column": "participant_id",
+        "include_column": "include",
+        "delimiter": "auto",
+        "encoding": "utf-8-sig",
+        "execution_scope": "group",
+        "readiness_status": "needs_attention",
+    },
+    ports=[
+        AtomPort(name="table_file", direction="in", schema="FilePath"),
+        AtomPort(name="participant_table", direction="out", schema="ParticipantTable"),
+        AtomPort(name="column_role_map", direction="out", schema="ColumnRoleMap"),
+        AtomPort(name="validation_report", direction="out", schema="TableValidationReport"),
+    ],
+    tags=["metadata", "participant", "group", "ml", "site"],
+)
+
+PARTICIPANT_METADATA_VALIDATE = MethodAtomTemplate(
+    template_id="participant_metadata_validate",
+    name="Participant Metadata Validate",
+    category=MethodAtomCategory.VALIDATION,
+    atom_type="participant_metadata_validate",
+    operation="participant_metadata_validate",
+    description="Validate participant metadata coverage, duplicates, include flags, and dataset joins",
+    default_config={"execution_scope": "group", "readiness_status": "needs_attention"},
+    ports=[
+        AtomPort(name="participant_table", direction="in", schema="ParticipantTable"),
+        AtomPort(name="data_manifest", direction="in", schema="DataManifest"),
+        AtomPort(name="validated_participant_table", direction="out", schema="ValidatedParticipantTable"),
+        AtomPort(name="join_preview", direction="out", schema="ParticipantJoinPreview"),
+    ],
+    tags=["metadata", "validation", "participant", "group"],
+)
+
+GROUP_DESIGN_MATRIX = MethodAtomTemplate(
+    template_id="group_design_matrix",
+    name="Group Design Matrix",
+    category=MethodAtomCategory.DESIGN,
+    atom_type="group_design_matrix",
+    operation="group_design_matrix",
+    description="Compile an SPM-style group-level design matrix from annotated subject results",
+    default_config={
+        "design_type": "two_sample_t",
+        "group_column": "group",
+        "covariates": [],
+        "execution_scope": "group",
+        "readiness_status": "needs_attention",
+    },
+    ports=[
+        AtomPort(name="annotated_subject_results", direction="in", schema="AnnotatedSubjectResults"),
+        AtomPort(name="group_design_matrix", direction="out", schema="GroupDesignMatrix"),
+        AtomPort(name="analysis_table", direction="out", schema="AnalysisTable"),
+    ],
+    tags=["group", "design", "spm"],
+)
+
+PARTICIPANT_LABEL_PROJECTION = MethodAtomTemplate(
+    template_id="participant_label_projection",
+    name="Participant Label Projection",
+    category=MethodAtomCategory.DATA,
+    atom_type="participant_label_projection",
+    operation="participant_label_projection",
+    description="Project a participant table column to ML labels and subject IDs",
+    default_config={"label_column": "group", "execution_scope": "group", "readiness_status": "needs_attention"},
+    ports=[
+        AtomPort(name="participant_table", direction="in", schema="ParticipantTable"),
+        AtomPort(name="labels", direction="out", schema="LabelVector"),
+        AtomPort(name="subject_ids", direction="out", schema="SubjectIDs"),
+    ],
+    tags=["metadata", "machine_learning", "labels"],
+)
+
+PARTICIPANT_SITE_PROJECTION = MethodAtomTemplate(
+    template_id="participant_site_projection",
+    name="Participant Site Projection",
+    category=MethodAtomCategory.DATA,
+    atom_type="participant_site_projection",
+    operation="participant_site_projection",
+    description="Project participant metadata into site and scanner metadata for multisite analysis",
+    default_config={"site_column": "site", "execution_scope": "group", "readiness_status": "needs_attention"},
+    ports=[
+        AtomPort(name="participant_table", direction="in", schema="ParticipantTable"),
+        AtomPort(name="site_metadata", direction="out", schema="SiteMetadata"),
+        AtomPort(name="batch_labels", direction="out", schema="BatchLabels"),
+    ],
+    tags=["metadata", "site", "combat"],
+)
+
+OBSERVATION_PAIRING_PROJECTION = MethodAtomTemplate(
+    template_id="observation_pairing_projection",
+    name="Observation Pairing Projection",
+    category=MethodAtomCategory.DATA,
+    atom_type="observation_pairing_projection",
+    operation="observation_pairing_projection",
+    description="Project observation rows into paired, repeated-measures, or dyad structures",
+    default_config={"execution_scope": "group", "readiness_status": "needs_attention"},
+    ports=[
+        AtomPort(name="observation_table", direction="in", schema="ObservationTable"),
+        AtomPort(name="pairing_structure", direction="out", schema="PairingStructure"),
+        AtomPort(name="dyad_structure", direction="out", schema="DyadStructure"),
+    ],
+    tags=["metadata", "paired", "repeated_measures", "hyperscanning"],
+)
+
+ALL_NODE_TEMPLATES.extend([
+    PARTICIPANT_TABLE_INPUT,
+    PARTICIPANT_METADATA_VALIDATE,
+    GROUP_DESIGN_MATRIX,
+    PARTICIPANT_LABEL_PROJECTION,
+    PARTICIPANT_SITE_PROJECTION,
+    OBSERVATION_PAIRING_PROJECTION,
+])

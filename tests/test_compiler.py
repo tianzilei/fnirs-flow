@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from fnirs_flow.compiler.compiler import compile_flow
 from fnirs_flow.compiler.hashing import compute_flow_hash
+
+pytestmark = pytest.mark.core
 
 
 class TestFlowHash:
@@ -150,3 +154,88 @@ class TestCompiler:
                 assert dep_layer < node_layer, (
                     f"Node {dag_node.step_id} (layer {node_layer}) depends on {dep} (layer {dep_layer})"
                 )
+
+    def test_ai_draft_pending_confirmation_blocks_compile(self, tmp_path, minimal_flow_dict):
+        flow = dict(minimal_flow_dict)
+        flow["metadata"] = {
+            "ai_generation": {
+                "requires_user_confirmation": ["contrast"],
+                "confirmed_parameters": [],
+                "not_used_for_execution": True,
+            }
+        }
+
+        with pytest.raises(ValueError, match="fatal risks"):
+            compile_flow(flow, tmp_path / "blocked")
+
+    def test_ai_confirmation_and_metadata_are_preserved(self, tmp_path, minimal_flow_dict):
+        flow = dict(minimal_flow_dict)
+        flow["metadata"] = {
+            "ai_generation": {
+                "model": "test-model",
+                "requires_user_confirmation": ["contrast"],
+                "confirmed_parameters": ["contrast"],
+                "confirmed_by": "human-reviewer",
+                "confirmed_at": "2026-07-13T12:00:00+08:00",
+                "not_used_for_execution": True,
+            }
+        }
+
+        result = compile_flow(flow, tmp_path / "confirmed")
+        plan = json.loads((result.outdir / "plan.json").read_text())
+        record = json.loads((result.outdir / "parameter_confirmation_record.json").read_text())
+
+        assert plan["metadata"]["ai_generation"]["model"] == "test-model"
+        assert record["pending"] == []
+        assert record["confirmed_by"] == "human-reviewer"
+
+    def test_group_scope_is_compiled_for_participant_metadata_atoms(self, tmp_path):
+        flow = {
+            "schema_version": "0.3.0",
+            "flow_id": "group-scope",
+            "nodes": [
+                {
+                    "id": "participants",
+                    "type": "participant_table_input",
+                    "atom_type": "participant_table_input",
+                    "operation": "participant_table_input",
+                    "category": "data",
+                    "config": {},
+                    "position": {"x": 0, "y": 0},
+                    "readiness_status": "ready",
+                    "ports": [
+                        {"name": "participant_table", "direction": "out", "schema": "ParticipantTable"},
+                    ],
+                },
+                {
+                    "id": "design",
+                    "type": "group_design_matrix",
+                    "atom_type": "group_design_matrix",
+                    "operation": "group_design_matrix",
+                    "category": "design",
+                    "config": {},
+                    "position": {"x": 100, "y": 0},
+                    "readiness_status": "ready",
+                    "ports": [
+                        {"name": "participant_table", "direction": "in", "schema": "ParticipantTable"},
+                        {"name": "group_design_matrix", "direction": "out", "schema": "GroupDesignMatrix"},
+                    ],
+                },
+            ],
+            "edges": [
+                {
+                    "id": "e1",
+                    "source": "participants",
+                    "target": "design",
+                    "source_handle": "participant_table",
+                    "target_handle": "participant_table",
+                }
+            ],
+        }
+
+        result = compile_flow(flow, tmp_path / "output")
+
+        dag = {node.atom_id: node for node in result.execution_dag.nodes}
+        assert dag["participants"].execution_scope == "group"
+        assert dag["design"].execution_scope == "group"
+        assert result.plan["execution"]["scopes"]["group"] == ["participants", "design"]

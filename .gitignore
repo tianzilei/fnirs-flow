@@ -37,7 +37,6 @@ outputs/*
 !outputs/methodatom_library/
 *.html
 *.htm
-!webui/index.html
 *.xml
 *.pdf
 *.xlsx
@@ -67,6 +66,8 @@ pubmed_*.csv
 webui/node_modules/
 webui/dist/
 webui/.vite/
+webui/test-results/
+webui/playwright-report/
 
 # Reference repos (embedded submodules - use git submodule instead)
 References/

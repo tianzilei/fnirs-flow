@@ -9,12 +9,23 @@ from pathlib import Path
 from typing import Any
 
 
-def _sanitize_for_json(obj: Any) -> Any:
+def _sanitize_for_json(obj: Any, project_root: Path | None = None) -> Any:
     """Convert non-serializable objects to strings for JSON output."""
     if isinstance(obj, dict):
-        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+        return {k: _sanitize_for_json(v, project_root) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
-        return [_sanitize_for_json(v) for v in obj]
+        return [_sanitize_for_json(v, project_root) for v in obj]
+    if isinstance(obj, str) and project_root is not None:
+        candidate = Path(obj)
+        if candidate.is_absolute():
+            try:
+                relative = candidate.resolve().relative_to(project_root.resolve())
+            except (OSError, ValueError):
+                return candidate.name
+            else:
+                from fnirs_flow.api.uri import create_project_uri
+
+                return str(create_project_uri(f"outputs/{relative.as_posix()}"))
     try:
         json.dumps(obj)
         return obj
@@ -50,8 +61,9 @@ class ProvenanceRecord:
     def extend(self, records: list[dict[str, Any]]) -> None:
         self._records.extend(records)
 
-    def write(self, outdir: Path) -> Path:
+    def write(self, outdir: Path, *, project_root: Path | None = None) -> Path:
+        outdir.mkdir(parents=True, exist_ok=True)
         path = outdir / "provenance_log.json"
-        safe_records = _sanitize_for_json(self._records)
+        safe_records = _sanitize_for_json(self._records, project_root)
         path.write_text(json.dumps(safe_records, indent=2), encoding="utf-8")
         return path

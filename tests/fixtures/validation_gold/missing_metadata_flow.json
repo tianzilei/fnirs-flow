@@ -1,0 +1,19 @@
+{
+  "schema_version": "0.2.0",
+  "flow_id": "missing-metadata-flow-001",
+  "name": "Missing Metadata Flow",
+  "description": "Flow with missing required metadata",
+  "nodes": [
+    {
+      "id": "node-1",
+      "type": "optical_density",
+      "category": "preprocessing",
+      "position": {"x": 0, "y": 0},
+      "config": {},
+      "status": "ready",
+      "ports": []
+    }
+  ],
+  "edges": [],
+  "adapter_registry": []
+}

@@ -113,6 +113,7 @@ def run_batch_with_adapter(
         adapter = MneNirsAdapter(
             subject=ctx.subject,
             session=ctx.session,
+            task=ctx.task,
             run=ctx.run,
             outdir=run_outdir,
         )

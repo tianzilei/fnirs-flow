@@ -12,6 +12,42 @@ def validate_adapters(flow: FlowGraph) -> list[RiskItem]:
     node_map = {n.id: n for n in flow.nodes}
     adapter_map = {a.adapter_id: a for a in flow.adapter_registry}
 
+    # Check for mixed backend usage without bridge
+    backend_atoms = {}
+    for node in flow.nodes:
+        if node.backend_binding:
+            backend_atoms[node.id] = node.backend_binding.backend_id
+
+    # Check edges for mixed backend connections
+    for edge in flow.edges:
+        source_backend = backend_atoms.get(edge.source)
+        target_backend = backend_atoms.get(edge.target)
+
+        # If both have backends and they're different, check for bridge
+        if source_backend and target_backend and source_backend != target_backend:
+            # Check if there's an adapter that can bridge them
+            has_bridge = False
+            if edge.adapter_id:
+                adapter = adapter_map.get(edge.adapter_id)
+                if adapter and hasattr(adapter, 'bridge_backends'):
+                    has_bridge = True
+
+            if not has_bridge:
+                risks.append(
+                    RiskItem(
+                        risk_id=f"backend-bridge-required-{edge.id}",
+                        code="BACKEND_BRIDGE_REQUIRED",
+                        severity="fatal",
+                        domain="adapter",
+                        affected_object=f"edge:{edge.id}",
+                        message=(
+                            f"Mixed backend connection without bridge: "
+                            f"{source_backend} -> {target_backend}"
+                        ),
+                        suggested_action="Add an adapter that bridges these backends or use the same backend",
+                    )
+                )
+
     for edge in flow.edges:
         source_atom = node_map.get(edge.source)
         target_atom = node_map.get(edge.target)

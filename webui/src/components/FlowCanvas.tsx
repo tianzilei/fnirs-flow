@@ -35,6 +35,7 @@ import { ParameterPanel } from './ParameterPanel';
 interface FlowCanvasProps {
   flow: Record<string, unknown>;
   onChange: (flow: Record<string, unknown>) => void;
+  readOnly?: boolean;
 }
 
 const nodeColors: Record<string, string> = {
@@ -182,7 +183,7 @@ function normalizePorts(atom: Record<string, unknown>): NodeDetail['ports'] {
   return [...inputPorts, ...outputPorts, ...legacyPorts];
 }
 
-export function FlowCanvas({ flow, onChange }: FlowCanvasProps) {
+export function FlowCanvas({ flow, onChange, readOnly = false }: FlowCanvasProps) {
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<NodeDetail | null>(null);
@@ -202,17 +203,19 @@ export function FlowCanvas({ flow, onChange }: FlowCanvasProps) {
 
   const onConnect = useCallback(
     (params: Connection) => {
+      if (readOnly) return;
       setEdges((currentEdges) => {
         const nextEdges = addEdge({ ...params, animated: true, className: 'flow-edge' }, currentEdges);
         onChange(syncFlow(flow, nodes, nextEdges));
         return nextEdges;
       });
     },
-    [flow, nodes, onChange, setEdges]
+    [flow, nodes, onChange, readOnly, setEdges]
   );
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      if (readOnly) return;
       setNodes((currentNodes) => {
         const nextNodes = applyNodeChanges(changes, currentNodes);
         if (shouldSyncNodeChanges(changes)) {
@@ -221,11 +224,12 @@ export function FlowCanvas({ flow, onChange }: FlowCanvasProps) {
         return nextNodes;
       });
     },
-    [edges, flow, onChange, setNodes]
+    [edges, flow, onChange, readOnly, setNodes]
   );
 
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      if (readOnly) return;
       setEdges((currentEdges) => {
         const nextEdges = applyEdgeChanges(changes, currentEdges);
         if (shouldSyncEdgeChanges(changes)) {
@@ -234,7 +238,7 @@ export function FlowCanvas({ flow, onChange }: FlowCanvasProps) {
         return nextEdges;
       });
     },
-    [nodes, flow, onChange, setEdges]
+    [nodes, flow, onChange, readOnly, setEdges]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -267,6 +271,7 @@ export function FlowCanvas({ flow, onChange }: FlowCanvasProps) {
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      if (readOnly) return;
       if (!reactFlowInstance) return;
 
       const payload = event.dataTransfer.getData('application/atom-template');
@@ -312,7 +317,7 @@ export function FlowCanvas({ flow, onChange }: FlowCanvasProps) {
       };
       onChange(nextFlow);
     },
-    [flow, nodes, onChange, reactFlowInstance]
+    [flow, nodes, onChange, reactFlowInstance, readOnly]
   );
 
   return (
@@ -327,6 +332,10 @@ export function FlowCanvas({ flow, onChange }: FlowCanvasProps) {
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
           onInit={setReactFlowInstance}
+          nodesDraggable={!readOnly}
+          nodesConnectable={!readOnly}
+          edgesUpdatable={!readOnly}
+          deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
           fitView
         >
           <Background color="#d7dee8" gap={18} />
@@ -383,9 +392,20 @@ export function FlowCanvas({ flow, onChange }: FlowCanvasProps) {
               value,
             }))}
             onChange={(name, value) => {
-              // Update the atom's parameters in the flow
-              const updatedParams = { ...selectedNode.parameters, [name]: value };
-              setSelectedNode({ ...selectedNode, parameters: updatedParams });
+              if (readOnly) return;
+              const updatedConfig = { ...selectedNode.config, [name]: value };
+              setSelectedNode({ ...selectedNode, config: updatedConfig });
+              const atomKey = Array.isArray(flow.flow_atoms) ? 'flow_atoms' : 'nodes';
+              const nextAtoms = asRecords(flow[atomKey]).map((atom) =>
+                String(atom.id) === selectedNode.id
+                  ? { ...atom, config: updatedConfig }
+                  : atom
+              );
+              onChange({
+                ...flow,
+                [atomKey]: nextAtoms,
+                ...(atomKey === 'flow_atoms' && Array.isArray(flow.nodes) ? { nodes: nextAtoms } : {}),
+              });
             }}
             atomInfo={{
               atom_id: selectedNode.id,

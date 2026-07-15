@@ -16,11 +16,13 @@ from pydantic import BaseModel, Field
 
 from fnirs_flow.flow.atoms import (
     AtomPort,
+    BackendBinding,
     ExecutableTrustLevel,
     FlowAtom,
     MethodAtomCategory,
     MethodAtomOrigin,
     Position,
+    ReadinessStatus,
 )
 
 
@@ -39,6 +41,11 @@ class MethodAtomTemplate(BaseModel):
     evidence_refs: list[str] = Field(default_factory=list)
     reference: str = ""
     tags: list[str] = Field(default_factory=list)
+    backend_binding: BackendBinding | None = None
+    # Dependency declaration (§4.2 of design document)
+    dependency_profile_id: str | None = None
+    required_capabilities: list[str] = Field(default_factory=list)
+    dependency_optional: bool = False
 
     @property
     def node_id(self) -> str:
@@ -134,6 +141,12 @@ class MethodAtomLibrary:
         if atom_id is None:
             atom_id = f"{template.atom_type}-{uuid.uuid4().hex[:8]}"
 
+        readiness_value = config.get("readiness_status", ReadinessStatus.NOT_CONFIGURED.value)
+        try:
+            readiness_status = ReadinessStatus(readiness_value)
+        except ValueError:
+            readiness_status = ReadinessStatus.NOT_CONFIGURED
+
         return FlowAtom(
             id=atom_id,
             type=template.atom_type,
@@ -146,7 +159,12 @@ class MethodAtomLibrary:
             position=position or Position(),
             config=config,
             ports=[p.model_copy() for p in template.ports],
+            backend_binding=(template.backend_binding.model_copy(deep=True) if template.backend_binding else None),
+            dependency_profile_id=template.dependency_profile_id,
+            required_capabilities=set(template.required_capabilities),
+            dependency_optional=template.dependency_optional,
             execution_trust_level=ExecutableTrustLevel.BUILTIN_MANAGED,
+            readiness_status=readiness_status,
         )
 
     def load_from_file(self, filepath: str | Path) -> int:

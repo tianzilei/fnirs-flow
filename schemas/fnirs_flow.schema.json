@@ -8,8 +8,8 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "enum": ["0.1.0", "0.2.0"],
-      "description": "Schema version. v0.2.0 introduces MethodAtom-first fields."
+      "enum": ["0.1.0", "0.2.0", "0.3.0"],
+      "description": "Schema version. v0.2.0 introduces MethodAtom-first fields. v0.3.0 adds backend binding."
     },
     "flow_id": {
       "type": "string",
@@ -156,6 +156,10 @@
           "items": { "$ref": "#/$defs/AdapterInstance" },
           "description": "Adapters bound to this atom"
         },
+        "backend_binding": {
+          "$ref": "#/$defs/BackendBinding",
+          "description": "Execution backend binding for this atom"
+        },
         "references": {
           "type": "array",
           "items": { "$ref": "#/$defs/NodeReference" },
@@ -258,6 +262,16 @@
         "parameters": { "type": "object" }
       }
     },
+    "BackendBinding": {
+      "type": "object",
+      "required": ["backend_id"],
+      "properties": {
+        "backend_id": { "type": "string", "description": "Execution backend identifier" },
+        "operation": { "type": "string", "description": "Specific operation to execute" },
+        "version_spec": { "type": "string", "description": "Backend version constraint" },
+        "parameters": { "type": "object", "description": "Backend-specific parameters" }
+      }
+    },
     "NodeReference": {
       "type": "object",
       "properties": {
@@ -293,6 +307,9 @@
             "input_summary": { "type": "string" },
             "assumptions": { "type": "array", "items": { "type": "string" } },
             "requires_user_confirmation": { "type": "array", "items": { "type": "string" } },
+            "confirmed_parameters": { "type": "array", "items": { "type": "string" } },
+            "confirmed_by": { "type": "string" },
+            "confirmed_at": { "type": "string" },
             "not_used_for_execution": { "type": "boolean", "default": true }
           }
         }

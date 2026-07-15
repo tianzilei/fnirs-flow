@@ -1,5 +1,206 @@
 # Changelog
 
+## [1.1.1] - 2026-07-14
+
+### Fixed
+- Quarantine bundles (`corrupt-*.fnirsflow`) no longer consume retained revision slots
+- API flow update endpoint now uses debounce to avoid excessive saves on rapid edits
+- Added per-file size limit (8 MiB) and compression ratio guard (zip bomb protection)
+- ADR-0004 SQLite v2 references replaced with ADR-0005 revocation notice across all docs
+- Homer3/AnalyzIR adapter status corrected to bidirectional (import + export)
+- Test counts unified to 858 passed, 1 skipped across all documentation
+
+### Added
+- Save/restore/migration failure injection tests
+- Cross-directory/cross-machine bundle move tests
+- Change detection and hash caching for flow-only saves
+- 100 project cold start benchmark
+- 1/4/8 MiB compliant bundle benchmarks and 10 MiB boundary tests
+
+### Changed
+- RC-5 SQLite section in release plan marked as revoked by ADR-0005
+- KNOWN_LIMITATIONS updated to reflect current RC status
+- CURRENT_DOCUMENTATION_MAP refreshed with all RC/audit documents
+
+## [1.1.0] - 2026-07-14
+
+### Added - Release Candidate Features
+
+#### Integrity & Durability (RC-1)
+- Real integrity status tracking (`unknown`, `checking`, `verified`, `failed`, `recoverable`)
+- Added `integrity_status`, `last_verified_at`, `verification_scope`, `integrity_error` fields
+- Added `fsync` calls for data durability during saves
+- Corrupt projects are now visible in project list with `failed` status
+
+#### Portability & Recovery (RC-2)
+- Project-relative URI system (`project://` and `external-data://`)
+- URI binding management for external datasets
+- Version history API mounted in the Project Workspace
+- Confirmed project restoration with success/error feedback and refreshed revision state
+- Portable artifact, provenance, result-index, relink, and package-rerun URIs
+
+#### Performance (RC-3)
+- Lazy loading mode for project bundles
+- `read_bundle_header` method for reading project metadata without full extraction
+- `ensure_project_loaded` method for on-demand full loading
+- Debounce primitives for `update_flow`; WebUI autosave integration remains deferred
+- Formal 100/500/1000 MiB mixed and incompressible bundle benchmarks
+- ADR-0005 decision to retain ZIP v1 as sole container format; ADR-0004 SQLite v2 prototype revoked
+
+#### Scientific Reproducibility (RC-4)
+- Three-entry-point consistency (CLI, API, WebUI)
+- ds007738 dataset reproducibility tests passing
+- RC checklist, upgrade guide, rollback guide, and known limitations documentation
+
+#### Type Safety
+- Added reproducible core/MNE/Cedalion Mypy profiles and CI gates
+- Added type annotations for numpy arrays
+- Fixed implicit Optional parameters
+
+### Validation note
+
+- The 2026-07-14 correctness pass fixed project URI parsing and traversal safety, made project listing genuinely lazy,
+  replaced the invalid synthetic performance benchmark, and increased the final test baseline to 858 passed, 1 skipped.
+- A clean ds007738 export/import/relink/rerun compared 12,493 numeric elements with a maximum absolute difference
+  of `6.404987651364991e-12` at `rtol=1e-8`, `atol=1e-10`.
+- Python and npm vulnerability audits finished with 0 known vulnerabilities. Pytest was raised to `>=9.0.3`
+  after the initial scan detected `PYSEC-2026-1845` in the prior development environment.
+
+## [1.0.4] - 2026-07-12
+
+### Added - Cedalion Unique Features as MethodAtoms
+
+#### New MethodAtoms (17 atoms)
+
+**DOT (Diffuse Optical Tomography)**
+- `ATOM_dot_head_model` - Two-surface head model construction from segmentation masks
+- `ATOM_dot_forward_model` - Monte Carlo / FEM forward model simulation for light transport
+- `ATOM_dot_image_recon` - DOT image reconstruction with Tikhonov or spatial basis function regularization
+- `ATOM_dot_tissue_properties` - Tissue optical properties configuration (absorption, scattering, refractive index)
+
+**Geometry / Photogrammetry**
+- `ATOM_photogrammetry_coregistration` - Photogrammetric optode co-registration from 3D scans using colored sticker detection
+
+**Signal Decomposition**
+- `ATOM_spoc_decomposition` - Spatial Patterns of Covariance (SpOC) for neural decoding
+- `ATOM_ica_signal_decomposition` - ICA-based signal decomposition (EBM/ERBM methods)
+- `ATOM_multimodal_signal_decomposition` - Multimodal decomposition (MSPoC, tCCA, ARC-EBM/ERBM)
+
+**Synthetic Data Generation**
+- `ATOM_synthetic_hrf_generation` - Synthetic hemodynamic response function generation with spatial activation
+- `ATOM_synthetic_artifact_generation` - Synthetic motion artifact generation for testing
+
+**Machine Learning Utilities**
+- `ATOM_epoch_feature_extraction` - Epoch feature extraction (slope, mean, max, min, AUC) for scikit-learn pipelines
+
+**GLM (General Linear Model)**
+- `ATOM_glm_basis_functions` - Temporal basis functions (Gamma, Gaussian kernels, Dirac delta)
+- `ATOM_glm_design_matrix` - GLM design matrix construction with drift and short-channel regression
+- `ATOM_glm_fit_with_uncertainty` - GLM fitting with confidence and prediction intervals
+
+**Quality Control**
+- `ATOM_psp_quality_metric` - Peak Spectral Power quality metric for channel assessment
+
+**Preprocessing Configuration**
+- `ATOM_channel_distance_computation` - Source-detector channel distance computation
+- `ATOM_extinction_coefficients` - Molar extinction coefficients lookup (Prahl spectrum)
+
+#### Updated Adapter
+
+- **cedalion_capabilities.py**: Updated operation detection to support all new cedalion modules (DOT, signal decomposition, synthetic data, ML utilities, geometry)
+- **cedalion_steps.py**: Added 18 new wrapper functions for cedalion operations
+- **cedalion_adapter.py**: Added 18 new adapter methods with provenance and artifact tracking
+
+#### Statistics
+
+- MethodAtom library: 96 → 113 templates (+17)
+- Cedalion adapter methods: 8 → 26 (+18)
+- All new atoms tested and verified
+
+## [1.0.3] - 2026-07-12
+
+### Added - Cedalion Backend Integration & Evidence Governance
+
+#### WP0: Baseline & Scope Lock
+- Unified version to 1.0.2 across `pyproject.toml`, `__init__.py`, and `webui/package.json`
+- Fixed all Ruff linting issues (19 errors resolved)
+- Added pytest markers for core/full/cedalion/adapter test separation (39 core tests identified)
+- Locked WebUI clean build with updated dependencies and CI using `npm ci`
+- Created baseline audit script and JSON report
+
+#### WP1: Execution Backend Abstraction
+- **Backend Protocol** (`fnirs_flow/adapters/backend_protocol.py`): Typed protocol for execution backends
+- **Backend Registry** (`fnirs_flow/adapters/backend_registry.py`): Registration, detection, and factory for MNE/Cedalion backends
+- **BackendBinding model**: Added to `FlowAtom` and `DagNode` for explicit backend assignment
+- **Compiler semantics**: Separated Edge Adapter from Execution Backend concepts
+- **Execution factory**: Updated to use backend registry instead of hardcoded MNE adapter
+- **Schema migration**: Updated to v0.3.0 with BackendBinding support
+- **Mixed backend gating**: Validation for MNE-Cedalion connections without bridges
+
+#### WP2: Cedalion MVP Adapter
+- **Capability detection** (`cedalion_capabilities.py`): Detect Cedalion installation, version, compatibility
+- **Data contract** (`cedalion_io.py`): SNIRF/Recording format definitions
+- **Step wrappers** (`cedalion_steps.py`): `int2od`, `od2conc`, SNIRF reading
+- **Adapter implementation** (`cedalion_adapter.py`): Full adapter with artifacts, provenance, citations
+- **MethodAtom templates**: Added Cedalion-specific templates with backend bindings
+- **CLI/API**: Added `backends` command and `/api/backends` endpoint
+- **Optional dependency**: Added `cedalion` as optional dependency in `pyproject.toml`
+
+#### WP3: Package, Methods & Evidence Chain
+- **Package verifier** (`package_verifier.py`): Validate profile, schema, checksum, backend manifest
+- **Evidence ID tracking**: Added `evidence_refs` to `AtomExecutionResult`
+- **Methods reporting**: Enhanced to support evidence references
+- **Backend tracking**: Package includes backend ID/version/capabilities
+- **Numerical tolerance**: Created specification document
+
+#### WP4: Validation Gold Standard & Backend Equivalence
+- **Gold standard flows**: Created test flows for valid, invalid order, missing metadata, backend mismatch
+- **Gold evaluator** (`evaluate_validation_gold.py`): Script to evaluate validation results
+- **Integration tests**: Created MNE/Cedalion equivalence and SNIRF smoke tests
+- **Backend comparison** (`compare_backends.py`): Script to compare MNE and Cedalion operations
+
+#### WP5: WebUI/API Minimal Integration
+- **Backend diagnostics**: Added `/api/backends` endpoint and SystemDiagnostics page
+- **Atom backend selection**: Added backend_id display to ParameterPanel
+- **Backend risks**: Updated ValidationPanel with backend-specific risk categorization
+
+### Changed
+- Updated README with Cedalion installation instructions and `backends` command
+- Updated test count from 445 to 555 tests
+
+### Technical Details
+- Schema version: 0.2.0 → 0.3.0
+- New error codes: `BACKEND_BRIDGE_REQUIRED`, `BACKEND_UNAVAILABLE`, `BACKEND_VERSION_MISMATCH`
+- New markers: `core`, `full`, `cedalion`, `adapter`, `real_data`
+
+## [1.0.3] - 2026-07-12
+
+### Added
+
+- **Homer3 bidirectional adapter**: Import Homer3 `.cfg`/`.json`/processFunc configs and convert to fnirs-flow atoms (`fnirs_flow/adapters/homer3_import.py`)
+- **AnalyzIR bidirectional adapter**: Import AnalyzIR `.R`/`.json` scripts and convert to fnirs-flow atoms (`fnirs_flow/adapters/analyzir_import.py`); export fnirs-flow atoms to AnalyzIR R script (`fnirs_flow/adapters/analyzir_export.py`)
+- **CLI adapter commands**: `import-homer3`, `import-analyzir`, `export-homer3`, `export-analyzir` subcommands with full file I/O, summary output, and report generation
+- **Cross-backend integration tests**: 94 tests covering Homer3↔AnalyzIR round-trip, triple-chain symmetry, parameter preservation, and CLI end-to-end workflows (`tests/test_homer3_bidirectional.py`, `tests/test_analyzir_bidirectional.py`, `tests/test_cross_backend_integration.py`, `tests/test_cli_adapters.py`)
+- **Unified adapter API**: `fnirs_flow/adapters/__init__.py` exports all 16 public functions/classes for Homer3 and AnalyzIR import/export
+
+### Supported mappings (13 atom types ↔ 15 backend functions)
+
+| fnirs-flow Atom | Homer3 Function | AnalyzIR R Function |
+|---|---|---|
+| `optical_density` | `hmrR_Intensity2OD` | `hmrR_Intensity2OD` |
+| `bandpass_filter` | `hmrR_BandpassFilt` | `hmrR_BandpassFilt` |
+| `tddr_motion` | `hmrR_MotionCorrectTD` | `hmrR_MotionCorrectTD` |
+| `wavelet_motion_correction` | `hmrR_MotionCorrectWavelet` | `hmrR_MotionCorrectWavelet` |
+| `spline_motion_correction` | `hmrR_MotionCorrectSpline` | `hmrR_MotionCorrectSpline` |
+| `pca_motion_correction` | `hmrR_MotionCorrectPCA` | `hmrR_MotionCorrectPCA` |
+| `cbsi_motion_correction` | `hmrR_MotionCorrectCBSI` | `hmrR_MotionCorrectCBSI` |
+| `beer_lambert_law` | `hmrR_OD2Conc` | `hmrR_OD2Conc` |
+| `scalp_coupling_index` | `hmrR_Sci` | `hmrR_Sci` |
+| `short_channel_regression` | `hmrR_StatAvg` | `hmrR_StatAvg` |
+| `block_averaging` | `hmrR_BlockAvg` | `hmrR_BlockAvg` |
+| `first_level_glm` | `hmrR_GLM` | `hmrR_GLM` |
+| `ica_motion_correction` | *(not supported)* | *(not supported)* |
+
 ## [1.0.2] - 2026-07-11
 
 ### Fixed

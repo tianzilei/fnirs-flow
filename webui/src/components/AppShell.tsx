@@ -49,6 +49,7 @@ export function AppShell() {
   const validate = useStore((s) => s.validate);
   const compile = useStore((s) => s.compile);
   const execute = useStore((s) => s.execute);
+  const readOnly = useStore((s) => s.importStatus?.read_only ?? false);
 
   const status = projectStatus();
 
@@ -93,6 +94,9 @@ export function AppShell() {
   }, [location.pathname, projectId]);
 
   const activeNav = getActiveNav();
+  const isSuccessNotice = error
+    ? ['Fork created', 'Flow saved', 'Execution cancelled'].includes(error.message)
+    : false;
 
   const handleNavClick = (navId: NavId) => {
     if (navId === 'projects') {
@@ -153,7 +157,7 @@ export function AppShell() {
           <div className="toolbar-actions">
             {project && (
               <>
-                <button className="ghost-button" onClick={saveFlow} disabled={loading} title="Save flow">
+                <button className="ghost-button" onClick={saveFlow} disabled={loading || readOnly} title={readOnly ? 'Fork the imported package before editing' : 'Save flow'}>
                   <Save size={16} />
                   <span>Save</span>
                 </button>
@@ -161,14 +165,14 @@ export function AppShell() {
                   {loading ? <Loader2 size={16} className="spin" /> : <FileCheck2 size={16} />}
                   <span>Validate</span>
                 </button>
-                <button className="ghost-button" onClick={compile} disabled={loading} title="Compile flow">
+                <button className="ghost-button" onClick={compile} disabled={loading || readOnly} title={readOnly ? 'Fork the imported package before compiling' : 'Compile flow'}>
                   <Save size={16} />
                   <span>Compile</span>
                 </button>
                 <button
                   className="primary-button"
                   onClick={execute}
-                  disabled={loading || !status.dataDiscovered || status.hasFatalRisk}
+                  disabled={loading || !status.compiled || !status.dataDiscovered || status.hasFatalRisk}
                   title={status.hasFatalRisk ? 'Cannot execute: fatal validation risks detected' : 'Execute project'}
                 >
                   <Play size={16} />
@@ -180,8 +184,8 @@ export function AppShell() {
         </header>
 
         {error && (
-          <div className={`toast-banner ${error.message === 'Fork created' || error.message === 'Flow saved' ? 'success' : 'error'}`}>
-            {error.message === 'Fork created' || error.message === 'Flow saved' ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+          <div className={`toast-banner ${isSuccessNotice ? 'success' : 'error'}`}>
+            {isSuccessNotice ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
             <div>
               <strong>{error.message}</strong>
               {error.detail && <span>{error.detail}</span>}

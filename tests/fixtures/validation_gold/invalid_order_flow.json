@@ -1,0 +1,41 @@
+{
+  "schema_version": "0.2.0",
+  "flow_id": "invalid-order-flow-001",
+  "name": "Invalid Order Flow",
+  "description": "Flow with incorrect node ordering (cycle)",
+  "nodes": [
+    {
+      "id": "node-a",
+      "type": "optical_density",
+      "category": "preprocessing",
+      "position": {"x": 0, "y": 0},
+      "config": {},
+      "status": "ready",
+      "ports": [
+        {"name": "input", "direction": "in", "schema": "RawData", "required": true},
+        {"name": "output", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ]
+    },
+    {
+      "id": "node-b",
+      "type": "bandpass_filter",
+      "category": "preprocessing",
+      "position": {"x": 200, "y": 0},
+      "config": {},
+      "status": "ready",
+      "ports": [
+        {"name": "input", "direction": "in", "schema": "OpticalDensityData", "required": true},
+        {"name": "output", "direction": "out", "schema": "OpticalDensityData", "required": true}
+      ]
+    }
+  ],
+  "edges": [
+    {"id": "edge-1", "source": "node-a", "target": "node-b", "source_handle": "output", "target_handle": "input"},
+    {"id": "edge-2", "source": "node-b", "target": "node-a", "source_handle": "output", "target_handle": "input"}
+  ],
+  "adapter_registry": [],
+  "metadata": {
+    "created_at": "2026-01-01T00:00:00Z",
+    "modified_at": "2026-01-01T00:00:00Z"
+  }
+}

@@ -95,7 +95,7 @@ class TestDryRunReport:
         assert "sub-01/nirs/sub-01_task-tapping_nirs.snirf" in report_md
         assert "abc123def456" in report_md
         assert report_json["planned_runs"][0]["task"] == "tapping"
-        assert report_json["planned_runs"][0]["data_path"] == "/data/sub-01_task-tapping_nirs.snirf"
+        assert report_json["planned_runs"][0]["data_path"] == "sub-01/nirs/sub-01_task-tapping_nirs.snirf"
 
     def test_creates_derivatives_layout(self, tmp_path):
         compiled = _compile_demo(tmp_path)

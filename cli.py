@@ -7,6 +7,42 @@ import json
 from pathlib import Path
 
 
+def cmd_backends(args: argparse.Namespace) -> int:
+    """Show backend status and capabilities."""
+    from fnirs_flow.adapters.backend_registry import get_registry
+
+    registry = get_registry()
+
+    print("Backend Status:")
+    print("=" * 60)
+
+    for backend_id in registry.list_all():
+        is_available = registry.is_available(backend_id)
+        status = "✓ Available" if is_available else "✗ Not Available"
+        print(f"\n{backend_id}: {status}")
+
+        if is_available:
+            try:
+                # Get backend class
+                backend_class = registry.get(backend_id)
+                if backend_class:
+                    # Try to get capabilities
+                    if hasattr(backend_class, 'capabilities'):
+                        caps = backend_class.capabilities
+                        if isinstance(caps, dict):
+                            print(f"  Version: {caps.get('version', 'unknown')}")
+                            ops = caps.get('supported_operations', [])
+                            if ops:
+                                print(f"  Operations: {', '.join(ops)}")
+                            limitations = caps.get('limitations', [])
+                            if limitations:
+                                print(f"  Limitations: {', '.join(limitations)}")
+            except Exception as e:
+                print(f"  Error getting info: {e}")
+
+    return 0
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     from fnirs_flow.validation.api import validate_flow
 
@@ -120,6 +156,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             data_root=getattr(args, "data_root", None),
             participant_labels=getattr(args, "participant_label", []) or [],
             session_labels=getattr(args, "session_label", []) or [],
+            task_labels=getattr(args, "task_label", []) or [],
             run_labels=getattr(args, "run_label", []) or [],
             continue_on_failure=getattr(args, "continue_on_failure", True),
         )
@@ -189,13 +226,489 @@ def cmd_export(args: argparse.Namespace) -> int:
     pkg_path = outdir / pkg_name
 
     try:
-        export_package(compiled_dir, pkg_path, profile_id=profile_id)
+        export_root = compiled_dir.parent if compiled_dir.name == "compiled" else compiled_dir
+        export_package(export_root, pkg_path, profile_id=profile_id)
         print(f"Package exported: {pkg_path}")
         print(f"  Profile:  {profile.name}")
         print(f"  Size:     {pkg_path.stat().st_size} bytes")
         return 0
     except Exception as e:
         print(f"Error: {e}")
+        return 1
+
+
+def cmd_verify_package(args: argparse.Namespace) -> int:
+    """Verify a .fnirsflow.zip package."""
+    from fnirs_flow.exporters.package_verifier import verify_and_print
+
+    package_path = Path(args.package_path)
+    expected_profile = args.profile if hasattr(args, 'profile') else None
+
+    return verify_and_print(package_path, expected_profile)
+
+
+def cmd_import_package(args: argparse.Namespace) -> int:
+    """Import a package and optionally relink it to a local dataset."""
+    from fnirs_flow.exporters.package_importer import import_package
+
+    try:
+        result = import_package(
+            args.package_path,
+            args.outdir,
+            relink_data=bool(args.data_root),
+            data_root=args.data_root,
+        )
+        print(f"Package imported: {args.package_path}")
+        print(f"  Output:      {result['output_dir']}")
+        print(f"  Read-only:   {result['read_only']}")
+        print(f"  Relinked:    {result['relinked']}")
+        print(f"  Quarantined: {len(result['quarantined_atoms'])}")
+        return 0
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+
+def cmd_relink_data(args: argparse.Namespace) -> int:
+    """Relink an imported package to a local data root."""
+    from fnirs_flow.exporters.package_importer import relink_package_data
+
+    try:
+        result = relink_package_data(args.package_dir, args.data_root)
+        print(f"Package data relinked: {args.package_dir}")
+        print(f"  Data root: {result['data_root']}")
+        print(f"  Missing:   {len(result['missing_paths'])}")
+        return 0 if not result["missing_paths"] else 1
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+
+def cmd_import_homer3(args: argparse.Namespace) -> int:
+    """Import a Homer3 config and convert to fnirs-flow atoms."""
+    from fnirs_flow.adapters.homer3_import import import_homer3, write_import_report
+
+    source = Path(args.source)
+    if not source.exists():
+        print(f"Error: File not found: {source}")
+        return 1
+
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    result = import_homer3(source)
+
+    # Print summary
+    print(f"Homer3 import: {source}")
+    print(f"  Format:    {result.source_format}")
+    print(f"  Atoms:     {len(result.atoms)}")
+    print(f"  Unmapped:  {len(result.unmapped_functions)}")
+
+    if result.atoms:
+        print()
+        print("Imported atoms:")
+        for i, atom in enumerate(result.atoms, 1):
+            op = atom.get("operation", "")
+            cat = atom.get("category", "")
+            src = atom.get("source_function", "")
+            print(f"  {i}. {atom['atom_type']} ({op}, {cat}) <- {src}")
+
+    if result.unmapped_functions:
+        print()
+        print("Unmapped Homer3 functions:")
+        for u in result.unmapped_functions:
+            print(f"  - {u['function']}: {u['reason']}")
+
+    if result.warnings:
+        print()
+        for w in result.warnings:
+            print(f"  Warning: {w}")
+
+    # Write report
+    report_path = write_import_report(result, outdir)
+
+    # Write atoms as JSON
+    atoms_path = outdir / "imported_atoms.json"
+    atoms_path.write_text(
+        json.dumps(result.atoms, indent=2, default=str),
+        encoding="utf-8",
+    )
+
+    print()
+    print(f"  Report:    {report_path}")
+    print(f"  Atoms JSON: {atoms_path}")
+    return 0
+
+
+def cmd_import_analyzir(args: argparse.Namespace) -> int:
+    """Import an AnalyzIR R script or JSON and convert to fnirs-flow atoms."""
+    from fnirs_flow.adapters.analyzir_import import import_analyzir, write_import_report
+
+    source = Path(args.source)
+    if not source.exists():
+        print(f"Error: File not found: {source}")
+        return 1
+
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    result = import_analyzir(source)
+
+    # Print summary
+    print(f"AnalyzIR import: {source}")
+    print(f"  Format:    {result.source_format}")
+    print(f"  Atoms:     {len(result.atoms)}")
+    print(f"  Unmapped:  {len(result.unmapped_functions)}")
+    if result.data_path:
+        print(f"  Data path: {result.data_path}")
+
+    if result.atoms:
+        print()
+        print("Imported atoms:")
+        for i, atom in enumerate(result.atoms, 1):
+            op = atom.get("operation", "")
+            cat = atom.get("category", "")
+            src = atom.get("source_function", "")
+            print(f"  {i}. {atom['atom_type']} ({op}, {cat}) <- {src}")
+
+    if result.unmapped_functions:
+        print()
+        print("Unmapped AnalyzIR functions:")
+        for u in result.unmapped_functions:
+            print(f"  - {u['function']}: {u['reason']}")
+
+    if result.warnings:
+        print()
+        for w in result.warnings:
+            print(f"  Warning: {w}")
+
+    # Write report
+    report_path = write_import_report(result, outdir)
+
+    # Write atoms as JSON
+    atoms_path = outdir / "imported_atoms.json"
+    atoms_path.write_text(
+        json.dumps(result.atoms, indent=2, default=str),
+        encoding="utf-8",
+    )
+
+    print()
+    print(f"  Report:    {report_path}")
+    print(f"  Atoms JSON: {atoms_path}")
+    return 0
+
+
+def cmd_export_homer3(args: argparse.Namespace) -> int:
+    """Export fnirs-flow atoms to Homer3 process config."""
+    from fnirs_flow.adapters.homer3_export import (
+        convert_flow_to_homer3,
+        write_homer3_config,
+        write_homer3_mapping_report,
+    )
+
+    atoms_path = Path(args.atoms_json)
+    if not atoms_path.exists():
+        print(f"Error: File not found: {atoms_path}")
+        return 1
+
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    atoms = json.loads(atoms_path.read_text(encoding="utf-8"))
+    if not isinstance(atoms, list):
+        print("Error: atoms JSON must be a list of atom objects")
+        return 1
+
+    config = convert_flow_to_homer3(atoms)
+
+    # Print summary
+    print(f"Homer3 export: {len(atoms)} atoms")
+    print(f"  Mapped:   {len(config.steps)}")
+    print(f"  Unmapped: {len(config.unmapped_atoms)}")
+
+    if config.steps:
+        print()
+        print("Exported steps:")
+        for i, step in enumerate(config.steps, 1):
+            print(f"  {i}. {step.name} -> {step.func}")
+
+    if config.unmapped_atoms:
+        print()
+        print("Unmapped atoms (no Homer3 equivalent):")
+        for a in config.unmapped_atoms:
+            print(f"  - {a}")
+
+    # Write files
+    config_path = write_homer3_config(config, outdir)
+    report_path = write_homer3_mapping_report(config, outdir)
+
+    print()
+    print(f"  Config:  {config_path}")
+    print(f"  Report:  {report_path}")
+    return 0
+
+
+def cmd_export_analyzir(args: argparse.Namespace) -> int:
+    """Export fnirs-flow atoms to an AnalyzIR R script."""
+    from fnirs_flow.adapters.analyzir_export import (
+        convert_flow_to_analyzir,
+        write_analyzir_mapping_report,
+        write_analyzir_script,
+    )
+
+    atoms_path = Path(args.atoms_json)
+    if not atoms_path.exists():
+        print(f"Error: File not found: {atoms_path}")
+        return 1
+
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    atoms = json.loads(atoms_path.read_text(encoding="utf-8"))
+    if not isinstance(atoms, list):
+        print("Error: atoms JSON must be a list of atom objects")
+        return 1
+
+    script = convert_flow_to_analyzir(
+        atoms,
+        data_path=args.data_path or "",
+        output_dir=args.output_dir or "",
+    )
+
+    # Print summary
+    print(f"AnalyzIR export: {len(atoms)} atoms")
+    print(f"  Mapped:   {len(script.steps)}")
+    print(f"  Unmapped: {len(script.unmapped_atoms)}")
+
+    if script.steps:
+        print()
+        print("Exported steps:")
+        for i, step in enumerate(script.steps, 1):
+            print(f"  {i}. {step.name} -> {step.func}")
+
+    if script.unmapped_atoms:
+        print()
+        print("Unmapped atoms (no AnalyzIR equivalent):")
+        for a in script.unmapped_atoms:
+            print(f"  - {a}")
+
+    # Write files
+    r_path = write_analyzir_script(script, outdir, args.filename)
+    report_path = write_analyzir_mapping_report(script, outdir)
+
+    print()
+    print(f"  R script: {r_path}")
+    print(f"  Report:   {report_path}")
+    return 0
+
+
+def cmd_deps_resolve(args: argparse.Namespace) -> int:
+    """Resolve dependencies for a flow or compiled directory."""
+    from fnirs_flow.dependencies.resolver import resolve_dependencies
+
+    source = Path(args.flow_json)
+    if not source.exists():
+        print(f"Error: Path not found: {args.flow_json}")
+        return 1
+
+    # Determine if this is a flow JSON or compiled directory
+    if source.is_dir():
+        dag_path = source / "execution_dag.json"
+        if not dag_path.exists():
+            print(f"Error: No execution_dag.json found in {source}")
+            return 1
+    else:
+        # Compile the flow first
+        from fnirs_flow.compiler.compiler import compile_flow
+        flow_dict = json.loads(source.read_text(encoding="utf-8"))
+        outdir = source.parent / "compiled"
+        result = compile_flow(flow_dict, outdir)
+        dag_path = result.outdir / "execution_dag.json"
+
+    # Load DAG and resolve
+    dag = json.loads(dag_path.read_text(encoding="utf-8"))
+    plan = resolve_dependencies(dag, flow_id=source.stem)
+
+    # Save plan
+    plan_path = dag_path.parent / "dependency_plan.json"
+    plan_path.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+
+    # Print summary
+    print(f"Dependency Resolution: {plan.plan_id}")
+    print(f"  Status:    {plan.status.value}")
+    print(f"  Flow ID:   {plan.flow_id}")
+    print(f"  Fingerprint: {plan.plan_fingerprint[:16]}...")
+    print()
+    print(f"  Requirements: {len(plan.requirements)}")
+    for req in plan.requirements:
+        status_icon = {
+            "satisfied": "[OK]",
+            "missing": "[MISSING]",
+            "incompatible_version": "[VERSION]",
+            "incompatible_python": "[PYTHON]",
+        }.get(req.status.value, "[???]")
+        print(f"    {status_icon} {req.package.distribution} ({req.profile_id})")
+        if req.installed_version:
+            print(f"           Installed: {req.installed_version}")
+        if req.error_message:
+            print(f"           Error: {req.error_message}")
+
+    print()
+    print(f"  Affected atoms: {sum(len(a) for a in plan.affected_atoms.values())}")
+    for profile_id, atom_ids in plan.affected_atoms.items():
+        print(f"    {profile_id}: {', '.join(atom_ids[:5])}")
+
+    if plan.requires_user_approval:
+        print()
+        print("  ACTION REQUIRED: Plan needs user approval before installation.")
+        print(f"  Run: fnirs-flow deps install --plan {plan.plan_id}")
+
+    print()
+    print(f"  Plan saved: {plan_path}")
+    return 0
+
+
+def cmd_deps_install(args: argparse.Namespace) -> int:
+    """Install dependencies from an approved plan."""
+    from fnirs_flow.dependencies.installer import get_installation_orchestrator
+    from fnirs_flow.dependencies.models import ApprovalRecord, DependencyPlan, InstallPolicy
+    from fnirs_flow.dependencies.policies import get_policy_manager
+
+    plan_id = args.plan
+
+    # Find the plan (search in compiled directories)
+    plan_data = None
+    for compiled_dir in Path(".").rglob("compiled"):
+        pp = compiled_dir / "dependency_plan.json"
+        if pp.exists():
+            data = json.loads(pp.read_text(encoding="utf-8"))
+            if data.get("plan_id") == plan_id:
+                plan_data = data
+                break
+
+    if plan_data is None:
+        print(f"Error: Plan '{plan_id}' not found")
+        return 1
+
+    plan = DependencyPlan.model_validate(plan_data)
+
+    # Check if approved
+    policy_manager = get_policy_manager()
+    if not policy_manager.is_approved(plan.plan_fingerprint):
+        print("Plan is not approved.")
+        if plan.requires_user_approval:
+            print(f"  Requirements: {len(plan.requirements)}")
+            for req in plan.requirements:
+                print(f"    - {req.package.distribution} ({req.status.value})")
+            confirm = input("Approve this plan and install dependencies? [y/N] ").strip().lower()
+            if confirm not in ("y", "yes"):
+                print("Installation cancelled.")
+                return 1
+        policy_manager.approve_plan(plan.plan_fingerprint)
+
+    # Create approval record
+    approval = ApprovalRecord(
+        plan_id=plan.plan_id,
+        plan_fingerprint=plan.plan_fingerprint,
+        decision=InstallPolicy.APPROVED_ONCE,
+    )
+
+    # Execute installation
+    orchestrator = get_installation_orchestrator()
+    print(f"Installing dependencies for plan: {plan_id}")
+    print(f"  Profile: {plan.requirements[0].profile_id if plan.requirements else 'unknown'}")
+    print()
+
+    task = orchestrator.install_from_plan(plan, approval)
+
+    print(f"Installation {task.status}")
+    print(f"  Task ID: {task.task_id}")
+    if task.error:
+        print(f"  Error: {task.error}")
+    if task.log_lines:
+        print("  Log:")
+        for line in task.log_lines[-10:]:
+            print(f"    {line}")
+
+    return 0 if task.status == "completed" else 1
+
+
+def cmd_deps_status(args: argparse.Namespace) -> int:
+    """Check dependency plan status."""
+    plan_id = args.plan_id
+
+    # Find the plan
+    for compiled_dir in Path(".").rglob("compiled"):
+        pp = compiled_dir / "dependency_plan.json"
+        if pp.exists():
+            data = json.loads(pp.read_text(encoding="utf-8"))
+            if data.get("plan_id") == plan_id:
+                print(f"Dependency Plan: {plan_id}")
+                print(f"  Status:      {data.get('status', 'unknown')}")
+                print(f"  Flow ID:     {data.get('flow_id', 'unknown')}")
+                print(f"  Fingerprint: {data.get('plan_fingerprint', '')[:16]}...")
+                print(f"  Requirements: {len(data.get('requirements', []))}")
+                print(f"  Requires approval: {data.get('requires_user_approval', False)}")
+                print(f"  Network required: {data.get('network_required', False)}")
+
+                # Check approval status
+                approval_path = compiled_dir / "approval_record.json"
+                if approval_path.exists():
+                    approval = json.loads(approval_path.read_text(encoding="utf-8"))
+                    print(f"  Approved: {approval.get('decision', 'unknown')}")
+                    print(f"  Approved at: {approval.get('approved_at', 'unknown')}")
+                else:
+                    print("  Approved: No")
+
+                return 0
+
+    print(f"Error: Plan '{plan_id}' not found")
+    return 1
+
+
+def cmd_deps_env_list(args: argparse.Namespace) -> int:
+    """List all dependency environments."""
+    from fnirs_flow.dependencies.installer import get_installation_orchestrator
+
+    orchestrator = get_installation_orchestrator()
+    envs = orchestrator.list_environments()
+
+    if not envs:
+        print("No dependency environments found.")
+        return 0
+
+    print("Dependency Environments:")
+    print("=" * 60)
+    for env in envs:
+        print(f"  {env['environment_id']}")
+        print(f"    Status:  {env['status']}")
+        print(f"    Path:    {env['path']}")
+        if env.get('created_at'):
+            print(f"    Created: {env['created_at']}")
+        print()
+
+    return 0
+
+
+def cmd_deps_env_remove(args: argparse.Namespace) -> int:
+    """Remove a dependency environment."""
+    from fnirs_flow.dependencies.installer import get_installation_orchestrator
+
+    environment_id = args.environment_id
+    parts = environment_id.split("/", 1)
+    if len(parts) != 2:
+        print(f"Error: Invalid environment_id format: {environment_id}")
+        print("Expected format: profile_id/lock_fingerprint")
+        return 1
+
+    orchestrator = get_installation_orchestrator()
+    success = orchestrator.remove_environment(parts[0], parts[1])
+
+    if success:
+        print(f"Removed environment: {environment_id}")
+        return 0
+    else:
+        print(f"Environment not found: {environment_id}")
         return 1
 
 
@@ -217,7 +730,7 @@ def cmd_webui(args: argparse.Namespace) -> int:
             webui_dir = Path(__file__).parent / "webui"
             if not (webui_dir / "node_modules").exists():
                 print("Installing frontend dependencies...")
-                subprocess.run(["npm", "ci"], cwd=webui_dir, check=True)
+                subprocess.run([sys.executable, "-m", "npm", "install"], cwd=webui_dir, check=True)
 
             print("Starting fnirs-flow in DEV mode")
             print(f"  Backend:  http://{host}:{port}")
@@ -242,11 +755,12 @@ def cmd_webui(args: argparse.Namespace) -> int:
             if not dist_dir.exists():
                 print("Frontend not built. Building now...")
                 import subprocess
+                import sys
 
                 webui_dir = Path(__file__).parent / "webui"
                 if not (webui_dir / "node_modules").exists():
                     print("Installing frontend dependencies...")
-                    subprocess.run(["npm", "ci"], cwd=webui_dir, check=True)
+                    subprocess.run([sys.executable, "-m", "npm", "install"], cwd=webui_dir, check=True)
                 print("Building frontend...")
                 subprocess.run(["npm", "run", "build"], cwd=webui_dir, check=True)
                 print()
@@ -270,6 +784,8 @@ def cmd_rerun(args: argparse.Namespace) -> int:
             package_dir=args.package_dir,
             outdir=args.outdir,
             participant_labels=getattr(args, "participant_label", []) or [],
+            task_labels=getattr(args, "task_label", []) or [],
+            run_labels=getattr(args, "run_label", []) or [],
             continue_on_failure=getattr(args, "continue_on_failure", True),
         )
         print(f"Rerun complete for '{args.package_dir}'")
@@ -321,6 +837,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--data-root", help="Root directory containing BIDS-NIRS data")
     p_run.add_argument("--participant-label", nargs="*", help="Filter by participant label")
     p_run.add_argument("--session-label", nargs="*", help="Filter by session label")
+    p_run.add_argument("--task-label", nargs="*", help="Filter by task label")
     p_run.add_argument("--run-label", nargs="*", help="Filter by run label")
     p_run.add_argument(
         "--continue-on-failure",
@@ -342,10 +859,33 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_export.set_defaults(func=cmd_export)
 
+    p_verify = subparsers.add_parser("verify-package", help="Verify a .fnirsflow.zip package")
+    p_verify.add_argument("package_path", help="Path to .fnirsflow.zip file")
+    p_verify.add_argument(
+        "--profile",
+        default=None,
+        choices=["reproducibility_package", "submission_package", "reviewer_package"],
+        help="Expected package profile (optional)",
+    )
+    p_verify.set_defaults(func=cmd_verify_package)
+
+    p_import_package = subparsers.add_parser("import-package", help="Import a .fnirsflow.zip package")
+    p_import_package.add_argument("package_path", help="Path to .fnirsflow.zip file")
+    p_import_package.add_argument("--outdir", required=True, help="Directory for imported package files")
+    p_import_package.add_argument("--data-root", help="Optional local data root for immediate relinking")
+    p_import_package.set_defaults(func=cmd_import_package)
+
+    p_relink = subparsers.add_parser("relink-data", help="Relink an imported package to local data")
+    p_relink.add_argument("package_dir", help="Directory containing the imported package")
+    p_relink.add_argument("--data-root", required=True, help="Local dataset root")
+    p_relink.set_defaults(func=cmd_relink_data)
+
     p_rerun = subparsers.add_parser("rerun", help="Rerun an imported package after data relink")
     p_rerun.add_argument("package_dir", help="Directory containing the imported package")
     p_rerun.add_argument("--outdir", default=None, help="Output directory (defaults to package_dir)")
     p_rerun.add_argument("--participant-label", nargs="*", help="Filter by participant label")
+    p_rerun.add_argument("--task-label", nargs="*", help="Filter by task label")
+    p_rerun.add_argument("--run-label", nargs="*", help="Filter by run label")
     p_rerun.add_argument(
         "--continue-on-failure",
         action=argparse.BooleanOptionalAction,
@@ -354,11 +894,82 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_rerun.set_defaults(func=cmd_rerun)
 
+    # Backend adapter commands
+    p_import_h3 = subparsers.add_parser(
+        "import-homer3",
+        help="Import Homer3 config (.cfg/.json) and convert to fnirs-flow atoms",
+    )
+    p_import_h3.add_argument("source", help="Path to Homer3 .cfg or .json file")
+    p_import_h3.add_argument("--outdir", required=True, help="Output directory")
+    p_import_h3.set_defaults(func=cmd_import_homer3)
+
+    p_import_az = subparsers.add_parser(
+        "import-analyzir",
+        help="Import AnalyzIR R script (.R) or JSON and convert to fnirs-flow atoms",
+    )
+    p_import_az.add_argument("source", help="Path to AnalyzIR .R or .json file")
+    p_import_az.add_argument("--outdir", required=True, help="Output directory")
+    p_import_az.set_defaults(func=cmd_import_analyzir)
+
+    p_export_h3 = subparsers.add_parser(
+        "export-homer3",
+        help="Export fnirs-flow atoms to Homer3 process config",
+    )
+    p_export_h3.add_argument("atoms_json", help="Path to atoms JSON file (e.g. imported_atoms.json)")
+    p_export_h3.add_argument("--outdir", required=True, help="Output directory")
+    p_export_h3.set_defaults(func=cmd_export_homer3)
+
+    p_export_az = subparsers.add_parser(
+        "export-analyzir",
+        help="Export fnirs-flow atoms to AnalyzIR R script",
+    )
+    p_export_az.add_argument("atoms_json", help="Path to atoms JSON file (e.g. imported_atoms.json)")
+    p_export_az.add_argument("--outdir", required=True, help="Output directory")
+    p_export_az.add_argument(
+        "--filename",
+        default="fnirs_pipeline.R",
+        help="R script filename (default: fnirs_pipeline.R)",
+    )
+    p_export_az.add_argument("--data-path", default="", help="Input data path for R script load command")
+    p_export_az.add_argument("--output-dir", default="", help="Output directory path for R script save command")
+    p_export_az.set_defaults(func=cmd_export_analyzir)
+
     p_webui = subparsers.add_parser("webui", help="Start the WebUI server")
     p_webui.add_argument("--host", default=None, help="Host to bind to (default: 127.0.0.1)")
     p_webui.add_argument("--port", type=int, default=8000, help="Port to listen on")
     p_webui.add_argument("--dev", action="store_true", help="Dev mode: start Vite dev server alongside backend")
     p_webui.set_defaults(func=cmd_webui)
+
+    p_backends = subparsers.add_parser("backends", help="Show backend status and capabilities")
+    p_backends.set_defaults(func=cmd_backends)
+
+    # Dependency management commands (§9.2)
+    p_deps = subparsers.add_parser("deps", help="Dependency management commands")
+    deps_subparsers = p_deps.add_subparsers(dest="deps_command", help="Dependency commands")
+
+    # fnirs-flow deps resolve <flow-or-project>
+    p_deps_resolve = deps_subparsers.add_parser("resolve", help="Resolve dependencies for a flow")
+    p_deps_resolve.add_argument("flow_json", help="Path to flow JSON file or compiled directory")
+    p_deps_resolve.set_defaults(func=cmd_deps_resolve)
+
+    # fnirs-flow deps install --plan <plan-id>
+    p_deps_install = deps_subparsers.add_parser("install", help="Install dependencies from a plan")
+    p_deps_install.add_argument("--plan", required=True, help="Plan ID to install")
+    p_deps_install.set_defaults(func=cmd_deps_install)
+
+    # fnirs-flow deps status <plan-id>
+    p_deps_status = deps_subparsers.add_parser("status", help="Check dependency plan status")
+    p_deps_status.add_argument("plan_id", help="Plan ID to check")
+    p_deps_status.set_defaults(func=cmd_deps_status)
+
+    # fnirs-flow deps env list
+    p_deps_env = deps_subparsers.add_parser("env", help="Manage dependency environments")
+    env_subparsers = p_deps_env.add_subparsers(dest="env_command", help="Environment commands")
+    p_env_list = env_subparsers.add_parser("list", help="List all environments")
+    p_env_list.set_defaults(func=cmd_deps_env_list)
+    p_env_remove = env_subparsers.add_parser("remove", help="Remove an environment")
+    p_env_remove.add_argument("environment_id", help="Environment ID (profile_id/lock_fingerprint)")
+    p_env_remove.set_defaults(func=cmd_deps_env_remove)
 
     # Legacy aliases (backward compatibility)
     p_validate_legacy = subparsers.add_parser("validate-flow", help="[Deprecated] Use 'validate'")

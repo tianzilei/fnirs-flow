@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
-import fnirs_flow.data.discovery as discovery
+from pathlib import Path
+
+import pytest
+
 from fnirs_flow.data.discovery import discover_dataset
 from fnirs_flow.data.manifest import DataFile, DataManifest, DataSource, SubjectSessionRun
 from fnirs_flow.data.registry import BUILTIN_DATASETS, DatasetEntry, DatasetRegistry
+
+pytestmark = pytest.mark.core
 
 
 class TestDatasetRegistry:
     def test_builtin_datasets_exist(self):
         assert "mne-fnirs-motor" in BUILTIN_DATASETS
         assert "bids-nirs-tapping" in BUILTIN_DATASETS
+        assert BUILTIN_DATASETS["ds007738"].folder_name == "Sample/ds007738-download"
 
     def test_registry_get(self):
         reg = DatasetRegistry()
@@ -77,19 +83,10 @@ class TestDiscovery:
         assert (tmp_path / "compiled" / "data_manifest.json").exists()
         assert (tmp_path / "compiled" / "run_table.csv").exists()
 
-    def test_discover_local_bids_nirs_tapping(self, tmp_path, monkeypatch):
-        dataset_root = tmp_path / "source" / "Sample" / "BIDS-NIRS-Tapping-master"
-        for subject in range(1, 6):
-            nirs_dir = dataset_root / f"sub-{subject:02d}" / "nirs"
-            nirs_dir.mkdir(parents=True)
-            stem = f"sub-{subject:02d}_task-tapping"
-            (nirs_dir / f"{stem}_nirs.snirf").write_bytes(f"synthetic-snirf-{subject}".encode())
-            (nirs_dir / f"{stem}_events.tsv").write_text(
-                "onset\tduration\ttrial_type\n0\t1\ttapping\n",
-                encoding="utf-8",
-            )
-
-        monkeypatch.setattr(discovery, "_find_workspace_root", lambda: tmp_path / "source")
+    def test_discover_local_bids_nirs_tapping(self, tmp_path):
+        sample_root = Path(__file__).resolve().parents[1] / "Sample" / "BIDS-NIRS-Tapping-master"
+        if not sample_root.exists():
+            pytest.skip("private sample dataset is not included in the public release")
         manifest = discover_dataset("bids-nirs-tapping", tmp_path)
         assert manifest.dataset_id == "bids-nirs-tapping"
         assert len([f for f in manifest.files if f.role == "raw_snirf"]) == 5
@@ -99,6 +96,10 @@ class TestDiscovery:
         assert first.task == "tapping"
         assert first.relative_path.endswith("_nirs.snirf")
         assert first.data_sha256
+        assert len(manifest.metadata_tables) == 1
+        assert manifest.metadata_tables[0].path.endswith("participants.tsv")
+        assert manifest.metadata_tables[0].sha256
         # data_manifest.json is now written to compiled/ subdirectory
         assert (tmp_path / "compiled" / "data_manifest.json").exists()
         assert (tmp_path / "compiled" / "run_table.csv").exists()
+        assert (tmp_path / "compiled" / "participant_table_manifest.json").exists()

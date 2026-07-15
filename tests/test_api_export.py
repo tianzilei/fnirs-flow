@@ -53,6 +53,48 @@ def test_export_package_success(tmp_path):
         names = zf.namelist()
         assert "plan.json" in names
         assert "RELINK_INSTRUCTIONS.json" in names
+        assert "manifest.json" in names
+
+
+@pytest.mark.parametrize(
+    ("profile", "expected", "unexpected"),
+    [
+        ("submission_package", "risk_register.json", "execution_dag.json"),
+        ("reviewer_package", "execution_dag.json", None),
+        ("reproducibility_package", "reproducibility_manifest.json", None),
+    ],
+)
+def test_export_profile_controls_archive_contents(tmp_path, profile, expected, unexpected):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    pid = _create_and_compile_flow(client, tmp_path)
+    response = client.post(
+        f"/api/projects/{pid}/export-package",
+        json={"profile": profile},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["profile"] == profile
+    with zipfile.ZipFile(response.json()["package_path"]) as archive:
+        names = archive.namelist()
+        assert expected in names
+        if unexpected:
+            assert unexpected not in names
+        manifest = json.loads(archive.read("manifest.json"))
+        assert manifest["profile"] == profile
+
+
+def test_package_profiles_endpoint_is_authoritative():
+    from fastapi.testclient import TestClient
+
+    response = TestClient(app).get("/api/package-profiles")
+    assert response.status_code == 200
+    assert {item["profile_id"] for item in response.json()} == {
+        "reproducibility_package",
+        "submission_package",
+        "reviewer_package",
+    }
 
 
 def test_export_package_no_compile():
@@ -63,7 +105,8 @@ def test_export_package_no_compile():
     pid = proj["id"]
 
     resp = client.post(f"/api/projects/{pid}/export-package")
-    assert resp.status_code == 400
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["code"] == "PLAN_NOT_COMPILED"
 
 
 def test_export_package_not_found():
@@ -71,7 +114,116 @@ def test_export_package_not_found():
 
     client = TestClient(app)
     resp = client.post("/api/projects/nonexistent/export-package")
-    assert resp.status_code == 400
+    assert resp.status_code == 404
+    assert resp.json()["detail"]["code"] == "PROJECT_NOT_FOUND"
+
+
+def test_imported_project_is_read_only_and_fork_owns_package(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    source_id = _create_and_compile_flow(client, tmp_path)
+    package_response = client.post(f"/api/projects/{source_id}/export-package")
+    package_path = package_response.json()["package_path"]
+
+    target = client.post("/api/projects", json={"name": "Imported"}).json()
+    target_id = target["id"]
+    imported = client.post(
+        f"/api/projects/{target_id}/import-package",
+        params={"package_path": package_path},
+    )
+    assert imported.status_code == 200
+    assert client.get(f"/api/projects/{target_id}/flow").json()["flow_id"]
+    assert (
+        client.put(
+            f"/api/projects/{target_id}/flow",
+            json={"flow": {"flow_id": "forbidden"}},
+        ).status_code
+        == 409
+    )
+    assert client.post(f"/api/projects/{target_id}/compile").status_code == 409
+
+    forked = client.post(
+        f"/api/projects/{target_id}/fork",
+        params={"fork_name": "Editable Copy"},
+    )
+    assert forked.status_code == 200
+    fork_id = forked.json()["fork_project_id"]
+    fork_flow = client.get(f"/api/projects/{fork_id}/flow").json()
+    assert fork_flow["flow_id"]
+    import fnirs_flow.api.app as api_module
+
+    fork_output = api_module.get_store().get_output_dir(fork_id)
+    assert (fork_output / "compiled" / "plan.json").exists()
+    fork_status = client.get(f"/api/projects/{fork_id}/import-status").json()
+    assert fork_status["read_only"] is False
+
+
+def test_relink_imported_data_updates_manifest(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    source_id = _create_and_compile_flow(client, tmp_path)
+    import fnirs_flow.api.app as api_module
+
+    compiled = api_module.get_store().get_output_dir(source_id) / "compiled"
+    (compiled / "data_manifest.json").write_text(
+        json.dumps(
+            {
+                "local_root": "/source/machine",
+                "subject_session_runs": [
+                    {"relative_path": "sub-01/run.snirf", "path": "/source/machine/sub-01/run.snirf"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    package_path = client.post(f"/api/projects/{source_id}/export-package").json()["package_path"]
+    target_id = client.post("/api/projects", json={"name": "Relink"}).json()["id"]
+    assert (
+        client.post(
+            f"/api/projects/{target_id}/import-package",
+            params={"package_path": package_path},
+        ).status_code
+        == 200
+    )
+
+    data_root = tmp_path / "local-data"
+    data_root.mkdir()
+    response = client.post(
+        f"/api/projects/{target_id}/relink-data",
+        params={"data_root": str(data_root)},
+    )
+    assert response.status_code == 200
+    manifest = json.loads(
+        (api_module.get_store().get_output_dir(target_id) / "compiled" / "data_manifest.json").read_text()
+    )
+    assert manifest["local_root"] == ""
+    assert manifest["subject_session_runs"][0]["path"] == "external-data://dataset/sub-01/run.snirf"
+    assert manifest["subject_session_runs"][0]["uri"] == "external-data://dataset/sub-01/run.snirf"
+    assert response.json()["data_uri"] == "external-data://dataset/"
+
+
+def test_results_endpoint_reads_imported_group_results(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    project = client.post("/api/projects", json={"name": "Results"}).json()
+    import fnirs_flow.api.app as api_module
+
+    outdir = api_module.get_store().get_output_dir(project["id"])
+    group_dir = outdir / "compiled" / "derivatives" / "group"
+    group_dir.mkdir(parents=True)
+    (group_dir / "group_summary.json").write_text(
+        json.dumps({"summaries": [{"roi": "motor", "mean_beta": 1.25}]}),
+        encoding="utf-8",
+    )
+
+    response = client.get(f"/api/projects/{project['id']}/results/group")
+
+    assert response.status_code == 200
+    assert response.json()["file_count"] == 1
+    assert response.json()["files"][0]["data"]["summaries"][0]["roi"] == "motor"
 
 
 # ============================================================================
@@ -80,6 +232,44 @@ def test_export_package_not_found():
 
 
 class TestRerunPackage:
+    def test_relink_package_rewrites_run_and_event_paths(self, tmp_path):
+        from fnirs_flow.exporters.package_importer import relink_package_data
+
+        old_root = tmp_path / "old"
+        new_root = tmp_path / "new"
+        relative = Path("sub-01/nirs/sub-01_task-test_run-01_nirs.snirf")
+        run_path = new_root / relative
+        run_path.parent.mkdir(parents=True)
+        run_path.write_text("snirf", encoding="utf-8")
+        events_path = run_path.with_name("sub-01_task-test_run-01_events.tsv")
+        events_path.write_text("onset\n", encoding="utf-8")
+        (tmp_path / "data_manifest.json").write_text(
+            json.dumps(
+                {
+                    "local_root": str(old_root),
+                    "subject_session_runs": [
+                        {
+                            "relative_path": relative.as_posix(),
+                            "path": str(old_root / relative),
+                            "events_path": str(old_root / events_path.relative_to(new_root)),
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        result = relink_package_data(tmp_path, new_root)
+        manifest = json.loads((tmp_path / "data_manifest.json").read_text())
+
+        assert result["missing_paths"] == []
+        assert manifest["subject_session_runs"][0]["path"] == (
+            "external-data://dataset/sub-01/nirs/sub-01_task-test_run-01_nirs.snirf"
+        )
+        assert manifest["subject_session_runs"][0]["events_path"] == (
+            "external-data://dataset/sub-01/nirs/sub-01_task-test_run-01_events.tsv"
+        )
+
     def test_rerun_missing_plan(self, tmp_path):
         from fnirs_flow.exporters.package_importer import rerun_package
 
@@ -118,3 +308,22 @@ class TestRerunPackage:
         )
         with pytest.raises(ValueError, match="quarantined atoms"):
             rerun_package(tmp_path)
+
+    def test_trust_atom_updates_quarantine_ledger(self, tmp_path):
+        from fnirs_flow.exporters.package_importer import trust_atom
+
+        (tmp_path / "plan.json").write_text(
+            json.dumps({"preprocessing_atoms": [{"atom_id": "custom-1", "operation": "custom-operation"}]}),
+            encoding="utf-8",
+        )
+        (tmp_path / "import_metadata.json").write_text(
+            json.dumps({"read_only": True, "quarantined_atoms": ["custom-1"]}),
+            encoding="utf-8",
+        )
+
+        result = trust_atom(tmp_path, "custom-1")
+        metadata = json.loads((tmp_path / "import_metadata.json").read_text())
+
+        assert result["status"] == "trusted"
+        assert metadata["quarantined_atoms"] == []
+        assert metadata["trust_decisions"][-1]["atom_id"] == "custom-1"

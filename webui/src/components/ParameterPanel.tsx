@@ -7,6 +7,8 @@ interface AtomInfo {
   operation?: string;
   evidence_refs?: string[];
   readiness_status?: string;
+  backend_id?: string;
+  available_backends?: string[];
 }
 
 interface Parameter {
@@ -138,6 +140,11 @@ export function ParameterPanel({
           {atomInfo.evidence_refs && atomInfo.evidence_refs.length > 0 && (
             <span className="atom-evidence" title={atomInfo.evidence_refs.join(', ')}>
               evidence: {atomInfo.evidence_refs.length}
+            </span>
+          )}
+          {atomInfo.available_backends && atomInfo.available_backends.length > 0 && (
+            <span className="atom-backend">
+              backend: {atomInfo.backend_id || 'default'}
             </span>
           )}
         </div>

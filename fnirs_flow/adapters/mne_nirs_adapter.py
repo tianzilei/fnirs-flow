@@ -52,7 +52,7 @@ def _copy_raw_with_data(raw: Any, new_data: np.ndarray) -> Any:
         new_raw = mne.io.RawArray(new_data, info, first_samp=raw.first_samp, verbose=False)
         return new_raw
     except ImportError:
-        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]")
+        raise ImportError("MNE-Python is required. Install with: pip install fnirs-flow[mne]") from None
 
 
 def _compute_raw_hash(raw: Any) -> str:
@@ -86,6 +86,7 @@ class MneNirsAdapter:
         self,
         subject: str = "",
         session: str = "",
+        task: str = "",
         run: str = "",
         outdir: str | Path | None = None,
     ) -> None:
@@ -94,10 +95,25 @@ class MneNirsAdapter:
         self._artifacts = ArtifactStore()
         self._subject = subject
         self._session = session
+        self._task = task
         self._run = run
         self._outdir = Path(outdir) if outdir else None
         if self._outdir:
             self._outdir.mkdir(parents=True, exist_ok=True)
+
+    def _entity_prefix(self) -> str:
+        """Return a collision-safe BIDS-like prefix for generated artifacts."""
+        prefix = f"sub-{self._subject}" if self._subject else "sub-unknown"
+        if self._session:
+            prefix += f"_ses-{self._session}"
+        if self._task:
+            prefix += f"_task-{self._task}"
+        if self._run:
+            prefix += f"_run-{self._run}"
+        return prefix
+
+    def _entity_id(self) -> str:
+        return "_".join(value for value in (self._subject, self._session, self._task, self._run) if value)
 
     @property
     def versions(self) -> dict[str, str]:
@@ -120,11 +136,12 @@ class MneNirsAdapter:
     ) -> ArtifactRecord:
         """Emit a structured artifact record for a step."""
         checksum = _compute_raw_hash(raw) if raw is not None else ""
-        artifact_id = f"{step_id}-{self._subject}_{self._session}_{self._run}-{checksum[:8]}"
+        artifact_id = f"{step_id}-{self._entity_id()}-{checksum[:8]}"
         record = ArtifactRecord(
             artifact_id=artifact_id,
             subject=self._subject,
             session=self._session,
+            task=self._task,
             run=self._run,
             step_id=step_id,
             artifact_type=artifact_type,
@@ -144,16 +161,27 @@ class MneNirsAdapter:
         """Write an artifact file to outdir. Returns path if written."""
         if not self._outdir:
             return None
-        prefix = f"sub-{self._subject}" if self._subject else "sub-unknown"
-        if self._session:
-            prefix += f"_ses-{self._session}"
-        if self._run:
-            prefix += f"_run-{self._run}"
+        prefix = self._entity_prefix()
         filename = f"{prefix}_desc-{suffix}.{fmt}"
         path = self._outdir / filename
         import json as _json
 
         path.write_text(_json.dumps(data, indent=2, default=str), encoding="utf-8")
+        resolved_path = path.resolve()
+        self._artifacts.register(
+            ArtifactRecord(
+                artifact_id=f"{step_id}-{suffix}-{self._entity_id()}",
+                subject=self._subject,
+                session=self._session,
+                task=self._task,
+                run=self._run,
+                step_id=step_id,
+                artifact_type="".join(part.title() for part in suffix.split("_")),
+                path=str(resolved_path),
+                sha256=hashlib.sha256(resolved_path.read_bytes()).hexdigest(),
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
         return path
 
     def _write_qc_tsv(self, qc: dict[str, Any]) -> Path | None:
@@ -162,11 +190,7 @@ class MneNirsAdapter:
             return None
         import csv
 
-        prefix = f"sub-{self._subject}" if self._subject else "sub-unknown"
-        if self._session:
-            prefix += f"_ses-{self._session}"
-        if self._run:
-            prefix += f"_run-{self._run}"
+        prefix = self._entity_prefix()
         filename = f"{prefix}_desc-qc_channels.tsv"
         path = self._outdir / filename
         bad_mask = qc.get("bad_channel_mask", [])
@@ -178,20 +202,36 @@ class MneNirsAdapter:
                 sci = sci_vals[i] if i < len(sci_vals) else ""
                 is_bad = bad_mask[i] if i < len(bad_mask) else ""
                 writer.writerow([i, sci, is_bad])
+        resolved_path = path.resolve()
+        self._artifacts.register(
+            ArtifactRecord(
+                artifact_id=f"compute_qc-qc_channels-{self._entity_id()}",
+                subject=self._subject,
+                session=self._session,
+                task=self._task,
+                run=self._run,
+                step_id="compute_qc",
+                artifact_type="QCChannels",
+                path=str(resolved_path),
+                sha256=hashlib.sha256(resolved_path.read_bytes()).hexdigest(),
+                created_at=datetime.now(timezone.utc).isoformat(),
+            )
+        )
         return path
 
     def read_run(self, filepath: str | Path) -> Any:
         """Read a SNIRF run file."""
         raw = read_raw_snirf(filepath)
+        source_name = Path(filepath).name
         self._provenance.log(
             step_id="read_run",
-            parameters={"filepath": str(filepath)},
+            parameters={"source_file": source_name},
         )
-        self._emit_artifact("RawIntensity", raw, "read_run", {"filepath": str(filepath)})
+        self._emit_artifact("RawIntensity", raw, "read_run", {"source_file": source_name})
         # Write import summary
         summary = {
             "step": "read_run",
-            "filepath": str(filepath),
+            "source_file": source_name,
             "n_channels": len(raw.ch_names),
             "n_times": len(raw.times),
             "sfreq": raw.info.get("sfreq", 0),
@@ -248,12 +288,13 @@ class MneNirsAdapter:
             parameters={"sci_threshold": sci_threshold},
         )
         # Emit QC report artifact (no raw object, use None)
-        artifact_id = f"qc-{self._subject}_{self._session}_{self._run}"
+        artifact_id = f"qc-{self._entity_id()}"
         self._artifacts.register(
             ArtifactRecord(
                 artifact_id=artifact_id,
                 subject=self._subject,
                 session=self._session,
+                task=self._task,
                 run=self._run,
                 step_id="compute_qc",
                 artifact_type="QCReport",
@@ -535,12 +576,13 @@ class MneNirsAdapter:
                 "n_trials": result["n_trials"],
             },
         )
-        artifact_id = f"block-avg-{self._subject}_{self._session}_{self._run}"
+        artifact_id = f"block-avg-{self._entity_id()}"
         self._artifacts.register(
             ArtifactRecord(
                 artifact_id=artifact_id,
                 subject=self._subject,
                 session=self._session,
+                task=self._task,
                 run=self._run,
                 step_id="block_averaging",
                 artifact_type="ChannelSummary",
@@ -583,10 +625,7 @@ class MneNirsAdapter:
         import csv
 
         outdir.mkdir(parents=True, exist_ok=True)
-        if self._subject:
-            path = outdir / f"sub-{self._subject}_channel_results.csv"
-        else:
-            path = outdir / "channel_results.csv"
+        path = outdir / f"{self._entity_prefix()}_desc-channel_results.csv"
 
         # Handle both formats: channel_output dict or raw dict
         if "channels" in results:
@@ -622,6 +661,7 @@ class MneNirsAdapter:
                 step_id="export_channel_results",
                 subject=self._subject,
                 session=self._session,
+                task=self._task,
                 run=self._run,
             )
         )
@@ -739,12 +779,13 @@ class MneNirsAdapter:
             step_id="channel_output",
             parameters={"n_channels": result.get("n_channels", 0)},
         )
-        artifact_id = f"channel-output-{self._subject}_{self._session}_{self._run}"
+        artifact_id = f"channel-output-{self._entity_id()}"
         self._artifacts.register(
             ArtifactRecord(
                 artifact_id=artifact_id,
                 subject=self._subject,
                 session=self._session,
+                task=self._task,
                 run=self._run,
                 step_id="channel_output",
                 artifact_type="ChannelSummary",
