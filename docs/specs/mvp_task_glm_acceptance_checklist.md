@@ -1,107 +1,108 @@
-# MVP Task GLM Flow 用户路径验收清单
+# MVP Task GLM Flow Acceptance Checklist
 
-生成日期：2026-07-10
-最后更新：2026-07-11
+Generated: 2026-07-10
 
-## 1. 验收清单
+Last updated: 2026-07-11
 
-### 1.1 新建项目
+## 1. Acceptance Checklist
 
-- [x] 用户可以创建新项目。
-- [x] 用户可以选择 `Task GLM` 模板。
-- [x] 系统生成初始粗粒度 Flow。
-- [x] Flow 显示以下模块节点：Dataset、Study Design、QC、Preprocessing、Analysis、Reporting、Export。
-- [x] 每个模块节点可展开为 Subflow。 (点击节点显示详情面板)
+### 1.1 Create a Project
 
-### 1.2 选择 Task GLM Template
+- [x] Users can create a new project.
+- [x] Users can select the `Task GLM` template.
+- [x] The system generates an initial coarse-grained Flow.
+- [x] The Flow shows these module nodes: Dataset, Study Design, QC, Preprocessing, Analysis, Reporting, and Export.
+- [x] Each module node can expand into a Subflow, or expose detail through the node detail panel.
 
-- [x] Template 自动带入以下 MethodAtom：Dataset、Study Design、QC、Preprocessing、Design Matrix、First-level GLM、Contrast、Channel Output、ROI Output、Report/Export。
-- [x] Template 自动带入以下 evidence references。
-- [x] Template 自动带入以下 preset references：QC preset、preprocessing preset、GLM preset。 (default_config 包含 preset 值)
+### 1.2 Select the Task GLM Template
 
-### 1.3 链接 demo dataset
+- [x] The template automatically includes these MethodAtoms: Dataset, Study Design, QC, Preprocessing, Design Matrix, First-level GLM, Contrast, Channel Output, ROI Output, and Report/Export.
+- [x] The template automatically includes evidence references.
+- [x] The template automatically includes preset references for QC, preprocessing, and GLM configuration through `default_config`.
 
-- [x] 用户可以链接或导入 MNE-NIRS finger tapping dataset。
-- [x] 系统检查 dataset 格式（BIDS/SNIRF）。
-- [x] 系统检查 adapter 兼容性。
-- [x] Dataset 节点状态变为 `configured`。
+### 1.3 Link the Demo Dataset
 
-### 1.4 确认 conditions/control/contrasts
+- [x] Users can link or import the MNE-NIRS finger tapping dataset.
+- [x] The system checks the dataset format, including BIDS and SNIRF compatibility.
+- [x] The system checks adapter compatibility.
+- [x] The Dataset node status becomes `configured`.
 
-- [x] 系统显示从 study_design 提取的 conditions 列表。
-- [x] 用户可以确认或修改 task conditions。
-- [x] 用户可以确认或修改 control condition。
-- [x] 用户可以确认或修改 contrasts。
-- [x] Design Matrix 节点状态变为 `configured`。
+### 1.4 Confirm Conditions, Control Condition, and Contrasts
 
-### 1.5 确认 QC、motion、filter、ROI 和 export profile
+- [x] The system displays the condition list extracted from `study_design`.
+- [x] Users can confirm or modify task conditions.
+- [x] Users can confirm or modify the control condition.
+- [x] Users can confirm or modify contrasts.
+- [x] The Design Matrix node status becomes `configured`.
 
-- [x] 系统显示 QC preset 参数，用户可以确认或修改。
-- [x] 系统显示 motion correction preset 参数，用户可以确认或修改。
-- [x] 系统显示 filter preset 参数，用户可以确认或修改。
-- [x] 系统显示 ROI strategy 参数，用户可以确认或修改。
-- [x] 用户可以选择 export profile（submission / reviewer / reproducibility）。
-- [x] 所有确认完成后，Readiness Check 状态为 `Ready`。
+### 1.5 Confirm QC, Motion, Filter, ROI, and Export Profile Settings
 
-### 1.6 保存 ProjectSnapshot
+- [x] The system displays QC preset parameters, and users can confirm or modify them.
+- [x] The system displays motion-correction preset parameters, and users can confirm or modify them.
+- [x] The system displays filter preset parameters, and users can confirm or modify them.
+- [x] The system displays ROI strategy parameters, and users can confirm or modify them.
+- [x] Users can choose an export profile: submission, reviewer, or reproducibility.
+- [x] After all confirmations are complete, the Readiness Check status is `Ready`.
 
-- [x] 用户可以保存 ProjectSnapshot。
-- [x] ProjectSnapshot 包含：flow、compiled、data、risk 层。
-- [x] ProjectSnapshot 不可变。
-- [x] 系统记录 snapshot_id、created_at、version_state、version_refs。
+### 1.6 Save a ProjectSnapshot
 
-### 1.7 dry-run
+- [x] Users can save a ProjectSnapshot.
+- [x] The ProjectSnapshot contains Flow, compiled, data, and risk layers.
+- [x] The ProjectSnapshot is immutable.
+- [x] The system records `snapshot_id`, `created_at`, `version_state`, and `version_refs`.
 
-- [x] 用户可以执行 dry-run。
-- [x] dry-run 验证：schema validation、graph validation、adapter validation、readiness check。
-- [x] dry-run 输出 risk register，列出所有 warning 和 error。
-- [x] dry-run 不执行实际计算。
+### 1.7 Dry Run
 
-### 1.8 execute
+- [x] Users can execute a dry run.
+- [x] Dry run performs schema validation, graph validation, adapter validation, and readiness checks.
+- [x] Dry run outputs a risk register listing all warnings and errors.
+- [x] Dry run does not perform real computation.
 
-- [x] 用户可以执行分析。
-- [x] 系统先创建 ProjectSnapshot（如果有 draft changes）。 (execute 前自动创建)
-- [x] 系统创建 ActionAttempt，引用 ProjectSnapshot。
-- [x] 执行引擎按 execution 顺序执行 (preprocessing → analysis → output)。
-- [x] 每个 MethodAtom 的执行状态记录在 ActionAttempt 中。
-- [x] 执行完成后，ActionAttempt 状态为 `completed` 或 `failed`。
-- [x] 执行过程中产生的 artifact 进入 artifact manifest。
+### 1.8 Execute
 
-### 1.9 查看 artifacts 和 reports
+- [x] Users can execute the analysis.
+- [x] The system creates a ProjectSnapshot first if draft changes exist.
+- [x] The system creates an ActionAttempt that references the ProjectSnapshot.
+- [x] The execution engine runs in execution order: preprocessing -> analysis -> output.
+- [x] Each MethodAtom execution status is recorded in the ActionAttempt.
+- [x] After execution, the ActionAttempt status is `completed` or `failed`.
+- [x] Artifacts generated during execution are written to the artifact manifest.
 
-- [x] 用户可以查看以下 artifacts：design matrix、GLM results、ROI results。
-- [x] 用户可以查看以下 reports：run_report.md、project_report。
-- [x] 每个 reportlet 可追溯到 source MethodAtom、source artifact、parameters hash。
-- [x] 用户可以查看 risk register。
+### 1.9 View Artifacts and Reports
 
-### 1.10 导出 package
+- [x] Users can view design matrix, GLM results, and ROI result artifacts.
+- [x] Users can view `run_report.md` and project reports.
+- [x] Each reportlet is traceable to the source MethodAtom, source artifact, and parameter hash.
+- [x] Users can view the risk register.
 
-- [x] 用户可以选择导出 profile。
-- [x] 系统按 profile 生成 Flow Package (.fnirsflow.zip)。
-- [x] Package 包含：plan.json、execution_dag.json、data_manifest.json 等。
-- [x] Package 不包含原始数据。
+### 1.10 Export a Package
 
-### 1.11 在新目录导入、relink、rerun
+- [x] Users can choose an export profile.
+- [x] The system generates a Flow Package (`.fnirsflow.zip`) according to the selected profile.
+- [x] The package includes `plan.json`, `execution_dag.json`, `data_manifest.json`, and related manifests.
+- [x] The package does not include raw data.
 
-- [x] 用户可以在新目录导入 package。
-- [x] 导入后，Flow 标记为只读。 (import_metadata.json + WebUI banner)
-- [x] custom executable atom 进入 `quarantined` 状态。 (检查 registry，未知 atom 标记 quarantine)
-- [x] 用户可以 relink data root。
-- [x] 用户可以 fork 到新 branch。 (fork_package 创建可编辑副本)
-- [x] 用户可以重新执行 trust 确认。 (Trust 按钮解除 quarantine)
-- [x] 用户可以重新执行 readiness check。
-- [x] 用户可以 rerun 分析。 (Fork 后移除 read_only，可正常 execute)
+### 1.11 Import, Relink, and Rerun in a New Directory
 
-## 2. 验收标准
+- [x] Users can import a package in a new directory.
+- [x] After import, the Flow is marked read-only through `import_metadata.json` and the WebUI banner.
+- [x] Custom executable atoms enter the `quarantined` state. Unknown atoms are marked quarantine during registry checks.
+- [x] Users can relink the data root.
+- [x] Users can fork the package into a new branch by creating an editable copy.
+- [x] Users can reconfirm trust. The Trust action releases quarantine for the current checksum and project.
+- [x] Users can rerun readiness checks.
+- [x] Users can rerun analysis after forking, because the fork removes read-only status.
 
-### 2.1 功能验收
+## 2. Acceptance Criteria
 
-- 46/46 checklist 项通过。 ✅
-- 无 fatal error。 ✅
-- 所有 high risk 已被用户确认。 ✅
+### 2.1 Functional Acceptance
 
-### 2.2 可复现验收
+- 46/46 checklist items pass.
+- No fatal error remains.
+- All high-risk items have been confirmed by the user.
 
-- Package 可导出并导入。 ✅
-- 所有参数、evidence 引用、risk 记录在 plan.json 中。 ✅
-- 所有执行记录在 action_attempts.json 中。 ✅
+### 2.2 Reproducibility Acceptance
+
+- Packages can be exported and imported.
+- All parameters, evidence references, and risk records are stored in `plan.json`.
+- All execution records are stored in `action_attempts.json`.
