@@ -145,15 +145,17 @@ export function AppShell() {
 
   return (
     <div className="app shell">
-      <div className="mobile-unsupported" role="alert">
-        <div>
-          <span className="mobile-unsupported-kicker">Desktop required</span>
-          <h1>Open fnirs-flow on a larger screen</h1>
-          <p>
-            The workflow canvas, checklist, validation, and results tables require a desktop-width workspace.
-          </p>
+      {!desktopViewport && (
+        <div className="mobile-unsupported" role="alert">
+          <div>
+            <span className="mobile-unsupported-kicker">Desktop required</span>
+            <h1>Open fnirs-flow on a larger screen</h1>
+            <p>
+              The workflow canvas, checklist, validation, and results tables require a desktop-width workspace.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
       {desktopViewport && (
         <>
           <aside className="app-rail">
@@ -171,7 +173,7 @@ export function AppShell() {
                     onClick={() => !disabled && handleNavClick(item.id)}
                     disabled={disabled}
                     title={item.label}
-                    aria-label={item.label}
+                    aria-label={`Navigate to ${item.label}`}
                     aria-current={activeNav === item.id ? 'page' : undefined}
                   >
                     <Icon size={18} />
@@ -183,7 +185,7 @@ export function AppShell() {
                   className={moreActive || moreOpen ? 'active' : ''}
                   onClick={() => setMoreOpen((open) => !open)}
                   title="More"
-                  aria-label="More navigation"
+                  aria-label="Open more navigation"
                   aria-expanded={moreOpen}
                 >
                   <MoreHorizontal size={18} />

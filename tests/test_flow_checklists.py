@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
@@ -91,3 +93,16 @@ def test_checklist_coverage_reports_existing_atom_missing_input_links():
     risks = validate_checklist_coverage(flow, "task_glm")
 
     assert any(r.code == "CHECKLIST_STEP_INPUTS_MISSING" and "DataManifest" in r.message for r in risks)
+
+
+def test_task_glm_demo_flow_satisfies_required_checklist_steps():
+    flow_dict = json.loads(Path("configs/demo_task_glm_real.json").read_text(encoding="utf-8"))
+    flow = FlowGraph.model_validate(flow_dict)
+
+    risks = validate_checklist_coverage(flow, "task_glm")
+
+    blocking_codes = {
+        "CHECKLIST_REQUIRED_STEP_MISSING",
+        "CHECKLIST_STEP_INPUTS_MISSING",
+    }
+    assert [risk.message for risk in risks if risk.code in blocking_codes] == []

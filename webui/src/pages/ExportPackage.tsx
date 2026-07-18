@@ -34,6 +34,7 @@ export function ExportPackage() {
   const projectStatus = useStore(useShallow((s) => s.projectStatus()));
   const [exported, setExported] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastExportResult, setLastExportResult] = useState<typeof exportResult>(null);
   const [selectedProfile, setSelectedProfile] = useState('reproducibility_package');
   const [profiles, setProfiles] = useState<PackageProfile[]>(FALLBACK_PROFILES);
 
@@ -43,16 +44,20 @@ export function ExportPackage() {
 
   useEffect(() => {
     if (project) void refreshStatus();
+    setExported(false);
+    setLastExportResult(null);
   }, [project?.id, refreshStatus]);
 
   const currentProfile = profiles.find((p) => p.profile_id === selectedProfile);
+  const visibleExportResult = lastExportResult || exportResult;
   const canExport = projectStatus.compiled && !loading && !exported;
 
   const handleExport = async () => {
     if (!canExport) return;
     setError(null);
     try {
-      await exportPackage({ profile: selectedProfile });
+      const result = await exportPackage({ profile: selectedProfile });
+      setLastExportResult(result);
       setExported(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');
@@ -80,6 +85,24 @@ export function ExportPackage() {
             <span>Export is enabled after the current flow has a compiled plan.</span>
           </div>
         </section>
+      )}
+
+      {exported && (
+        <div className="export-success" role="status" aria-live="polite">
+          <div className="export-success-header">
+            <CheckCircle2 size={20} />
+            <p>Package exported successfully!</p>
+          </div>
+          {visibleExportResult && (
+            <div className="export-result-details">
+              <dl>
+                <div><dt>Package Path</dt><dd><code>{visibleExportResult.package_path}</code></dd></div>
+                <div><dt>Size</dt><dd>{formatBytes(visibleExportResult.size_bytes)}</dd></div>
+                <div><dt>Profile</dt><dd>{currentProfile?.name || selectedProfile}</dd></div>
+              </dl>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="export-content">
@@ -112,9 +135,9 @@ export function ExportPackage() {
 
         {currentProfile && (
           <section className="package-contents">
-            <h3>{exportResult ? 'Exported Package Contents' : `Expected Package Contents: ${currentProfile.name}`}</h3>
+            <h3>{visibleExportResult ? 'Exported Package Contents' : `Expected Package Contents: ${currentProfile.name}`}</h3>
             <ul>
-              {(exportResult?.contents || currentProfile.include_patterns).map((item) => (
+              {(visibleExportResult?.contents || currentProfile.include_patterns).map((item) => (
                 <li key={item}>
                   <CheckCircle2 size={14} />
                   <code>{item}</code>
@@ -142,19 +165,6 @@ export function ExportPackage() {
 
       {exported && (
         <div className="export-success">
-          <div className="export-success-header">
-            <CheckCircle2 size={20} />
-            <p>Package exported successfully!</p>
-          </div>
-          {exportResult && (
-            <div className="export-result-details">
-              <dl>
-                <div><dt>Package Path</dt><dd><code>{exportResult.package_path}</code></dd></div>
-                <div><dt>Size</dt><dd>{formatBytes(exportResult.size_bytes)}</dd></div>
-                <div><dt>Profile</dt><dd>{currentProfile?.name || selectedProfile}</dd></div>
-              </dl>
-            </div>
-          )}
           <div className="export-instructions">
             <h4>Reproducibility Instructions</h4>
             <ol>

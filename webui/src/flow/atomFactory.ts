@@ -77,6 +77,14 @@ export const categoryOrder: Record<string, number> = {
   export: 6,
 };
 
+const operationAliases: Record<string, string[]> = {
+  build_design_matrix: ['design_matrix', 'study_design'],
+  compute_qc: ['qc_metrics', 'signal_qc'],
+  estimate_contrast: ['contrast', 'estimate_contrast'],
+  filtering: ['bandpass_filter', 'filter'],
+  motion_correction: ['tddr_motion_correction', 'motion_correction'],
+};
+
 export function asRecords(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
 }
@@ -253,10 +261,16 @@ export function atomMatchesChecklistStep(atom: Record<string, unknown>, step: Fl
   const templateId = atomTemplateId(atom);
   const atomType = String(atom.atom_type || atom.type || '');
   const operation = String(atom.operation || '');
+  const identifiers = new Set([
+    templateId,
+    atomType,
+    operation,
+    ...(operationAliases[operation] || []),
+    ...(operationAliases[atomType] || []),
+  ]);
   return (
-    step.recommended_template_ids.includes(templateId) ||
-    step.recommended_template_ids.includes(operation) ||
-    step.recommended_atom_types.includes(atomType)
+    step.recommended_template_ids.some((id) => identifiers.has(id)) ||
+    step.recommended_atom_types.some((id) => identifiers.has(id))
   );
 }
 

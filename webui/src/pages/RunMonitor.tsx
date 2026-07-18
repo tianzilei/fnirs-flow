@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Boxes, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, CopyCheck, FileJson, GitFork, Play, Radar, ShieldCheck, XCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store';
@@ -12,6 +13,7 @@ const statusIcons: Record<string, typeof Clock3> = {
 };
 
 export function RunMonitor() {
+  const navigate = useNavigate();
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
   const runs = useStore((s) => s.runs);
   const executeInfo = useStore((s) => s.executeInfo);
@@ -27,6 +29,11 @@ export function RunMonitor() {
   const trustAtom = useStore((s) => s.trustAtom);
   const projectStatus = useStore(useShallow((s) => s.projectStatus()));
   const quarantined = (importStatus?.quarantined_atoms.length ?? 0) > 0;
+
+  const handleFork = async () => {
+    const newProject = await fork();
+    if (newProject) navigate(`/projects/${newProject.id}/flow`);
+  };
 
   const hasFatalRisk = validation?.risks?.some(
     (r: Record<string, unknown>) => r.severity === 'fatal'
@@ -52,6 +59,8 @@ export function RunMonitor() {
             className="ghost-button"
             onClick={dryRun}
             disabled={loading || !canPlanRun}
+            type="button"
+            aria-label="Dry run project"
             title={!canPlanRun ? 'Dry run requires a compiled flow, bound data, and no fatal validation risks' : 'Plan project runs'}
           >
             <CopyCheck size={16} />
@@ -61,19 +70,21 @@ export function RunMonitor() {
             className="primary-button"
             onClick={execute}
             disabled={loading || !canPlanRun}
+            type="button"
+            aria-label="Execute project"
             title={hasFatalRisk ? 'Cannot execute: fatal validation risks detected' : 'Execute project'}
           >
             <Play size={16} />
             <span>{loading ? 'Executing...' : 'Execute'}</span>
           </button>
           {currentAttempt && ['queued', 'running', 'cancelling'].includes(currentAttempt.status) && (
-            <button className="ghost-button" onClick={cancelExecution} disabled={currentAttempt.status === 'cancelling'}>
+            <button className="ghost-button" onClick={cancelExecution} disabled={currentAttempt.status === 'cancelling'} type="button">
               <XCircle size={16} />
               <span>{currentAttempt.status === 'cancelling' ? 'Cancelling...' : 'Cancel'}</span>
             </button>
           )}
           {importStatus?.imported && importStatus.read_only && (
-            <button className="ghost-button" onClick={fork} disabled={loading}>
+            <button className="ghost-button" onClick={handleFork} disabled={loading} type="button">
               <GitFork size={16} />
               <span>Fork</span>
             </button>
@@ -129,13 +140,14 @@ export function RunMonitor() {
                 </tr>
               </thead>
               <tbody>
-                {runs.map((run) => {
+                {runs.map((run, index) => {
                   const Icon = statusIcons[run.status] || Clock3;
-                  const isExpanded = expandedRunId === run.run_id;
                   const derivativeCount = run.artifacts?.filter((artifact) => artifact.path).length || 0;
                   const skippedAtoms = run.atom_results?.filter((atom) => atom.status === 'skipped').length || 0;
+                  const runKey = run.run_id || `${run.subject || 'run'}-${run.session || 'session'}-${run.run || index}`;
+                  const isExpanded = expandedRunId === runKey;
                   return (
-                    <Fragment key={run.run_id}>
+                    <Fragment key={runKey}>
                       <tr>
                         <td>
                           <span className={`status-chip ${run.status}`}>
@@ -151,8 +163,10 @@ export function RunMonitor() {
                           {run.atom_results && run.atom_results.length > 0 ? (
                             <button
                               className="atom-count-button"
-                              onClick={() => setExpandedRunId(isExpanded ? null : run.run_id)}
+                              onClick={() => setExpandedRunId(isExpanded ? null : runKey)}
                               aria-expanded={isExpanded}
+                              aria-label={`Show atom details for ${run.run_id || runKey}`}
+                              type="button"
                               title="Show atom outputs and derivative locations"
                             >
                               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}

@@ -112,7 +112,7 @@ interface StoreState {
   exportPackage: (options?: api.ExportOptions) => Promise<ExportResult>;
   importPackage: (projectId: string, packagePath: string) => Promise<void>;
   createSnapshot: () => Promise<void>;
-  fork: () => Promise<void>;
+  fork: () => Promise<Project | null>;
   trustAtom: (atomId: string) => Promise<void>;
   relinkData: (dataRoot: string) => Promise<void>;
   refreshStatus: () => Promise<void>;
@@ -362,7 +362,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  importParticipantTable: async (path: string, idColumn = 'participant_id', includeColumn = 'include', roles = {}) => {
+  importParticipantTable: async (path: string, idColumn = 'participant_id', includeColumn = '', roles = {}) => {
     const { project } = get();
     if (!project) throw new Error('No project selected');
     set({ error: null });
@@ -481,7 +481,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
   fork: async () => {
     const { project } = get();
-    if (!project) return;
+    if (!project) return null;
     set({ loading: true, error: null });
     try {
       const result = await api.forkProject(project.id, `${project.name}_editable`);
@@ -491,8 +491,10 @@ export const useStore = create<StoreState>((set, get) => ({
         loading: false,
         error: { message: 'Fork created', detail: `New project: ${result.fork_project_id}` },
       }));
+      return newProject;
     } catch (e: any) {
       set({ error: { message: 'Fork failed', detail: api.formatApiError(e) }, loading: false });
+      return null;
     }
   },
 
@@ -514,12 +516,20 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!project) return;
     set({ loading: true, error: null });
     try {
-      await api.relinkData(project.id, dataRoot);
+      const relinkResult = await api.relinkData(project.id, dataRoot);
       const [importStatus, readiness] = await Promise.all([
         api.getImportStatus(project.id),
         api.getProjectStatus(project.id),
       ]);
-      set({ importStatus, readiness, loading: false });
+      set({
+        importStatus: {
+          ...importStatus,
+          relinked: importStatus.relinked || relinkResult.status === 'relinked',
+          data_root: importStatus.data_root || String(relinkResult.data_root || dataRoot),
+        },
+        readiness,
+        loading: false,
+      });
     } catch (e: any) {
       set({ error: { message: 'Relink failed', detail: api.formatApiError(e) }, loading: false });
       throw e;

@@ -23,13 +23,29 @@ export function ResultsWorkspace() {
   const [resultsError, setResultsError] = useState('');
 
   useEffect(() => {
-    if (!project || selectedTab === 'artifacts') return;
+    if (!project || selectedTab === 'artifacts') {
+      setBackendResults(null);
+      setResultsLoading(false);
+      setResultsError('');
+      return;
+    }
+    let active = true;
+    setBackendResults(null);
     setResultsLoading(true);
     setResultsError('');
     getProjectResults(project.id, selectedTab)
-      .then(setBackendResults)
-      .catch((error) => setResultsError(formatApiError(error)))
-      .finally(() => setResultsLoading(false));
+      .then((result) => {
+        if (active) setBackendResults(result);
+      })
+      .catch((error) => {
+        if (active) setResultsError(formatApiError(error));
+      })
+      .finally(() => {
+        if (active) setResultsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [project, selectedTab]);
 
   const allArtifacts: LocatedArtifact[] = runs.flatMap((run) =>
@@ -296,7 +312,14 @@ function ResultDataPanel({
       const emptyCopy = title === 'ROI Results'
         ? 'No ROI result files are available. This can happen when the selected demo flow completes channel and group summaries without ROI-level exports.'
         : `No ${title.toLowerCase()} files available.`;
-      return <div className="empty-state compact"><p>{emptyCopy}</p></div>;
+      return (
+        <div className="artifacts-panel result-data-panel">
+          <div className="results-section-heading">
+            <h3>{title}</h3>
+          </div>
+          <div className="empty-state compact"><p>{emptyCopy}</p></div>
+        </div>
+      );
     }
   }
   const figures = result.figures || [];
@@ -315,7 +338,10 @@ function ResultDataPanel({
   const previewRows = selectPreviewRows(rows, 100);
   const columns = Array.from(new Set(previewRows.flatMap((row) => Object.keys(row)))).slice(0, 10);
   return (
-    <div className="artifacts-panel">
+    <div className="artifacts-panel result-data-panel">
+      <div className="results-section-heading">
+        <h3>{title}</h3>
+      </div>
       <p className="muted">{result.file_count} files · {rows.length} rows{figures.length ? ` · ${figures.length} figures` : ''}{rows.length > 100 ? ' · showing 100 representative rows' : ''}</p>
       {figures.length > 0 && (
         <div className="result-figures">

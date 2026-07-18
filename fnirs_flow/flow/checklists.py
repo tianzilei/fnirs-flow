@@ -9,6 +9,52 @@ from fnirs_flow.flow.empty_markers import is_empty_marker_atom
 from fnirs_flow.flow.models import FlowGraph
 from fnirs_flow.validation.models import RiskItem
 
+OPERATION_ALIASES: dict[str, tuple[str, ...]] = {
+    "build_design_matrix": ("design_matrix", "study_design"),
+    "compute_qc": ("qc_metrics", "signal_qc"),
+    "estimate_contrast": ("contrast", "estimate_contrast"),
+    "filtering": ("bandpass_filter", "filter"),
+    "motion_correction": ("tddr_motion_correction", "motion_correction"),
+}
+
+HANDLE_SCHEMA_ALIASES: dict[str, str] = {
+    "data_manifest": "DataManifest",
+    "raw": "RawData",
+    "raw_data": "RawData",
+    "od_data": "OpticalDensityData",
+    "corrected_data": "OpticalDensityData",
+    "filtered_data": "OpticalDensityData",
+    "hb_data": "HaemoglobinData",
+    "haemoglobin": "HaemoglobinData",
+    "design": "DesignSpec",
+    "design_spec": "DesignSpec",
+    "design_matrix": "DesignMatrix",
+    "glm_result": "GLMResults",
+    "contrast_result": "ContrastResults",
+    "channel_results": "ContrastResults",
+}
+
+SCHEMA_ALIASES: dict[str, str] = {
+    "GLMResult": "GLMResults",
+    "ContrastResult": "ContrastResults",
+    "ChannelResults": "ContrastResults",
+}
+
+OPERATION_OUTPUT_SCHEMAS: dict[str, tuple[str, ...]] = {
+    "dataset_discovery": ("DataManifest",),
+    "read_run": ("RawData",),
+    "optical_density": ("OpticalDensityData",),
+    "compute_qc": ("QCReport",),
+    "motion_correction": ("OpticalDensityData",),
+    "filtering": ("OpticalDensityData",),
+    "beer_lambert_law": ("HaemoglobinData",),
+    "build_design_matrix": ("DesignSpec", "DesignMatrix"),
+    "first_level_glm": ("GLMResults",),
+    "estimate_contrast": ("ContrastResults",),
+    "channel_output": ("ContrastResults",),
+    "roi_output": ("ROIResults",),
+}
+
 
 @dataclass(frozen=True)
 class FlowChecklistStep:
@@ -80,10 +126,10 @@ TASK_GLM_CHECKLIST = FlowChecklist(
             label="Quality control",
             required=False,
             recommended_template_ids=("qc_metrics", "sci_check", "cv_check", "snr_check"),
-            recommended_atom_types=("signal_qc",),
+            recommended_atom_types=("signal_qc", "qc_metrics"),
             default_template_id="qc_metrics",
             alternative_template_ids=("sci_check", "cv_check", "snr_check"),
-            input_requirements=("RawData",),
+            input_requirements=("OpticalDensityData",),
             depends_on=("signal_conversion",),
             allow_empty_marker=True,
             category="preprocessing",
@@ -112,7 +158,7 @@ TASK_GLM_CHECKLIST = FlowChecklist(
             label="Filtering",
             required=False,
             recommended_template_ids=("bandpass_filter",),
-            recommended_atom_types=("filter",),
+            recommended_atom_types=("filter", "filtering"),
             default_template_id="bandpass_filter",
             alternative_template_ids=("notch_filter", "lowpass_filter"),
             input_requirements=("OpticalDensityData",),
@@ -151,7 +197,7 @@ TASK_GLM_CHECKLIST = FlowChecklist(
             recommended_template_ids=("design_matrix",),
             recommended_atom_types=("design",),
             default_template_id="design_matrix",
-            input_requirements=("HaemoglobinData", "DesignSpec"),
+            input_requirements=("DataManifest",),
             depends_on=("haemoglobin_conversion", "study_design"),
             category="design",
             guidance="Build the GLM design matrix from haemoglobin data and design spec.",
@@ -172,8 +218,8 @@ TASK_GLM_CHECKLIST = FlowChecklist(
             slot_id="contrast",
             label="Contrast",
             required=True,
-            recommended_template_ids=("contrast",),
-            recommended_atom_types=("first_level_glm",),
+            recommended_template_ids=("contrast", "estimate_contrast"),
+            recommended_atom_types=("estimate_contrast",),
             default_template_id="contrast",
             input_requirements=("GLMResults",),
             depends_on=("first_level_glm",),
@@ -577,15 +623,25 @@ def _atom_matches_step(atom: Any, step: FlowChecklistStep) -> bool:
     template_id = str(getattr(atom, "template_id", "") or atom.metadata.get("template_id", ""))
     atom_type = str(getattr(atom, "atom_type", "") or getattr(atom, "type", ""))
     operation = str(getattr(atom, "operation", "") or "")
+    identifiers = {
+        template_id,
+        atom_type,
+        operation,
+        *OPERATION_ALIASES.get(operation, ()),
+        *OPERATION_ALIASES.get(atom_type, ()),
+    }
     return (
-        template_id in step.recommended_template_ids
-        or atom_type in step.recommended_atom_types
-        or operation in step.recommended_template_ids
+        bool(identifiers.intersection(step.recommended_template_ids))
+        or bool(identifiers.intersection(step.recommended_atom_types))
     )
 
 
 def _step_satisfied(flow: FlowGraph, step: FlowChecklistStep) -> bool:
     return any(_atom_matches_step(atom, step) for atom in flow.nodes)
+
+
+def _canonical_schema(schema: str) -> str:
+    return SCHEMA_ALIASES.get(schema, schema)
 
 
 def _input_requirement_missing(flow: FlowGraph, atom: Any, step: FlowChecklistStep) -> tuple[str, ...]:
@@ -601,12 +657,21 @@ def _input_requirement_missing(flow: FlowGraph, atom: Any, step: FlowChecklistSt
         if source is None:
             continue
         source_port_name = edge.source_handle
+        edge_schemas: set[str] = set()
         for port in getattr(source, "ports", []):
             if port.direction != "out":
                 continue
             if source_port_name is None or port.name == source_port_name:
-                incoming_schemas.add(port.port_schema)
-    return tuple(schema for schema in step.input_requirements if schema not in incoming_schemas)
+                edge_schemas.add(_canonical_schema(port.port_schema))
+        if not edge_schemas:
+            for handle in (edge.source_handle, edge.target_handle):
+                schema = HANDLE_SCHEMA_ALIASES.get(str(handle or ""))
+                if schema:
+                    edge_schemas.add(_canonical_schema(schema))
+            source_operation = str(getattr(source, "operation", "") or getattr(source, "atom_type", "") or "")
+            edge_schemas.update(_canonical_schema(schema) for schema in OPERATION_OUTPUT_SCHEMAS.get(source_operation, ()))
+        incoming_schemas.update(edge_schemas)
+    return tuple(schema for schema in step.input_requirements if _canonical_schema(schema) not in incoming_schemas)
 
 
 def _step_skipped(flow: FlowGraph, step: FlowChecklistStep) -> bool:

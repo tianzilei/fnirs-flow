@@ -280,6 +280,7 @@ button {
   border-radius: 8px;
   background: var(--surface);
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
 }
 
 .toast-banner.error {
@@ -313,6 +314,7 @@ button {
   background: transparent;
   color: inherit;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .app-main {

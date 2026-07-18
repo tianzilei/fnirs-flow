@@ -2,7 +2,7 @@
 
 GUI-enabled fNIRS analysis toolbox + reproducibility framework。用 Flow 编排预处理、验证、执行和复现，基于 MNE-NIRS 执行后端。
 
-**v1.2.0** | 1068 source-tree tests passing | Python 3.10+
+**v1.2.0** | 1126 source-tree tests passing | Python 3.10+
 
 ---
 
@@ -134,9 +134,10 @@ python cli.py export outputs/demo --outdir outputs/demo --profile reviewer_packa
 
 示例 AI draft：`configs/ai_draft_task_glm.json`（task GLM 分析方案，含 `ai_generation` 元数据和 `requires_user_confirmation` 待确认项）。
 
-配套文档：
-- 实施计划：`docs/implementation/generative_ai_prerelease_support_plan.md`
-- Generative AI 声明：`docs/GENERATIVE_AI_DECLARATION.md`
+配套入口：
+- 生成规范：`ai_flow_generation_guide.md`
+- 示例 Flow：`configs/ai_draft_task_glm.json`
+- 公共 API 说明：`docs/specs/fnirs_flow_public_api.md`
 
 ---
 
@@ -183,8 +184,7 @@ React + Vite，通过 `src/api/client.ts` 调用后端 API。
 
 ### 测试 — `tests/`
 
-61 个测试模块；公开发布树当前为 958 passed、5 skipped。私有工作树包含本地
-样例数据时，额外执行 1 项数据发现测试。测试覆盖核心链路：
+71 个测试模块；最新 release convergence 记录为 1126 passed、1 skipped。测试覆盖核心链路：
 
 | 测试文件 | 覆盖范围 |
 |---|---|
@@ -243,76 +243,33 @@ pytest -k "mne"           # 按关键词
 | `readiness_result.schema.json` | 就绪检查结果 schema |
 | `literature_flow_evidence.schema.json` | 文献→Flow 证据映射 schema |
 
-### 文献数据与工具 — `outputs/`
-
-| 子目录 | 内容 |
-|---|---|
-| `literature_extraction/` | 文献提取 CSV 主数据（studies, acquisition, preprocessing_methods, analysis_methods, risk_register 等） |
-| `methodatom_library/` | 从文献生成的 MethodAtom 模板库（method_atoms, templates, adapter_definitions, risk_rule_candidates 等） |
-| `skills/` | 可移植 skill 包（fnirs-literature-extractor.zip 等） |
-| `local_tapping_analysis/` | 本地 BIDS-NIRS tapping 分析结果 |
-| `acceptance/` | 验收测试编译产物 |
-| `PDF2MD0708/` `PDF2MD0709/` | PDF 转 Markdown 的文献全文 |
-| `organized/` | 整理后的文献元数据 |
-| `precision_pubmed_searches/` | 精确 PubMed 检索结果 |
-
 ### 脚本 — `scripts/`
 
 | 文件 | 用途 |
 |---|---|
-| `run_local_analysis.py` | 本地 BIDS-NIRS tapping 数据集完整分析 |
-| `analysis_tapping.py` | tapping 分析兼容入口（调用 run_local_analysis） |
-| `demo_full_pipeline.py` | 全流程 demo 脚本 |
-| `run_task_glm_demo.py` | 任务态 GLM demo |
-| `generate_flow_evidence.py` | 从文献生成 Flow 证据 |
-| `generate_evidence_map.py` | 生成文献证据映射 |
-| `batch_extract.py` `batch_flow_evidence.py` | 批量文献提取 |
-| `deep_extract_core.py` | 深度核心文献提取 |
+| `analyze_ds007738_qc_sensitivity.py` | ds007738 QC 敏感性分析 |
+| `audit_ds007738_outputs.py` | ds007738 输出审计 |
+| `benchmark_performance.py` | 性能基准脚本 |
+| `build_ds007738_exclusion_manifests.py` | ds007738 exclusion manifest 构建 |
+| `compare_ds007738_golden_rerun.py` | ds007738 golden rerun 对比 |
+| `run_ds007738_full_analysis.py` | ds007738 全流程分析入口 |
 | `sync_public_release.py` | 公开版本同步 |
-| `pubmed_precision_search.py` | PubMed 精确检索 |
-| `validate_first80_extraction.py` `validate_first160_extraction.py` | 提取结果验证 |
-| `audit_code_reconstruction_readiness.py` | 代码重建就绪审计 |
-| `init_core_manual_screening_table.py` | 初始化人工筛选表 |
-| `build_tier1_precision_candidates.py` | 构建 Tier1 精确候选集 |
-| `extract_*.py` `inspect_*.py` | 各批次文献提取与检查 |
-| `upgrade_schema_*.py` | Schema 升级脚本 |
-| `auto_screen_core_records.py` | 自动筛选核心记录 |
 
 ### 文档 — `docs/`
 
-| 子目录/文件 | 核心文件 | 用途 |
-|---|---|---|
-| **根** | `GENERATIVE_AI_DECLARATION.md` `README.md` | Generative AI 声明、文档索引 |
-| **architecture/** | `architecture.md` `fnirs_flow_product_architecture.md` `fnirs_flow_design_decisions_v0_{2..7}.md`（6 个版本） `CURRENT_DOCUMENTATION_MAP.md` `reference_reuse_matrix.md` | 产品架构、设计决策演进（v0.2→v0.7）、文档地图、参考代码复用矩阵 |
-| **implementation/** | `IMPLEMENTATION_HANDOFF.md` `FNIRS_FLOW_IMPLEMENTATION_ROADMAP.md` `fnirs_flow_v1_implementation_master_plan.md` `fnirs_flow_v1_backlog.md` `V1_WORKFLOW.md` | 实施交接、路线图、总方案、backlog、工作流 |
-| | `fnirs_flow_webui_development_plan.md` `generative_ai_prerelease_support_plan.md` `public_dataset_demo_selection.md` | WebUI 开发计划、AI 支持计划、数据集选择 |
-| | `current_issues_and_future_directions.md` `current_progress_and_next_plan.md` `next_optimization_plan.md` `project_optimization_plan_2026-07-11.md` | 当前问题、进度、优化计划 |
-| | `execution_closure_detailed_plan.md` `controlled_flow_and_preset_node_execution_plan.md` `code_and_manuscript_improvement_plan.md` | 执行闭环、受控 flow、代码与论文改进 |
-| **business/** | `fnirs_flow_business_logic_v0_1.md` `scenario_business_model.md` | 业务逻辑、场景模型 |
-| **literature/** | `literature_extraction_plan.md` `literature_extraction_tables.md` `agent_extraction_protocol.md` | 文献提取方案、字段表、agent 协议 |
-| | `literature_flow_evidence_schema.md` `code_reconstruction_evidence_guide.md` | 证据 schema、代码重建证据指南 |
-| | `qc_threshold_recommendations.md` `ml_leakage_prevention_checklist.md` | QC 阈值建议、ML 防泄漏清单 |
-| | `review_plan_precision_pubmed_redesign.md` `review_protocol_pubmed_precision_only.md` | 文献检索 review 方案 |
-| | `pubmed_functional_near-infrared_spectroscopyTitleAbstract.csv` | PubMed 检索结果（1600+ 条） |
-| | `code_reconstruction_readiness_summary.md` `extraction_status_report.md` `literature_structure_summary.md` | 提取状态报告 |
-| **manuscript/** | `neuroimage_manuscript_methodatom_first.md` `neuroimage_manuscript_structure_methodatom_first.md` `neuroimage_manuscript_blueprint.md` | NeuroImage 论文稿件 |
-| | `neuroimage_manuscript_review_suggestions.md` `neuroimage_submission_execution_plan.md` | 审稿意见、投稿执行计划 |
-| | `guide_for_authors_neuroimage.md` | NeuroImage 作者指南 |
-| | `evidence_map_tables/` | 论文证据映射表（CSV/JSON） |
-| **methodatom/** | `method_atom_refactor_and_code_optimization_plan.md` `method_atom_refactor_inventory.md` | MethodAtom 重构计划与影响面盘点 |
-| | `method_atom_library_design_recommendations.md` `method_atom_terminology_checklist.md` `evidence_to_atom_mapping.md` | 模板库设计、术语检查、证据→原子映射 |
-| **specs/** | `fnirs_flow_public_api.md` `package_profile_spec.md` `generative_ai_analysis_script_builder.md` `mvp_task_glm_acceptance_checklist.md` | 公共 API、package profile、AI 分析脚本规范、验收清单 |
-| **supplementary/** | `S1` – `S8` | 论文补充材料：检索策略、CSV schema、MethodAtom seed、风险规则、报告要求、demo flow、执行 DAG、reproducibility package |
-| **reviews/** | `reference_repo_optimization_directions.md` `business_logic_review_recommendations.md` | 参考仓库优化方向、业务逻辑 review 建议 |
-
-### 其他目录
-
-| 目录 | 用途 |
+| 文件 | 用途 |
 |---|---|
-| `legacy/fnirs_pipeline/` | 冻结的 v0 脚手架代码，不再添加新功能 |
-| `References/` | 参考仓库源码（Langflow、LangChain、MNE-Python、Homer3、NIRS-KIT、SPM 等） |
-| `Sample/` | BIDS-NIRS 示例数据集（BIDS-NIRS-Tapping、ds007738） |
-| `schemas/` | JSON Schema 文件（见上方索引） |
+| `README.md` | public 文档索引 |
+| `specs/fnirs_flow_public_api.md` | 公共 API 与 package 概念 |
+| `specs/package_profile_spec.md` | submission/reviewer/reproducibility profile |
+| `specs/mvp_task_glm_acceptance_checklist.md` | task-GLM MVP 验收清单 |
+
+### 发布说明
+
+| 文件 | 用途 |
+|---|---|
+| `PUBLIC_RELEASE.md` | public 发布树范围与排除策略 |
+| `PUBLIC_RELEASE_MANIFEST.json` | 生成的文件清单、大小和 SHA-256 |
 
 ### 根目录文件
 
@@ -324,6 +281,7 @@ pytest -k "mne"           # 按关键词
 | `ai_flow_generation_guide.md` | 生成式 AI flow 生成规范（prompt 上下文） |
 | `CHANGELOG.md` | 版本变更记录 |
 | `README.md` | 本文件 |
+| `PUBLIC_RELEASE.md` | public 发布树说明 |
 
 ---
 
@@ -359,7 +317,7 @@ flow.json
 | `AtomPort` | MethodAtom 的输入/输出端口 |
 | `FlowGraph` | 由 FlowAtom + edge 组成的分析流程图 |
 | `ExecutionPlan` | FlowGraph 编译后的可执行计划 |
-| `Evidence Store` | 文献提取证据的结构化存储 |
+| `Evidence Store` | 文献证据驱动的 MethodAtom 与参数候选索引；原始抽取工作表不包含在 public release 中 |
 | `Scenario` | 研究场景路由器（task/resting_state/real_world/hyperscanning/machine_learning） |
 | `Adapter` | 连接前后 MethodAtom 的输入输出转换器 |
 | `Cedalion Adapter` | Cedalion 可选后端 adapter，支持 DOT、信号分解、合成数据等独有功能 |
@@ -367,22 +325,16 @@ flow.json
 
 ---
 
-## 文献提取数据
+## Public Release Scope
 
-从 1600+ 篇 fNIRS 文献中提取的结构化证据，存储在 `outputs/literature_extraction/`：
+本仓库发布的是 code-oriented public release tree，包含源码、WebUI、测试、schema、demo config 和公开 specs。以下内容不包含在 public repo 中：
 
-| 数据表 | 内容 |
-|---|---|
-| `studies.csv` | 研究基本信息 |
-| `acquisition.csv` | 采集参数（设备、波长、采样率、源探距等） |
-| `preprocessing_methods.csv` | 预处理方法（滤波、运动校正、MBLL 等） |
-| `analysis_methods.csv` | 分析方法（GLM、连接、ML 等） |
-| `risk_register.csv` | 风险项登记 |
-| `samples.csv` | 被试信息 |
-| `reporting_requirements.csv` | 报告要求 |
-| `flow_slot_contracts.csv` | Flow 端口契约 |
-| `method_atoms.csv` | 方法原子定义 |
-| `parameter_candidates.csv` | 参数候选值 |
+- manuscript drafts and submission working files
+- literature extraction worktables and full-text processing outputs
+- sample datasets and generated analysis outputs
+- reference repository checkouts and local platform metadata
+
+发布清单见 `PUBLIC_RELEASE_MANIFEST.json`。
 
 ---
 

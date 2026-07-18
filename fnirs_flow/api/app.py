@@ -1549,12 +1549,15 @@ async def import_status_endpoint(project_id: str):
     if not metadata_path.exists():
         return {"imported": False, "read_only": False, "quarantined_atoms": []}
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    dataset_id = str(metadata.get("dataset_id") or "")
+    bound_root = store.get_dataset_binding(dataset_id) if dataset_id else None
     return {
         "imported": True,
         "read_only": metadata.get("read_only", False),
         "quarantined_atoms": metadata.get("quarantined_atoms", []),
         "relinked": metadata.get("relinked", False),
-        "data_root": "",
+        "data_root": str(bound_root) if bound_root else "",
+        "dataset_id": dataset_id,
     }
 
 

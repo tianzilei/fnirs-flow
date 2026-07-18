@@ -47,7 +47,7 @@ export function DataWorkspace() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [participantPath, setParticipantPath] = useState('');
   const [idColumn, setIdColumn] = useState('participant_id');
-  const [includeColumn, setIncludeColumn] = useState('include');
+  const [includeColumn, setIncludeColumn] = useState('');
   const [groupColumn, setGroupColumn] = useState('group');
   const [labelColumn, setLabelColumn] = useState('group');
   const [siteColumn, setSiteColumn] = useState('site');
@@ -124,20 +124,20 @@ export function DataWorkspace() {
     setMetadataLoading(true);
     setError('');
     try {
-      await importParticipantTable(participantPath.trim(), idColumn.trim() || 'participant_id', includeColumn.trim() || 'include', {
-        group_column: groupColumn.trim() || 'group',
-        label_column: labelColumn.trim() || groupColumn.trim() || 'group',
-        site_column: siteColumn.trim() || 'site',
-        scanner_column: scannerColumn.trim() || 'scanner_id',
+      await importParticipantTable(participantPath.trim(), idColumn.trim() || 'participant_id', includeColumn.trim(), {
+        group_column: groupColumn.trim(),
+        label_column: labelColumn.trim() || groupColumn.trim(),
+        site_column: siteColumn.trim(),
+        scanner_column: scannerColumn.trim(),
         covariate_columns: covariateColumns
           .split(',')
           .map((column) => column.trim())
           .filter(Boolean),
-        session_column: sessionColumn.trim() || 'session',
-        timepoint_column: timepointColumn.trim() || 'timepoint',
-        pair_id_column: pairIdColumn.trim() || 'pair_id',
-        dyad_id_column: dyadIdColumn.trim() || 'dyad_id',
-        participant_role_column: participantRoleColumn.trim() || 'participant_role',
+        session_column: sessionColumn.trim(),
+        timepoint_column: timepointColumn.trim(),
+        pair_id_column: pairIdColumn.trim(),
+        dyad_id_column: dyadIdColumn.trim(),
+        participant_role_column: participantRoleColumn.trim(),
       });
     } catch (err) {
       setError(formatApiError(err));
@@ -251,7 +251,11 @@ export function DataWorkspace() {
           </label>
           <label>
             Include column
-            <input value={includeColumn} onChange={(event) => setIncludeColumn(event.target.value)} />
+            <input
+              value={includeColumn}
+              onChange={(event) => setIncludeColumn(event.target.value)}
+              placeholder="optional"
+            />
           </label>
           <label>
             Group column

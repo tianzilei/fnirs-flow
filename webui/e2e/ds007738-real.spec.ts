@@ -30,18 +30,18 @@ test.describe('ds007738 real-data package', () => {
     await page.getByRole('button', { name: 'Relink', exact: true }).click();
     await expect(page.getByText(`Linked to ${dataRoot}`)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Results', exact: true }).click();
+    await page.getByRole('button', { name: 'Navigate to Results', exact: true }).click();
     await expect(page.getByText('Imported package results are available in the result tabs below.')).toBeVisible();
     await page.getByRole('button', { name: 'Group', exact: true }).click();
     await expect(page.getByText('2 files · 1135 rows · showing 100 representative rows')).toBeVisible();
     await expect(page.getByText('technical_smoke_roi_channels_000_015', { exact: true })).toBeVisible();
     await expect(page.getByText('Covert_Left_minus_Covert_Right', { exact: true }).first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Export', exact: true }).click();
+    await page.getByRole('button', { name: 'Navigate to Export', exact: true }).click();
     await page.getByRole('button', { name: 'Export Package', exact: true }).click();
     await expect(page.getByText('Package exported successfully!')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Runs', exact: true }).click();
+    await page.getByRole('button', { name: 'Navigate to Runs', exact: true }).click();
     await page.getByRole('button', { name: 'Execute', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();

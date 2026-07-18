@@ -234,6 +234,9 @@ def test_relink_imported_data_updates_manifest(tmp_path):
     assert manifest["subject_session_runs"][0]["path"] == "external-data://dataset/sub-01/run.snirf"
     assert manifest["subject_session_runs"][0]["uri"] == "external-data://dataset/sub-01/run.snirf"
     assert response.json()["data_uri"] == "external-data://dataset/"
+    import_status = client.get(f"/api/projects/{target_id}/import-status")
+    assert import_status.status_code == 200
+    assert import_status.json()["data_root"] == str(data_root.resolve())
 
 
 def test_results_endpoint_reads_imported_group_results(tmp_path):

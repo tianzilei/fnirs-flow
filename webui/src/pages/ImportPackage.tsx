@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, CheckCircle2, GitFork,
   Package, ShieldCheck, Upload
@@ -6,6 +7,7 @@ import {
 import { useStore } from '../store';
 
 export function ImportPackage() {
+  const navigate = useNavigate();
   const importStatus = useStore((s) => s.importStatus);
   const loading = useStore((s) => s.loading);
   const project = useStore((s) => s.project);
@@ -19,6 +21,11 @@ export function ImportPackage() {
   const [error, setError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [dataRoot, setDataRoot] = useState('');
+
+  const handleFork = async () => {
+    const newProject = await fork();
+    if (newProject) navigate(`/projects/${newProject.id}/flow`);
+  };
 
   const handleImport = async () => {
     if (!packagePath.trim() || !project) return;
@@ -111,7 +118,7 @@ export function ImportPackage() {
 
               {importStatus.read_only && (
                 <div className="fork-action">
-                  <button className="ghost-button" onClick={fork} disabled={loading}>
+                  <button className="ghost-button" onClick={handleFork} disabled={loading}>
                     <GitFork size={16} />
                     <span>Fork to Editable Copy</span>
                   </button>
@@ -143,7 +150,9 @@ export function ImportPackage() {
                     Relink
                   </button>
                 </div>
-                {importStatus.relinked && <p className="help-text">Linked to {importStatus.data_root}</p>}
+                {importStatus.relinked && (
+                  <p className="help-text">Linked to {importStatus.data_root || dataRoot.trim()}</p>
+                )}
               </div>
             </section>
 

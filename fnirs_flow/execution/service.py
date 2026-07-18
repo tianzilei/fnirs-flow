@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import math
+import warnings
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1330,70 +1331,74 @@ class ExecutionService:
                 adapter = None
                 artifact_offset = 0
                 result = None
+                caught_warnings: list[warnings.WarningMessage] = []
                 try:
-                    # Inject outputs only from this atom's actual DAG predecessors.
-                    self._inject_edge_dependencies(
-                        atom_id,
-                        atom,
-                        params,
-                        intermediate_state,
-                        predecessors,
-                        atom_map,
-                    )
-                    # Retain legacy/default injections for event parsing and old DAGs.
-                    self._inject_dependencies(atom, params, intermediate_state)
-
-                    # Get the appropriate adapter for this atom (MethodAtom-level)
-                    atom_backend_id = resolve_atom_backend_id(atom, default_backend_id)
-                    adapter = adapter_pool.get(atom_backend_id, **adapter_kwargs)
-                    artifact_offset = len(adapter.artifacts.all()) if hasattr(adapter, "artifacts") else 0
-
-                    # Dispatch based on category
-                    if category == "preprocessing":
-                        result = self._dispatch_preprocessing(
-                            adapter,
-                            raw_input,
-                            operation,
+                    with warnings.catch_warnings(record=True) as caught:
+                        warnings.simplefilter("always", RuntimeWarning)
+                        # Inject outputs only from this atom's actual DAG predecessors.
+                        self._inject_edge_dependencies(
+                            atom_id,
+                            atom,
                             params,
+                            intermediate_state,
+                            predecessors,
+                            atom_map,
                         )
-                        # QC emits metrics rather than a transformed data object.
-                        raw_outputs[atom_id] = raw_input if operation == "compute_qc" else result
-                        intermediate_state[atom_id] = result
-                    elif category in ("analysis", "output"):
-                        result = self._dispatch_analysis(
-                            adapter,
-                            raw_input,
-                            operation,
-                            params,
-                        )
-                        intermediate_state[atom_id] = result
-                        raw_outputs[atom_id] = raw_input
-                        # Store specific results for downstream injection
-                        if operation == "build_design_matrix":
-                            intermediate_state["design_matrix"] = result
-                        elif operation == "first_level_glm":
-                            intermediate_state["glm_result"] = result
-                        elif operation == "estimate_contrast":
-                            intermediate_state["contrast_result"] = result
-                        elif operation == "channel_output":
-                            intermediate_state["channel_results"] = result
-                            # Preserve channel-level output for run and group reports.
-                            channel_rows = self._extract_channel_list(result)
-                            for row in channel_rows:
-                                enriched_row = dict(row)
-                                enriched_row.setdefault("source_atom_id", atom_id)
-                                run_result.channel_results.append(enriched_row)
-                        elif operation == "roi_output":
-                            intermediate_state["roi_results"] = result
-                            # Store in run_result for group summary
-                            roi_rows = self._extract_roi_list(result)
-                            for row in roi_rows:
-                                enriched_row = dict(row)
-                                enriched_row.setdefault("source_atom_id", atom_id)
-                                run_result.roi_results.append(enriched_row)
-                    else:
-                        # Data nodes (e.g., read_run) - skip, already handled
-                        intermediate_state[atom_id] = {"status": "skipped"}
+                        # Retain legacy/default injections for event parsing and old DAGs.
+                        self._inject_dependencies(atom, params, intermediate_state)
+
+                        # Get the appropriate adapter for this atom (MethodAtom-level)
+                        atom_backend_id = resolve_atom_backend_id(atom, default_backend_id)
+                        adapter = adapter_pool.get(atom_backend_id, **adapter_kwargs)
+                        artifact_offset = len(adapter.artifacts.all()) if hasattr(adapter, "artifacts") else 0
+
+                        # Dispatch based on category
+                        if category == "preprocessing":
+                            result = self._dispatch_preprocessing(
+                                adapter,
+                                raw_input,
+                                operation,
+                                params,
+                            )
+                            # QC emits metrics rather than a transformed data object.
+                            raw_outputs[atom_id] = raw_input if operation == "compute_qc" else result
+                            intermediate_state[atom_id] = result
+                        elif category in ("analysis", "output"):
+                            result = self._dispatch_analysis(
+                                adapter,
+                                raw_input,
+                                operation,
+                                params,
+                            )
+                            intermediate_state[atom_id] = result
+                            raw_outputs[atom_id] = raw_input
+                            # Store specific results for downstream injection
+                            if operation == "build_design_matrix":
+                                intermediate_state["design_matrix"] = result
+                            elif operation == "first_level_glm":
+                                intermediate_state["glm_result"] = result
+                            elif operation == "estimate_contrast":
+                                intermediate_state["contrast_result"] = result
+                            elif operation == "channel_output":
+                                intermediate_state["channel_results"] = result
+                                # Preserve channel-level output for run and group reports.
+                                channel_rows = self._extract_channel_list(result)
+                                for row in channel_rows:
+                                    enriched_row = dict(row)
+                                    enriched_row.setdefault("source_atom_id", atom_id)
+                                    run_result.channel_results.append(enriched_row)
+                            elif operation == "roi_output":
+                                intermediate_state["roi_results"] = result
+                                # Store in run_result for group summary
+                                roi_rows = self._extract_roi_list(result)
+                                for row in roi_rows:
+                                    enriched_row = dict(row)
+                                    enriched_row.setdefault("source_atom_id", atom_id)
+                                    run_result.roi_results.append(enriched_row)
+                        else:
+                            # Data nodes (e.g., read_run) - skip, already handled
+                            intermediate_state[atom_id] = {"status": "skipped"}
+                        caught_warnings = list(caught)
 
                     atom_result.status = "completed"
                     result_type = type(result).__name__ if result else "None"
@@ -1426,6 +1431,14 @@ class ExecutionService:
                     atom_result.error_code = "EXECUTION_FAILED"
                     if not continue_on_failure:
                         run_result.status = "failed"
+
+                if caught_warnings:
+                    seen_warning_messages = set(atom_result.warnings)
+                    for warning_message in caught_warnings:
+                        text = f"{warning_message.category.__name__}: {warning_message.message}"
+                        if text not in seen_warning_messages:
+                            atom_result.warnings.append(text)
+                            seen_warning_messages.add(text)
 
                 if adapter is not None and hasattr(adapter, "artifacts"):
                     self._append_adapter_artifacts(
@@ -2308,6 +2321,7 @@ class ExecutionService:
         participant_table = load_participant_table_from_artifacts(
             outdir / "compiled"
         ) or load_participant_table_from_artifacts(outdir)
+        role_map = participant_table.column_role_map if participant_table is not None else None
         included_subjects: set[str] | None = None
         if participant_table is not None:
             join = join_participant_metadata(
@@ -2358,6 +2372,9 @@ class ExecutionService:
                 "n_subjects": len(values),
                 "mean_beta": float(np.mean(values)),
                 "std_beta": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
+                "id_column": role_map.id_column if role_map is not None else "",
+                "include_column": role_map.include_column if role_map is not None else "",
+                "group_column": role_map.group_column if role_map is not None else "",
             }
             for (source_atom_id, channel, contrast), values in sorted(grouped.items())
         ]
@@ -2368,7 +2385,17 @@ class ExecutionService:
         with csv_path.open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(
                 stream,
-                fieldnames=["source_atom_id", "channel", "contrast", "n_subjects", "mean_beta", "std_beta"],
+                fieldnames=[
+                    "source_atom_id",
+                    "channel",
+                    "contrast",
+                    "n_subjects",
+                    "mean_beta",
+                    "std_beta",
+                    "id_column",
+                    "include_column",
+                    "group_column",
+                ],
             )
             writer.writeheader()
             writer.writerows(summaries)

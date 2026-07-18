@@ -124,7 +124,7 @@ def relink_package_data(
     if metadata_path.exists():
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         metadata["relinked"] = True
-        metadata.pop("data_root", None)
+        metadata["dataset_id"] = str(manifest.get("dataset_id") or "dataset")
         metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     return {**result, "manifest_path": str(manifest_path)}
 
@@ -260,12 +260,17 @@ def import_package(
         file_infos = _validate_zip_for_import(package_path, zf, extract_dir)
         extracted_files = _extract_validated_members(zf, file_infos, extract_dir)
 
+    manifest_path = extract_dir / "data_manifest.json"
+    manifest = (
+        json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest_path.exists()
+        else {"dataset_id": "dataset"}
+    )
+
     # Relink data if requested
     relinked = False
     if relink_data and data_root is not None:
-        manifest_path = extract_dir / "data_manifest.json"
         if manifest_path.exists():
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             _relink_manifest(manifest, Path(data_root))
             manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
             if persist_binding:
@@ -280,6 +285,7 @@ def import_package(
         "read_only": True,
         "quarantined_atoms": [],
         "relinked": relinked,
+        "dataset_id": str(manifest.get("dataset_id") or "dataset"),
     }
 
     # Check for custom atoms in plan.json and mark them as quarantined
