@@ -290,9 +290,9 @@
       "source": "fnirs_flow/api/__init__.py"
     },
     {
-      "bytes": 70779,
+      "bytes": 74305,
       "path": "fnirs_flow/api/app.py",
-      "sha256": "d6e9ee342b15b4f0cb5ff761af288e2ff5c89b20b68fed219968aa5eef7b4235",
+      "sha256": "3150f5831e2002c1b632eb7cde3ee5a68413335607f3e193181d9628731e8a96",
       "source": "fnirs_flow/api/app.py"
     },
     {
@@ -308,9 +308,9 @@
       "source": "fnirs_flow/api/exceptions.py"
     },
     {
-      "bytes": 8534,
+      "bytes": 10269,
       "path": "fnirs_flow/api/jobs.py",
-      "sha256": "ed29fd3f7ba45cc94142167b64eebda540ec564bca715103e9497d3d67d213d7",
+      "sha256": "205f5a540c68d6c2a6cd13bcc8f3285c6abb80f58e15b9246c41d887e1cc97e6",
       "source": "fnirs_flow/api/jobs.py"
     },
     {
@@ -332,9 +332,9 @@
       "source": "fnirs_flow/api/project_bundle.py"
     },
     {
-      "bytes": 49313,
+      "bytes": 52395,
       "path": "fnirs_flow/api/projects.py",
-      "sha256": "262cee9eb961a9740e0cf07c0b6a08382487934ca0084baa7594a62e771ebe62",
+      "sha256": "5ee4b80be34a00a2168c1144453064f40ede5d20e1cd59c146813fb9d76ede3a",
       "source": "fnirs_flow/api/projects.py"
     },
     {
@@ -398,9 +398,9 @@
       "source": "fnirs_flow/data/__init__.py"
     },
     {
-      "bytes": 12322,
+      "bytes": 12669,
       "path": "fnirs_flow/data/discovery.py",
-      "sha256": "804e9f3ae810a5e626f82692949c20a97c6d6e5e8e0c5f4a1c627cf58801b125",
+      "sha256": "c837f7da1001f37a92420dc5c5af82b0b00eef7beb2b3da531162c0d2c1a9e66",
       "source": "fnirs_flow/data/discovery.py"
     },
     {
@@ -1052,9 +1052,9 @@
       "source": "tests/test_analyzir_bidirectional.py"
     },
     {
-      "bytes": 32339,
+      "bytes": 35359,
       "path": "tests/test_api.py",
-      "sha256": "7a998f779a07ffc7d52ec50b7389f2cf27d77516a1b101c4b31124b4acbc8223",
+      "sha256": "7b358962d4af1dac3f266514a1b526ef17a77f9f22bc27105a35e3c00aefe6b7",
       "source": "tests/test_api.py"
     },
     {
@@ -1160,9 +1160,9 @@
       "source": "tests/test_evidence_config.py"
     },
     {
-      "bytes": 5939,
+      "bytes": 8122,
       "path": "tests/test_execution_jobs.py",
-      "sha256": "51d2abd46b21d8afdf04356020977602855794c4296fb0aadb45c6943835d6d6",
+      "sha256": "03ec39c6635163a7af9f48679388c011862182bc39383055d5c4a50f5547cc3c",
       "source": "tests/test_execution_jobs.py"
     },
     {
@@ -1490,9 +1490,9 @@
       "source": "webui/src/App.tsx"
     },
     {
-      "bytes": 20719,
+      "bytes": 21523,
       "path": "webui/src/api/client.ts",
-      "sha256": "d32448e5281cc2584ac80be879a5333e49fec34f40a6359830135169187ec6ac",
+      "sha256": "65bddaf9449436bacbf44cd2887c24bfddca43968f67ae83874a94b9f76aabe1",
       "source": "webui/src/api/client.ts"
     },
     {
@@ -1502,9 +1502,9 @@
       "source": "webui/src/components/AIDraftReviewPanel.tsx"
     },
     {
-      "bytes": 11620,
+      "bytes": 11856,
       "path": "webui/src/components/AppShell.tsx",
-      "sha256": "0afa91af39260fa76b0658a40a326b5bb7ef24c01b52b27e3e96fae733d478bb",
+      "sha256": "afa60809642b1ff0be363009061f3ed82eabc8d2d9aceb8c57ae6973fe39b792",
       "source": "webui/src/components/AppShell.tsx"
     },
     {
@@ -1592,21 +1592,21 @@
       "source": "webui/src/pages/DataImport.tsx"
     },
     {
-      "bytes": 19452,
+      "bytes": 19963,
       "path": "webui/src/pages/DataWorkspace.tsx",
-      "sha256": "286e17d3c9e9ef105d64781d6313677bbd08e3ef17edf9ec9ce15c128a6cd76e",
+      "sha256": "17c8a029eb4c279047a712c433c407421fe51eeb5712f03b4ece742b593f5e70",
       "source": "webui/src/pages/DataWorkspace.tsx"
     },
     {
-      "bytes": 6310,
+      "bytes": 6369,
       "path": "webui/src/pages/ExportPackage.tsx",
-      "sha256": "5b3c4c7379989c24e885bb60091c66d263a0d6b106c6eefcfb4c0f40ff7a77e3",
+      "sha256": "9f26ff0e51b4a935e11163f44757ebf18f9f3d9b6eec4e374eeaf5d160eeb984",
       "source": "webui/src/pages/ExportPackage.tsx"
     },
     {
-      "bytes": 3072,
+      "bytes": 5033,
       "path": "webui/src/pages/FlowBuilder.tsx",
-      "sha256": "b7f144cf06d05b054af0ea06685818ca2fd00228072da7cf4f1caa7b058de166",
+      "sha256": "fe2976c3768bc5af7a97bec8f67176ad48f8b8d8bd9a756f2608782601373642",
       "source": "webui/src/pages/FlowBuilder.tsx"
     },
     {
@@ -1622,15 +1622,15 @@
       "source": "webui/src/pages/ProjectWorkspace.tsx"
     },
     {
-      "bytes": 15792,
+      "bytes": 16022,
       "path": "webui/src/pages/ResultsWorkspace.tsx",
-      "sha256": "0f25df190c58bb726cb0d5eaf7af393b62c0bec19520812b093551a3d17e64af",
+      "sha256": "6d5a59b17843709c6a8ef0321fc7ace8da943baefe9976bd8e2aa9404069a755",
       "source": "webui/src/pages/ResultsWorkspace.tsx"
     },
     {
-      "bytes": 13603,
+      "bytes": 13833,
       "path": "webui/src/pages/RunMonitor.tsx",
-      "sha256": "de79f69699f8eb7a8d9ee101db51af8bfb34d24a28c6cd9acd564eff7369a54f",
+      "sha256": "22e367c6cbf5b4af53588b48d508c7924fba6b3ccf25de3d7f7c5456bbfb87c2",
       "source": "webui/src/pages/RunMonitor.tsx"
     },
     {
@@ -1646,15 +1646,15 @@
       "source": "webui/src/pages/ValidationDashboard.tsx"
     },
     {
-      "bytes": 15328,
+      "bytes": 16428,
       "path": "webui/src/store.ts",
-      "sha256": "13d1ca89fca63820593652826ccc7af1ac2ed7beb14ff9b7cfdcc05e8b356d9b",
+      "sha256": "26d59be46f6c9b57ead7646d6c1eb3eaf4c6610dbbb31535b1608a963b9bf1d4",
       "source": "webui/src/store.ts"
     },
     {
-      "bytes": 65609,
+      "bytes": 65844,
       "path": "webui/src/styles/global.css",
-      "sha256": "b4ee7bcf3889d4d2d75ee4e974b48807630425570289b01b40c2c96266f29626",
+      "sha256": "0ac38f4821fd21307ca06481af5e84df8feb1f5e89602eb165eeb6b38d334f45",
       "source": "webui/src/styles/global.css"
     },
     {
