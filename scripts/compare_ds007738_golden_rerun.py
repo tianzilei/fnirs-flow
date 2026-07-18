@@ -136,33 +136,35 @@ def compare(reference: Path = DEFAULT_REFERENCE, rerun: Path = DEFAULT_RERUN) ->
 
 def write_report(result: dict[str, Any]) -> None:
     hashes = "\n".join(
-        f"- `{name}`：{'一致' if details['match'] else '不一致'}"
+        f"- `{name}`: {'match' if details['match'] else 'mismatch'}"
         for name, details in result["config_hashes"].items()
     )
     comparison = result["results"]
-    text = f"""# ds007738 跨目录复现验证
+    text = f"""# ds007738 Cross-Directory Reproducibility Validation
 
-生成时间：{result['created_at']}
+Generated: {result['created_at']}
 
-- 总体结果：{'PASS' if result['passed'] else 'FAIL'}
-- 复跑成功：{result['rerun_summary']['successful_runs']} / {result['rerun_summary']['total_runs']}
-- 比较 JSON 文件：{comparison['files_compared']}
-- 比较数值元素：{comparison['numeric_elements']}
-- 容差：`rtol={comparison['rtol']}`，`atol={comparison['atol']}`
-- 最大绝对差：{comparison['max_abs_difference']}
-- 容差外元素：{len(comparison['numeric_failures'])}
-- 基线目录：`{result['reference']}`
-- 干净复跑目录：`{result['rerun']}`
-- 正式选择：participant `01 02`，task `covert`，run `01 02`
-- Attempt：`{result['rerun_summary']['attempt_id']}`
+- Overall result: {'PASS' if result['passed'] else 'FAIL'}
+- Successful reruns: {result['rerun_summary']['successful_runs']} / {result['rerun_summary']['total_runs']}
+- Compared JSON files: {comparison['files_compared']}
+- Compared numeric elements: {comparison['numeric_elements']}
+- Tolerance: `rtol={comparison['rtol']}`, `atol={comparison['atol']}`
+- Maximum absolute difference: {comparison['max_abs_difference']}
+- Elements outside tolerance: {len(comparison['numeric_failures'])}
+- Reference directory: `{result['reference']}`
+- Clean rerun directory: `{result['rerun']}`
+- Official selection: participant `01 02`, task `covert`, run `01 02`
+- Attempt: `{result['rerun_summary']['attempt_id']}`
 
-## 配置哈希
+## Configuration Hashes
 
 {hashes}
 
-验证流程为 export → verify → import → relink → rerun。复跑使用项目本地隔离的 `.venv-mne`
-环境和独立输出目录。导出包使用 `external-data://ds007738/`，不包含 `/Volumes/` 或
-`/Users/` 机器绝对路径；本次验证不代表跨操作系统复现。
+Validation flow: export -> verify -> import -> relink -> rerun. The rerun uses the
+project-local isolated `.venv-mne` environment and a separate output directory. The
+exported package uses `external-data://ds007738/` and does not contain machine
+absolute paths under `/Volumes/` or `/Users/`. This validation does not represent
+cross-operating-system reproducibility.
 """
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(text, encoding="utf-8")

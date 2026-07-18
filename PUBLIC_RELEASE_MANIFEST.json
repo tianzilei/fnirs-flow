@@ -20,9 +20,9 @@
       "source": "LICENSE"
     },
     {
-      "bytes": 16809,
+      "bytes": 18013,
       "path": "README.md",
-      "sha256": "7e75ede3d673673cd7a26a3d16c70cdd511509c620ba68ef3a32f6bbc927bc7b",
+      "sha256": "97b707adbbe5e1d017423a290b40a3cc9a02ef6ac776f3a0d8efd19f2343834a",
       "source": "README.md"
     },
     {
@@ -128,15 +128,15 @@
       "source": "docs/specs/fnirs_flow_public_api.md"
     },
     {
-      "bytes": 4533,
+      "bytes": 5044,
       "path": "docs/specs/mvp_task_glm_acceptance_checklist.md",
-      "sha256": "e6621bb666067e7e4f996256ee1ecfe4f16ac582959204fd86ba7b5332854041",
+      "sha256": "36108f6018267dedf2050f7e14a8cec118934b4b7149584b9cb34cbecbcd03ea",
       "source": "docs/specs/mvp_task_glm_acceptance_checklist.md"
     },
     {
-      "bytes": 4610,
+      "bytes": 5217,
       "path": "docs/specs/package_profile_spec.md",
-      "sha256": "7c9f22814143a86ddb6ec4541b8b027b5eb8b8c568a66dc5a7d4bd619fb88552",
+      "sha256": "5f64c14ebc1bf09205f8dd21bec75f61ae1ac036d01e92edf50c39df02ecf731",
       "source": "docs/specs/package_profile_spec.md"
     },
     {
@@ -176,9 +176,9 @@
       "source": "fnirs_flow/adapters/backend_protocol.py"
     },
     {
-      "bytes": 10824,
+      "bytes": 10857,
       "path": "fnirs_flow/adapters/backend_registry.py",
-      "sha256": "fb4976535967c40f8e2a29fdca88d28812a6527836ccc21f3be183571fe75394",
+      "sha256": "5e5aeadfda4a2ef3cd6bd6241a474fedeb6977dc2ad04f4ab12a26182e1d7af0",
       "source": "fnirs_flow/adapters/backend_registry.py"
     },
     {
@@ -290,9 +290,9 @@
       "source": "fnirs_flow/api/__init__.py"
     },
     {
-      "bytes": 74508,
+      "bytes": 74506,
       "path": "fnirs_flow/api/app.py",
-      "sha256": "4a2681319313150fa89d45a31c2c3c085d6fd1611624a93e38b7df7afc68776f",
+      "sha256": "3a912a970fbc70839ef23fa8f0137e0b1bd13cf0707ba2e6c60f43a25486bbf1",
       "source": "fnirs_flow/api/app.py"
     },
     {
@@ -368,9 +368,9 @@
       "source": "fnirs_flow/compiler/__init__.py"
     },
     {
-      "bytes": 15140,
+      "bytes": 15173,
       "path": "fnirs_flow/compiler/compiler.py",
-      "sha256": "0118878f69e100f85efe3e8db1796492ae66570e1ddaf25a09bd5e37ad27f45f",
+      "sha256": "626ce2903544f1dedfa4c726579ba4eb4a25278bc3a7b111ccdef9feec7f623c",
       "source": "fnirs_flow/compiler/compiler.py"
     },
     {
@@ -428,21 +428,21 @@
       "source": "fnirs_flow/dependencies/__init__.py"
     },
     {
-      "bytes": 14504,
+      "bytes": 14556,
       "path": "fnirs_flow/dependencies/environment_manager.py",
-      "sha256": "9a4b3f97fd0b6cf040228b41e452250b22363d750ed7b67238c48c7d89bcfa36",
+      "sha256": "b460e91e66e13bd9a7af8f0cedc1995ede7a10d71a7b7af3ec88bf07413f5630",
       "source": "fnirs_flow/dependencies/environment_manager.py"
     },
     {
-      "bytes": 18281,
+      "bytes": 18409,
       "path": "fnirs_flow/dependencies/installer.py",
-      "sha256": "2404aee4baf1bc95f0ae79d865d1e4f4fc4be556180a6086700c05a029d956cf",
+      "sha256": "d5ea9c2a31c35cf22ede2cbb9e1815d65de03bdcbfb102c07bf15cccd607721b",
       "source": "fnirs_flow/dependencies/installer.py"
     },
     {
-      "bytes": 12525,
+      "bytes": 12522,
       "path": "fnirs_flow/dependencies/models.py",
-      "sha256": "aeefc42b4098dc73fa388051446af68cdba66fbca90e12b30af471ac5cd6a872",
+      "sha256": "05aa94c3c79658fb7733388b140ecfab59a0a1acac5c4936b9a30d2b6b875db9",
       "source": "fnirs_flow/dependencies/models.py"
     },
     {
@@ -518,9 +518,9 @@
       "source": "fnirs_flow/execution/provenance.py"
     },
     {
-      "bytes": 108346,
+      "bytes": 108378,
       "path": "fnirs_flow/execution/service.py",
-      "sha256": "cb5b9d0b4e31c1dd5853580aad10f899ce90f20b088ffc94a824475f138379ca",
+      "sha256": "544f9927fa36f4a7456109f19f8e090b87d1d7f14beb73c29109ec27764e467b",
       "source": "fnirs_flow/execution/service.py"
     },
     {
@@ -764,9 +764,9 @@
       "source": "fnirs_flow/registry/methodatom_lib/atom_evidence_links.csv"
     },
     {
-      "bytes": 90944,
+      "bytes": 90950,
       "path": "fnirs_flow/registry/methodatom_lib/method_atoms.csv",
-      "sha256": "7e77e634bcc8d4d999bee74126bbc10a7daa2669f8f8039c3165139d5531944a",
+      "sha256": "df360360d60f428337a846f7f2e7fbda79efe5ada2c58115319399fe6f35fd81",
       "source": "fnirs_flow/registry/methodatom_lib/method_atoms.csv"
     },
     {
@@ -788,9 +788,9 @@
       "source": "fnirs_flow/registry/node_library.py"
     },
     {
-      "bytes": 65408,
+      "bytes": 65420,
       "path": "fnirs_flow/registry/node_templates.py",
-      "sha256": "c382bdf0dd4afc7deae9b124b2a97bb63a4dccc7e333be7ed983acef90fecec7",
+      "sha256": "82076eadad1e1238cc01c639c5612942139a3d122dce5e48328a4ab85e8bca86",
       "source": "fnirs_flow/registry/node_templates.py"
     },
     {
@@ -932,9 +932,9 @@
       "source": "schemas/risk_item.schema.json"
     },
     {
-      "bytes": 10716,
+      "bytes": 10823,
       "path": "scripts/analyze_ds007738_qc_sensitivity.py",
-      "sha256": "055f594f7279492cefc380e60d738606755640e89b8c853a7442977741a67da6",
+      "sha256": "59ab2af9990dd57a092c4465980eb67d12abf4e9efa1a9e88ea610f8b6519fa8",
       "source": "scripts/analyze_ds007738_qc_sensitivity.py"
     },
     {
@@ -950,15 +950,15 @@
       "source": "scripts/benchmark_performance.py"
     },
     {
-      "bytes": 6584,
+      "bytes": 6674,
       "path": "scripts/build_ds007738_exclusion_manifests.py",
-      "sha256": "70341263869d2452846f22500b5f9def6a03c5c4ba9c4d91ac25b9d5f455d4ce",
+      "sha256": "5ff40fd239fff5393bbe33711d69d219bd3bf80be774bb40b53b566b6fb4abe0",
       "source": "scripts/build_ds007738_exclusion_manifests.py"
     },
     {
-      "bytes": 7473,
+      "bytes": 7613,
       "path": "scripts/compare_ds007738_golden_rerun.py",
-      "sha256": "4ff7fd812c91aeb64ca5fb99a80804d51c4a0229f413a7c3713fcba60a6b683d",
+      "sha256": "6eec26c06dc9d43b6233e2d36550be6887ec486180e76d12e363060e905adb51",
       "source": "scripts/compare_ds007738_golden_rerun.py"
     },
     {
@@ -1124,9 +1124,9 @@
       "source": "tests/test_demo_task_glm_real_config.py"
     },
     {
-      "bytes": 19662,
+      "bytes": 19741,
       "path": "tests/test_dependency_resolution.py",
-      "sha256": "5641573594ff7ccd40b885d05535e99c03210b5288c8382f37e116355ebf7df8",
+      "sha256": "bb82558ce1677908f6ad0d45a9f2b76001037f09263ca03a927cf0b763e9e53f",
       "source": "tests/test_dependency_resolution.py"
     },
     {
@@ -1703,5 +1703,5 @@
   ],
   "schema_version": 1,
   "source_root_name": "fnirs-flow",
-  "target_root_name": "fnirs-flow"
+  "target_root_name": "fnirs-flow-public"
 }

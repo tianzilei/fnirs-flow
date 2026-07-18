@@ -110,7 +110,7 @@ class DependencyInstaller:
     ) -> tuple[bool, list[str]]:
         """Validate an approval record against a plan.
 
-        §8.2: approve 校验计划指纹、来源策略和目标环境后，才创建安装任务
+        §8.2: approve validates the plan fingerprint, source policy, and target environment before creating an installation task
 
         Returns:
             (is_valid, list of error messages)
@@ -143,7 +143,7 @@ class DependencyInstaller:
     ) -> InstallationTask:
         """Create an installation task.
 
-        §8.4: 首个请求创建任务
+        §8.4: The first request creates the task
         """
         # Validate approval
         is_valid, errors = self.validate_approval(plan, approval)
@@ -338,7 +338,7 @@ class DependencyInstaller:
     def _sanitize_command(self, cmd: list[str]) -> list[str]:
         """Sanitize command for logging (remove credentials).
 
-        §8.3: 禁止把 token、私有索引凭证和完整环境变量写入日志
+        §8.3: Do not write tokens, private index credentials, or full environment variables to logs
         """
         sanitized = []
         skip_next = False
@@ -359,7 +359,7 @@ class DependencyInstaller:
     def _sanitize_output(self, output: str) -> str:
         """Sanitize output for logging (remove credentials).
 
-        §8.3: 安装日志保留必要诊断信息，并对路径、用户名和凭证进行脱敏
+        §8.3: Installation logs retain necessary diagnostics and redact paths, user names, and credentials
         """
         import re
         # Remove potential tokens in key=value format
@@ -375,7 +375,7 @@ class DependencyInstaller:
     def _freeze_requirements(self, env_path: Path) -> str:
         """Generate frozen requirements for environment.
 
-        §8.3: 安装完成后生成冻结依赖清单和环境指纹
+        §8.3: Generate frozen requirements and an environment fingerprint after installation
         """
         pip_cmd = [
             sys.executable, "-m", "pip", "freeze",
@@ -398,7 +398,7 @@ class DependencyInstaller:
     def subscribe(self, task_id: str, callback: Any) -> bool:
         """Subscribe to installation progress.
 
-        §8.4: 后续请求订阅进度
+        §8.4: Later requests subscribe to progress
         """
         if task_id not in self._tasks:
             return False
@@ -408,7 +408,7 @@ class DependencyInstaller:
     def cancel(self, task_id: str) -> bool:
         """Cancel an installation task.
 
-        §8.4: 单个订阅者取消不终止仍有订阅者的安装
+        §8.4: Canceling one subscriber does not stop an installation that still has subscribers
         """
         if task_id not in self._tasks:
             return False

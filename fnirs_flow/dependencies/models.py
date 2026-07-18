@@ -231,7 +231,7 @@ class DependencyPlan(BaseModel):
     def format_user_error(self) -> str:
         """Format user-facing error message per §12 of design document.
 
-        §12: 面向用户的错误必须指出"哪个 MethodAtom、缺什么、下一步是什么"
+        §12: User-facing errors must state which MethodAtom, what is missing, and the next step
 
         Example output:
             MethodAtom `atom-od-01` requires Cedalion capability `int2od`.

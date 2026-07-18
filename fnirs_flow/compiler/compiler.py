@@ -101,9 +101,10 @@ def _validate_cross_backend_edges(
 ) -> None:
     """Validate cross-backend adapter edges.
 
-    §7.2: 跨后端边必须经过显式 AdapterDefinition 或数据落盘边界，
-    禁止直接把 MNE 对象传给 Cedalion MethodAtom。
-    若不存在已验证的桥接适配器，编译阶段必须阻断。
+    §7.2: Cross-backend edges must pass through an explicit AdapterDefinition
+    or a persisted data boundary. Passing MNE objects directly into Cedalion
+    MethodAtoms is forbidden. If no validated bridge adapter exists, compilation
+    must stop.
 
     Raises ValueError if cross-backend edge found without explicit adapter.
     """
