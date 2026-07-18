@@ -323,6 +323,7 @@ export interface ProjectResults {
   kind: 'qc' | 'channel' | 'roi' | 'group';
   file_count: number;
   files: Array<{ path: string; data: unknown }>;
+  figures?: Array<{ path: string; svg: string }>;
 }
 
 export async function getProjectResults(
@@ -398,11 +399,67 @@ export interface AtomTemplate {
   description: string;
   input_ports: Array<{ name: string; schema: string; required: boolean }>;
   output_ports: Array<{ name: string; schema: string; required: boolean }>;
+  ports?: Array<{ name: string; direction: 'in' | 'out'; schema: string; required: boolean }>;
   evidence_refs: string[];
 }
 
 export async function listAtomTemplates(): Promise<AtomTemplate[]> {
   const { data } = await api.get('/atom-templates');
+  return data;
+}
+
+export interface EmptyMarkerSpec {
+  category: string;
+  input_schema: string;
+  output_schema: string;
+  label: string;
+  atom_id: string;
+  template_id: string;
+}
+
+export async function listEmptyMarkerSpecs(): Promise<EmptyMarkerSpec[]> {
+  const { data } = await api.get('/empty-marker-specs');
+  return data;
+}
+
+export interface FlowChecklistSummary {
+  scenario_id: string;
+  label: string;
+  description: string;
+  version: string;
+  step_count: number;
+}
+
+export interface FlowChecklistStep {
+  slot_id: string;
+  label: string;
+  required: boolean;
+  recommended_template_ids: string[];
+  recommended_atom_types: string[];
+  default_template_id: string;
+  alternative_template_ids: string[];
+  input_requirements: string[];
+  depends_on: string[];
+  allow_empty_marker: boolean;
+  category: string;
+  guidance: string;
+}
+
+export interface FlowChecklist {
+  scenario_id: string;
+  label: string;
+  description: string;
+  version: string;
+  steps: FlowChecklistStep[];
+}
+
+export async function listFlowChecklists(): Promise<FlowChecklistSummary[]> {
+  const { data } = await api.get('/flow-checklists');
+  return data;
+}
+
+export async function getFlowChecklist(scenarioId: string): Promise<FlowChecklist> {
+  const { data } = await api.get(`/flow-checklists/${scenarioId}`);
   return data;
 }
 
@@ -621,6 +678,10 @@ export interface AIGenerationMetadata {
     timeout_seconds?: number;
     api_key_present?: boolean;
     mode?: string;
+    endpoint?: string;
+    direct_import?: boolean;
+    provider_status?: string;
+    generation_source?: string;
   };
 }
 
@@ -645,7 +706,6 @@ export interface GenerateAIDraftRequest {
     mode: 'template' | 'openai-compatible';
     provider: string;
     base_url: string;
-    api_key_present?: boolean;
     model: string;
     organization?: string;
     project?: string;

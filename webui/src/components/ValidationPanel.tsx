@@ -4,9 +4,47 @@ import type { ValidationResult } from '../api/client';
 interface ValidationPanelProps {
   result: ValidationResult | null;
   onOpenAIDraft?: () => void;
+  onRiskSelect?: (risk: Record<string, unknown>) => void;
 }
 
-export function ValidationPanel({ result, onOpenAIDraft }: ValidationPanelProps) {
+function isChecklistRisk(risk: Record<string, unknown>) {
+  return String(risk.code || '').startsWith('CHECKLIST_') ||
+    String(risk.affected_object || '').startsWith('checklist:');
+}
+
+function RiskItem({
+  risk,
+  onRiskSelect,
+}: {
+  risk: Record<string, unknown>;
+  onRiskSelect?: (risk: Record<string, unknown>) => void;
+}) {
+  const clickable = isChecklistRisk(risk) && !!onRiskSelect;
+  const content = (
+    <>
+      <span className="risk-severity">[{String(risk.severity || '')}]</span>
+      <span className="risk-message">{String(risk.message || '')}</span>
+      {risk.code ? <span className="risk-code">{String(risk.code)}</span> : null}
+      {risk.suggested_action ? (
+        <span className="risk-action">Action: {String(risk.suggested_action)}</span>
+      ) : null}
+    </>
+  );
+  if (!clickable) {
+    return <div className={`risk ${String(risk.severity || '')}`}>{content}</div>;
+  }
+  return (
+    <button
+      className={`risk risk-button ${String(risk.severity || '')}`}
+      onClick={() => onRiskSelect?.(risk)}
+      type="button"
+    >
+      {content}
+    </button>
+  );
+}
+
+export function ValidationPanel({ result, onOpenAIDraft, onRiskSelect }: ValidationPanelProps) {
   if (!result) {
     return (
       <aside className="validation-panel">
@@ -49,11 +87,7 @@ export function ValidationPanel({ result, onOpenAIDraft }: ValidationPanelProps)
         <div className="section">
           <h4>Risks ({result.risks.length})</h4>
           {result.risks.map((r, i) => (
-            <div key={i} className={`risk ${String(r.severity || '')}`}>
-              <span className="risk-severity">[{String(r.severity || '')}]</span>
-              <span className="risk-message">{String(r.message || '')}</span>
-              {r.code ? <span className="risk-code">{String(r.code)}</span> : null}
-            </div>
+            <RiskItem key={i} risk={r} onRiskSelect={onRiskSelect} />
           ))}
         </div>
       )}
@@ -65,13 +99,7 @@ export function ValidationPanel({ result, onOpenAIDraft }: ValidationPanelProps)
           {result.risks
             .filter(r => String(r.domain || '') === 'backend')
             .map((r, i) => (
-              <div key={i} className={`risk ${String(r.severity || '')}`}>
-                <span className="risk-severity">[{String(r.severity || '')}]</span>
-                <span className="risk-message">{String(r.message || '')}</span>
-                {r.suggested_action ? (
-                  <span className="risk-action">Action: {String(r.suggested_action)}</span>
-                ) : null}
-              </div>
+              <RiskItem key={i} risk={r} onRiskSelect={onRiskSelect} />
             ))}
         </div>
       )}

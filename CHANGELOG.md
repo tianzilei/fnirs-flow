@@ -2,6 +2,43 @@
 
 ## [1.2.0] - 2026-07-15
 
+### Added — 2026-07-18 Release Convergence
+
+- Flow Checklist guidance panel for Task GLM, resting-state connectivity, group analysis, and ML classification workflows
+- Checklist-to-Atom Library recommendation flow with `Best fit`, `Recommended`, and `Alternative` ranking
+- Checklist `Next:` action banner, priority-step highlighting, recommendation reasons, focused atom navigation, and guided missing-atom preview
+- Order-risk and Empty-risk controls for reviewed order violations and no-op processing markers
+- Empty-risk reverse sync: disabling the risk removes generated empty atoms and clears checklist skip state
+- Canvas-level badges for checklist focus, missing required inputs, and empty/no-op atoms
+- Checklist JSON report export with step status, missing inputs, skip reasons, and link state
+- Group/second-level result exports for direct review in the Results Workspace:
+  - `group_glm_results.csv/json`
+  - `contrast_results.csv/json`
+  - `contrast_matrix.csv`
+  - `effect_sizes.csv/json`
+  - `multiple_comparison_results.csv/json`
+  - `contrast_effects.svg`
+- Results API support for group SVG figures, rendered directly in the WebUI Group tab
+- Frontend unit tests for checklist atom orchestration helpers
+
+### Changed — 2026-07-18 Release Convergence
+
+- Atom Library now auto-focuses the Checklist tab after selecting a checklist step, reducing atom selection noise.
+- Group contrast atom parameters are merged into group configuration during group-scope execution.
+- Manual drag outside the active checklist step is warned but not blocked.
+- WebUI remains English-only; no Chinese UI strings are introduced.
+
+### Verified — 2026-07-18 Release Convergence
+
+- `ruff check cli.py fnirs_flow tests scripts/evaluate_validation_gold.py`: passed
+- `pytest -q`: 1126 passed, 1 skipped
+- `npm run test:unit`: 9 passed
+- `npm run build -- --mode development`: passed with the existing Vite chunk-size warning
+- `npx playwright test e2e/workflows.spec.ts`: 6 passed
+- WebUI Chinese-character scan: no UI strings found in `webui/src`, `webui/e2e`, or `webui/tests`
+- CLI smoke: `python cli.py --help` and `python -m fnirs_flow.cli --help` passed
+- Real WebUI smoke: Checklist `Next:` CTA, recommendation reason, priority step, Group UI routing, no Chinese UI text, and no horizontal overflow
+
 ### Added — FlowVCS (Design History)
 
 FlowVCS is a content-addressed version control system for `.fnirsflow` project files.

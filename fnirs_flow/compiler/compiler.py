@@ -22,6 +22,7 @@ from fnirs_flow.compiler.manifests import (
 )
 from fnirs_flow.dependencies.resolver import resolve_dependencies
 from fnirs_flow.filesystem import remove_macos_metadata_paths
+from fnirs_flow.flow.empty_markers import normalize_empty_markers
 from fnirs_flow.flow.models import FlowGraph
 from fnirs_flow.validation.api import validate_flow
 
@@ -167,6 +168,8 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
     outdir = Path(outdir)
     compiled_dir = outdir / "compiled"
     compiled_dir.mkdir(parents=True, exist_ok=True)
+
+    flow_dict = normalize_empty_markers(flow_dict)
 
     # Parse flow
     flow = FlowGraph.model_validate(flow_dict)

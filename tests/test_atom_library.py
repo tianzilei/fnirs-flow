@@ -110,6 +110,32 @@ class TestLiteratureDerivedMethodAtoms:
         ]
         assert template.default_config["execution_readiness"] == "needs_attention"
 
+    def test_localization_projection_import_atom_is_executable(self):
+        library = create_builtin_library()
+        template = library.get("localization_projection_import")
+        assert template is not None
+        assert template.operation == "localization_projection_import"
+        assert template.default_config["execution_scope"] == "group"
+        assert template.default_config["readiness_status"] == "ready"
+        assert template.output_ports[0].port_schema == "ProjectedMNIChannels"
+        atom = library.create_atom("localization_projection_import", atom_id="loc")
+        assert atom is not None
+        assert atom.execution_scope == "group"
+        assert atom.readiness_status == ReadinessStatus.READY
+
+    def test_nirs_spm_surface_projection_atom_is_executable(self):
+        library = create_builtin_library()
+        template = library.get("nirs_spm_surface_projection")
+        assert template is not None
+        assert template.operation == "nirs_spm_surface_projection"
+        assert template.default_config["execution_scope"] == "group"
+        assert template.default_config["readiness_status"] == "needs_attention"
+        assert template.output_ports[0].port_schema == "ProjectedMNIChannels"
+        atom = library.create_atom("nirs_spm_surface_projection", atom_id="nirsspm-projection")
+        assert atom is not None
+        assert atom.execution_scope == "group"
+        assert atom.readiness_status == ReadinessStatus.NEEDS_ATTENTION
+
     def test_runtime_fingerprint_reports_library_inputs(self):
         fingerprint = method_atom_library_fingerprint()
         assert fingerprint["method_atoms_rows"] > 0

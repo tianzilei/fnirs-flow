@@ -113,6 +113,14 @@ def create_default_registry() -> OperationRegistry:
             )
         )
 
+    registry.register(
+        OperationSpec(
+            operation_id="empty_marker",
+            category="control",
+            description="Mark a reviewed empty/no-op processing stage without transforming data",
+        )
+    )
+
     # Participant metadata and group-scope helper operations
     for op_id, desc in [
         ("participant_table_input", "Read participant CSV/TSV metadata"),
@@ -123,6 +131,12 @@ def create_default_registry() -> OperationRegistry:
         ("participant_covariate_projection", "Project participant metadata to covariate matrices"),
         ("participant_dpf_projection", "Project participant age metadata to DPF inputs"),
         ("participant_outcome_projection", "Project participant metadata to behavioral or clinical outcomes"),
+        ("localization_projection_import", "Import prepared localization projection CSV coordinates"),
+        (
+            "nirs_spm_surface_projection",
+            "Project MNI head-surface coordinates to cortical MNI coordinates "
+            "using a Python rewrite of NIRS-SPM projection_CS",
+        ),
         ("combat_preflight", "Validate ComBat site and covariate metadata preconditions"),
         ("observation_pairing_projection", "Project observation metadata to pairing and dyad structures"),
         ("group_design_matrix", "Compile an SPM-style group design matrix"),

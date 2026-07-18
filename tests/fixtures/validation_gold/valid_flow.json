@@ -1,89 +1,35 @@
 {
   "schema_version": "0.2.0",
   "flow_id": "valid-flow-001",
-  "name": "Valid Task GLM Flow",
-  "description": "A valid task GLM analysis flow for testing",
+  "name": "Valid Minimal Flow",
+  "description": "A minimal valid data-to-preprocessing flow for validation-gold testing.",
   "nodes": [
     {
-      "id": "node-discover",
+      "id": "node-data",
       "type": "dataset_discovery",
       "category": "data",
       "position": {"x": 0, "y": 0},
       "config": {"dataset_id": "test-dataset"},
       "status": "ready",
-      "ports": [{"name": "output", "direction": "out", "schema": "DataManifest", "required": true}]
-    },
-    {
-      "id": "node-read",
-      "type": "snirf_reader",
-      "category": "data",
-      "position": {"x": 200, "y": 0},
-      "config": {},
-      "status": "ready",
       "ports": [
-        {"name": "file_path", "direction": "in", "schema": "FilePath", "required": true},
-        {"name": "raw_data", "direction": "out", "schema": "RawData", "required": true}
+        {"name": "out", "direction": "out", "schema": "DataManifest", "required": true}
       ]
     },
     {
-      "id": "node-od",
-      "type": "optical_density",
+      "id": "node-prep",
+      "type": "quality_control",
       "category": "preprocessing",
-      "position": {"x": 400, "y": 0},
-      "config": {},
+      "position": {"x": 200, "y": 0},
+      "config": {"sci_threshold": 0.8},
       "status": "ready",
       "ports": [
-        {"name": "raw_data", "direction": "in", "schema": "RawData", "required": true},
-        {"name": "od_data", "direction": "out", "schema": "OpticalDensityData", "required": true}
-      ],
-      "evidence_refs": ["evidence-mne-od"]
-    },
-    {
-      "id": "node-filter",
-      "type": "bandpass_filter",
-      "category": "preprocessing",
-      "position": {"x": 600, "y": 0},
-      "config": {"l_freq": 0.01, "h_freq": 0.2},
-      "status": "ready",
-      "ports": [
-        {"name": "input", "direction": "in", "schema": "OpticalDensityData", "required": true},
-        {"name": "output", "direction": "out", "schema": "OpticalDensityData", "required": true}
-      ],
-      "evidence_refs": ["prep-bandpass-97"]
-    },
-    {
-      "id": "node-bl",
-      "type": "beer_lambert_law",
-      "category": "preprocessing",
-      "position": {"x": 800, "y": 0},
-      "config": {"ppf": 6.0},
-      "status": "ready",
-      "ports": [
-        {"name": "od_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
-        {"name": "hb_data", "direction": "out", "schema": "HaemoglobinData", "required": true}
-      ],
-      "evidence_refs": ["evidence-mne-mbll"]
-    },
-    {
-      "id": "node-glm",
-      "type": "first_level_glm",
-      "category": "analysis",
-      "position": {"x": 1000, "y": 0},
-      "config": {"hrf_model": "glover"},
-      "status": "ready",
-      "ports": [
-        {"name": "hb_data", "direction": "in", "schema": "HaemoglobinData", "required": true},
-        {"name": "glm_result", "direction": "out", "schema": "GLMResult", "required": true}
-      ],
-      "evidence_refs": ["ana-glm-1"]
+        {"name": "in", "direction": "in", "schema": "DataManifest", "required": true},
+        {"name": "out", "direction": "out", "schema": "QCData", "required": true}
+      ]
     }
   ],
   "edges": [
-    {"id": "edge-1", "source": "node-discover", "target": "node-read", "source_handle": "output", "target_handle": "file_path"},
-    {"id": "edge-2", "source": "node-read", "target": "node-od", "source_handle": "raw_data", "target_handle": "raw_data"},
-    {"id": "edge-3", "source": "node-od", "target": "node-filter", "source_handle": "od_data", "target_handle": "input"},
-    {"id": "edge-4", "source": "node-filter", "target": "node-bl", "source_handle": "output", "target_handle": "od_data"},
-    {"id": "edge-5", "source": "node-bl", "target": "node-glm", "source_handle": "hb_data", "target_handle": "hb_data"}
+    {"id": "edge-valid", "source": "node-data", "target": "node-prep", "source_handle": "out", "target_handle": "in"}
   ],
   "adapter_registry": [],
   "metadata": {

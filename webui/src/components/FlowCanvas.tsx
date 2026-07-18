@@ -18,6 +18,7 @@ import ReactFlow, {
 } from 'reactflow';
 import {
   Activity,
+  AlertTriangle,
   Braces,
   Cable,
   CircleDot,
@@ -30,13 +31,32 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import 'reactflow/dist/style.css';
-import type { AtomTemplate } from '../api/client';
+import { listEmptyMarkerSpecs, type AtomTemplate, type EmptyMarkerSpec } from '../api/client';
+import {
+  addMissingEmptyMarkerAtoms,
+  addTemplateAtomToFlow,
+  atomCollectionKey,
+  asRecords,
+  clearChecklistChoiceForAtom,
+  connectionProblem,
+  findPort,
+  flowAtoms as getFlowAtoms,
+  getAtomInputStatuses,
+  getAtomPorts,
+  getOrderPolicy,
+  previewEmptyRiskRemoval,
+  removeUnconnectedAutoEmptyMarkerAtoms,
+  withChecklistChoice,
+  withOrderPolicy,
+} from '../flow/atomFactory';
 import { ParameterPanel } from './ParameterPanel';
 
 interface FlowCanvasProps {
   flow: Record<string, unknown>;
   onChange: (flow: Record<string, unknown>) => void;
   readOnly?: boolean;
+  focusedAtomId?: string | null;
+  activeChecklistStep?: { scenarioId: string; slotId: string; label?: string; templateIds: string[] } | null;
   onInspectingChange?: (inspecting: boolean) => void;
 }
 
@@ -71,15 +91,23 @@ interface NodeDetail {
   ports: Array<{ name: string; direction: string; schema: string }>;
 }
 
-function asRecords(value: unknown): Array<Record<string, unknown>> {
-  return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
-}
-
 function portCount(atom: Record<string, unknown>, key: string, fallback: string) {
-  return asRecords(atom[key]).length || asRecords(atom[fallback]).length;
+  return asRecords(atom[key]).length || asRecords(atom[fallback]).length || getAtomPorts(atom).filter((port) =>
+    key === 'input_ports' ? port.direction === 'in' : port.direction === 'out'
+  ).length;
 }
 
-function NodeLabel({ atom }: { atom: Record<string, unknown> }) {
+function NodeLabel({
+  atom,
+  missingInputs,
+  emptyAtom,
+  focused,
+}: {
+  atom: Record<string, unknown>;
+  missingInputs: boolean;
+  emptyAtom: boolean;
+  focused: boolean;
+}) {
   const category = String(atom.category || 'node');
   const atomType = String(atom.atom_type || atom.type || atom.id || 'Atom');
   const operation = String(atom.operation || atomType);
@@ -99,24 +127,39 @@ function NodeLabel({ atom }: { atom: Record<string, unknown> }) {
         <span>{portCount(atom, 'input_ports', 'inputs')} in</span>
         <span>{portCount(atom, 'output_ports', 'outputs')} out</span>
       </div>
+      {(missingInputs || emptyAtom || focused) && (
+        <div className="flow-node-badges">
+          {focused && <span>Checklist</span>}
+          {missingInputs && <span>Missing input</span>}
+          {emptyAtom && <span>Empty</span>}
+        </div>
+      )}
     </div>
   );
 }
 
-function toNodes(flow: Record<string, unknown>): Node[] {
+function toNodes(flow: Record<string, unknown>, focusedAtomId?: string | null): Node[] {
   const flowAtoms = asRecords(flow.flow_atoms).length > 0 ? asRecords(flow.flow_atoms) : asRecords(flow.nodes);
   return flowAtoms.map((atom) => ({
-    id: String(atom.id),
-    position: (atom.position as { x: number; y: number }) ?? { x: 0, y: 0 },
-    data: { label: <NodeLabel atom={atom} /> },
-    style: {
-      background: 'transparent',
-      border: 'none',
-      boxShadow: 'none',
-      padding: 0,
-      cursor: 'pointer',
-    },
-    className: `flow-node flow-node-${String(atom.category || 'default')}`,
+    ...(() => {
+      const metadata = (atom.metadata as Record<string, unknown>) || {};
+      const emptyAtom = atom.operation === 'empty_marker' || atom.atom_type === 'empty_marker' || metadata.empty_atom === true;
+      const missingInputs = getAtomInputStatuses(flow, atom).some((input) => input.required && !input.connected);
+      const focused = String(atom.id) === String(focusedAtomId || '');
+      return {
+        id: String(atom.id),
+        position: (atom.position as { x: number; y: number }) ?? { x: 0, y: 0 },
+        data: { label: <NodeLabel atom={atom} missingInputs={missingInputs} emptyAtom={emptyAtom} focused={focused} /> },
+        style: {
+          background: 'transparent',
+          border: 'none',
+          boxShadow: 'none',
+          padding: 0,
+          cursor: 'pointer',
+        },
+        className: `flow-node flow-node-${String(atom.category || 'default')} ${missingInputs ? 'flow-node-missing-inputs' : ''} ${emptyAtom ? 'flow-node-empty' : ''} ${focused ? 'flow-node-focused' : ''}`,
+      };
+    })(),
   }));
 }
 
@@ -141,13 +184,19 @@ function syncFlow(flow: Record<string, unknown>, nodes: Node[], edges: Edge[]): 
     id: String(node.id),
     position: node.position,
   }));
-  const nextEdges = edges.map((edge, index) => ({
-    id: String(edge.id || `edge-${index + 1}`),
-    source: String(edge.source),
-    target: String(edge.target),
-    source_handle: String(edge.sourceHandle || 'output'),
-    target_handle: String(edge.targetHandle || 'input'),
-  }));
+  const nextEdges = edges.map((edge, index) => {
+    const source = String(edge.source);
+    const target = String(edge.target);
+    const sourcePort = findPort(atomById.get(source), edge.sourceHandle, 'out');
+    const targetPort = findPort(atomById.get(target), edge.targetHandle, 'in');
+    return {
+      id: String(edge.id || `edge-${index + 1}`),
+      source,
+      target,
+      source_handle: String(edge.sourceHandle || sourcePort?.name || 'output'),
+      target_handle: String(edge.targetHandle || targetPort?.name || 'input'),
+    };
+  });
   const nextFlow = {
     ...flow,
     [atomKey]: nextAtoms,
@@ -168,22 +217,11 @@ function shouldSyncEdgeChanges(changes: EdgeChange[]): boolean {
 }
 
 function normalizePorts(atom: Record<string, unknown>): NodeDetail['ports'] {
-  const inputPorts = asRecords(atom.input_ports).map((port) => ({
-    name: String(port.name || 'input'),
-    direction: 'in',
-    schema: String(port.schema || port.type || 'unknown'),
+  return getAtomPorts(atom).map((port) => ({
+    name: port.name,
+    direction: port.direction,
+    schema: port.schema,
   }));
-  const outputPorts = asRecords(atom.output_ports).map((port) => ({
-    name: String(port.name || 'output'),
-    direction: 'out',
-    schema: String(port.schema || port.type || 'unknown'),
-  }));
-  const legacyPorts = asRecords(atom.ports).map((port) => ({
-    name: String(port.name || 'port'),
-    direction: String(port.direction || 'in'),
-    schema: String(port.schema || 'unknown'),
-  }));
-  return [...inputPorts, ...outputPorts, ...legacyPorts];
 }
 
 function atomToDetail(atom: Record<string, unknown>): NodeDetail {
@@ -199,11 +237,22 @@ function atomToDetail(atom: Record<string, unknown>): NodeDetail {
   };
 }
 
-export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChange }: FlowCanvasProps) {
+export function FlowCanvas({
+  flow,
+  onChange,
+  readOnly = false,
+  focusedAtomId,
+  activeChecklistStep,
+  onInspectingChange,
+}: FlowCanvasProps) {
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<NodeDetail | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [connectionError, setConnectionError] = useState('');
+  const [canvasNotice, setCanvasNotice] = useState('');
+  const [emptyMarkerSpecs, setEmptyMarkerSpecs] = useState<EmptyMarkerSpec[]>([]);
+  const [emptyRemovalPreview, setEmptyRemovalPreview] = useState<ReturnType<typeof previewEmptyRiskRemoval> | null>(null);
   const [searchParams] = useSearchParams();
   const nodesRef = useRef<Node[]>([]);
   const edgesRef = useRef<Edge[]>([]);
@@ -211,13 +260,19 @@ export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChang
   const edgeCount = edges.length;
 
   useEffect(() => {
-    const nextNodes = toNodes(flow);
+    const nextNodes = toNodes(flow, focusedAtomId);
     const nextEdges = toEdges(flow);
     nodesRef.current = nextNodes;
     edgesRef.current = nextEdges;
     setNodes(nextNodes);
     setEdges(nextEdges);
-  }, [flow, setNodes, setEdges]);
+  }, [flow, focusedAtomId, setNodes, setEdges]);
+
+  useEffect(() => {
+    listEmptyMarkerSpecs()
+      .then(setEmptyMarkerSpecs)
+      .catch(() => setEmptyMarkerSpecs([]));
+  }, []);
 
   useEffect(() => {
     nodesRef.current = nodes;
@@ -228,9 +283,10 @@ export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChang
   }, [edges]);
 
   const flowAtoms = useMemo(
-    () => (asRecords(flow.flow_atoms).length > 0 ? asRecords(flow.flow_atoms) : asRecords(flow.nodes)),
+    () => getFlowAtoms(flow),
     [flow]
   );
+  const orderPolicy = useMemo(() => getOrderPolicy(flow), [flow]);
 
   useEffect(() => {
     const nodeId = searchParams.get('node');
@@ -242,16 +298,86 @@ export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChang
     }
   }, [flowAtoms, onInspectingChange, searchParams]);
 
+  useEffect(() => {
+    if (!focusedAtomId) return;
+    const atom = flowAtoms.find((item) => String(item.id) === focusedAtomId);
+    if (!atom) return;
+    setSelectedNode(atomToDetail(atom));
+    onInspectingChange?.(true);
+    const position = (atom.position as { x: number; y: number }) || undefined;
+    if (position && reactFlowInstance) {
+      reactFlowInstance.setCenter(position.x + 90, position.y + 40, { zoom: 1, duration: 300 });
+    }
+  }, [flowAtoms, focusedAtomId, onInspectingChange, reactFlowInstance]);
+
   const onConnect = useCallback(
     (params: Connection) => {
       if (readOnly) return;
-      const nextEdges = addEdge({ ...params, animated: true, className: 'flow-edge' }, edgesRef.current);
+      const problem = connectionProblem(params, flowAtoms, edgesRef.current, orderPolicy);
+      if (problem) {
+        setConnectionError(problem);
+        return;
+      }
+      const source = params.source;
+      const target = params.target;
+      if (!source || !target) return;
+      const sourceAtom = flowAtoms.find((atom) => String(atom.id) === source);
+      const targetAtom = flowAtoms.find((atom) => String(atom.id) === target);
+      const sourcePort = findPort(sourceAtom, params.sourceHandle, 'out');
+      const targetPort = findPort(targetAtom, params.targetHandle, 'in');
+      const edgeId = `edge-${source}-${target}-${edgesRef.current.length + 1}`;
+      const nextEdges = addEdge(
+        {
+          ...params,
+          id: edgeId,
+          source,
+          target,
+          sourceHandle: params.sourceHandle || sourcePort?.name,
+          targetHandle: params.targetHandle || targetPort?.name,
+          animated: true,
+          className: 'flow-edge',
+        },
+        edgesRef.current
+      );
       edgesRef.current = nextEdges;
       setEdges(nextEdges);
+      setConnectionError('');
       onChange(syncFlow(flow, nodesRef.current, nextEdges));
     },
-    [flow, onChange, readOnly, setEdges]
+    [flow, flowAtoms, onChange, orderPolicy, readOnly, setEdges]
   );
+
+  const isValidConnection = useCallback(
+    (connection: Connection) =>
+      readOnly ? false : connectionProblem(connection, flowAtoms, edgesRef.current, orderPolicy) === null,
+    [flowAtoms, orderPolicy, readOnly]
+  );
+
+  const toggleOrderRisk = useCallback(() => {
+    if (readOnly) return;
+    onChange(withOrderPolicy(flow, { allow_order_violations: !orderPolicy.allow_order_violations }));
+  }, [flow, onChange, orderPolicy.allow_order_violations, readOnly]);
+
+  const toggleEmptyRisk = useCallback(() => {
+    if (readOnly) return;
+    if (orderPolicy.allow_empty_edges) {
+      const preview = previewEmptyRiskRemoval(flow);
+      setEmptyRemovalPreview(preview);
+      return;
+    }
+    const nextFlow = withOrderPolicy(flow, { allow_empty_edges: !orderPolicy.allow_empty_edges });
+    onChange(
+      !orderPolicy.allow_empty_edges
+        ? addMissingEmptyMarkerAtoms(nextFlow, emptyMarkerSpecs)
+        : removeUnconnectedAutoEmptyMarkerAtoms(nextFlow)
+    );
+  }, [emptyMarkerSpecs, flow, onChange, orderPolicy.allow_empty_edges, readOnly]);
+
+  const applyEmptyRemoval = useCallback(() => {
+    if (!emptyRemovalPreview) return;
+    onChange(emptyRemovalPreview.flow);
+    setEmptyRemovalPreview(null);
+  }, [emptyRemovalPreview, onChange]);
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -297,6 +423,7 @@ export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChang
 
   const deleteSelectedNode = useCallback(() => {
     if (readOnly || !selectedNode) return;
+    const removedAtom = flowAtoms.find((atom) => String(atom.id) === selectedNode.id);
     const nextNodes = nodesRef.current.filter((node) => node.id !== selectedNode.id);
     const nextEdges = edgesRef.current.filter(
       (edge) => edge.source !== selectedNode.id && edge.target !== selectedNode.id
@@ -307,8 +434,9 @@ export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChang
     setEdges(nextEdges);
     setSelectedNode(null);
     onInspectingChange?.(false);
-    onChange(syncFlow(flow, nextNodes, nextEdges));
-  }, [flow, onChange, onInspectingChange, readOnly, selectedNode, setEdges, setNodes]);
+    const syncedFlow = syncFlow(flow, nextNodes, nextEdges);
+    onChange(removedAtom ? clearChecklistChoiceForAtom(syncedFlow, removedAtom) : syncedFlow);
+  }, [flow, flowAtoms, onChange, onInspectingChange, readOnly, selectedNode, setEdges, setNodes]);
 
   useEffect(() => {
     if (readOnly || !selectedNode) return undefined;
@@ -347,41 +475,36 @@ export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChang
         x: event.clientX,
         y: event.clientY,
       });
-      const baseId = template.operation || template.atom_type || template.id;
-      const existingIds = new Set(nodes.map((node) => node.id));
-      let index = nodes.length + 1;
-      let id = `${baseId}_${index}`;
-      while (existingIds.has(id)) {
-        index += 1;
-        id = `${baseId}_${index}`;
+      const added = addTemplateAtomToFlow(flow, template, position);
+      let nextFlow = added.flow;
+      const matchesActiveStep = activeChecklistStep?.templateIds.includes(template.id) ||
+        activeChecklistStep?.templateIds.includes(template.operation);
+      if (activeChecklistStep && !matchesActiveStep) {
+        setCanvasNotice(`This atom is outside the selected checklist step: ${activeChecklistStep.label || activeChecklistStep.slotId}.`);
+      } else {
+        setCanvasNotice('');
       }
-
-      const atom = {
-        id,
-        atom_id: id,
-        atom_type: template.atom_type,
-        type: template.atom_type,
-        template_id: template.id,
-        category: template.category,
-        operation: template.operation,
-        description: template.description,
-        input_ports: template.input_ports,
-        output_ports: template.output_ports,
-        evidence_refs: template.evidence_refs,
-        parameters: {},
-        config: {},
-        position,
-      };
-      const atomKey = Array.isArray(flow.flow_atoms) ? 'flow_atoms' : 'nodes';
-      const nextAtoms = [...asRecords(flow[atomKey]), atom];
-      const nextFlow = {
-        ...flow,
-        [atomKey]: nextAtoms,
-        ...(atomKey === 'flow_atoms' && Array.isArray(flow.nodes) ? { nodes: nextAtoms } : {}),
-      };
+      if (activeChecklistStep && matchesActiveStep) {
+        const atomKey = atomCollectionKey(nextFlow);
+        const nextAtoms = asRecords(nextFlow[atomKey]).map((atom) => {
+          if (String(atom.id) !== String(added.atom.id)) return atom;
+          const metadata = (atom.metadata as Record<string, unknown>) || {};
+          return { ...atom, metadata: { ...metadata, checklist_slot_id: activeChecklistStep.slotId } };
+        });
+        nextFlow = {
+          ...nextFlow,
+          [atomKey]: nextAtoms,
+          ...(atomKey === 'flow_atoms' && Array.isArray(nextFlow.nodes) ? { nodes: nextAtoms } : {}),
+        };
+        nextFlow = withChecklistChoice(nextFlow, activeChecklistStep.scenarioId, activeChecklistStep.slotId, {
+          template_id: template.id,
+          atom_id: String(added.atom.id),
+          skipped: false,
+        });
+      }
       onChange(nextFlow);
     },
-    [flow, nodes, onChange, reactFlowInstance, readOnly]
+    [activeChecklistStep, flow, onChange, reactFlowInstance, readOnly]
   );
 
   return (
@@ -393,6 +516,7 @@ export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChang
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
+          isValidConnection={isValidConnection}
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
           onInit={setReactFlowInstance}
@@ -412,6 +536,53 @@ export function FlowCanvas({ flow, onChange, readOnly = false, onInspectingChang
           <Cable size={14} />
           <span>{edgeCount} links</span>
         </div>
+        <div className="canvas-risk-controls">
+          <button
+            className={orderPolicy.allow_order_violations ? 'active' : ''}
+            onClick={toggleOrderRisk}
+            disabled={readOnly}
+            title="Allow order violations as reviewed risks"
+            type="button"
+          >
+            <AlertTriangle size={14} />
+            <span>Order risk</span>
+          </button>
+          <button
+            className={orderPolicy.allow_empty_edges ? 'active' : ''}
+            onClick={toggleEmptyRisk}
+            disabled={readOnly || (!orderPolicy.allow_empty_edges && emptyMarkerSpecs.length === 0)}
+            title="Allow empty links as reviewed risks"
+            type="button"
+          >
+            <CircleDot size={14} />
+            <span>Empty risk</span>
+          </button>
+        </div>
+        {connectionError && (
+          <div className="canvas-connection-error">
+            <AlertTriangle size={14} />
+            <span>{connectionError}</span>
+          </div>
+        )}
+        {canvasNotice && (
+          <div className="canvas-checklist-notice">
+            <AlertTriangle size={14} />
+            <span>{canvasNotice}</span>
+          </div>
+        )}
+        {emptyRemovalPreview && (
+          <div className="canvas-empty-removal-preview" role="dialog" aria-label="Disable Empty risk">
+            <strong>Disable Empty risk?</strong>
+            <span>
+              Remove {emptyRemovalPreview.removed_atoms.length} empty atom{emptyRemovalPreview.removed_atoms.length === 1 ? '' : 's'}
+              {emptyRemovalPreview.cleared_slots.length > 0 ? ` and clear ${emptyRemovalPreview.cleared_slots.length} skip marker${emptyRemovalPreview.cleared_slots.length === 1 ? '' : 's'}` : ''}.
+            </span>
+            <div>
+              <button className="icon-text-button" onClick={applyEmptyRemoval} type="button">Apply</button>
+              <button className="icon-text-button subtle" onClick={() => setEmptyRemovalPreview(null)} type="button">Cancel</button>
+            </div>
+          </div>
+        )}
         {nodeCount === 0 && (
           <div className="canvas-empty-hint">
             <CircleDot size={18} />

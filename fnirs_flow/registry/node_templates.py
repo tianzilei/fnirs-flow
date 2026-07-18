@@ -70,6 +70,75 @@ RUN_READER = MethodAtomTemplate(
     tags=["data", "bids", "snirf", "run"],
 )
 
+LOCALIZATION_PROJECTION_IMPORT = MethodAtomTemplate(
+    template_id="localization_projection_import",
+    name="Localization Projection Import",
+    category=MethodAtomCategory.DATA,
+    atom_type="localization_projection_import",
+    operation="localization_projection_import",
+    description="Import a prepared localization/projection CSV as standardized MNI channel coordinates",
+    default_config={
+        "path": (
+            "Sample/privatedata/定位/usable_projection_csv/"
+            "Protocol02_QYZ_optimized_10-20MNI_projection_coordinates.csv"
+        ),
+        "coordinate_set_id": "Protocol02_QYZ_optimized_10-20MNI",
+        "execution_scope": "group",
+        "readiness_status": "ready",
+        "accuracy_caveat": "not_claimed_to_reproduce_nirsspm_accuracy",
+        "method_note": "Imports prepared projection coordinates; does not implement NIRS-SPM/NFRI projection.",
+    },
+    ports=[
+        AtomPort(name="projection_csv", direction="in", schema="ProjectionCoordinateCSV"),
+        AtomPort(name="projected_mni_channels", direction="out", schema="ProjectedMNIChannels"),
+        AtomPort(name="projection_import_manifest", direction="out", schema="ProjectionImportManifest"),
+    ],
+    tags=["data", "localization", "projection", "mni", "group"],
+)
+
+NIRS_SPM_SURFACE_PROJECTION = MethodAtomTemplate(
+    template_id="nirs_spm_surface_projection",
+    name="NIRS-SPM Surface Projection",
+    category=MethodAtomCategory.DATA,
+    atom_type="nirs_spm_surface_projection",
+    operation="nirs_spm_surface_projection",
+    description=(
+        "Rewrite NIRS-SPM v4 r1 projection_CS: project MNI head-surface coordinates "
+        "to cortical MNI coordinates using bundled NIRS-SPM surface references"
+    ),
+    default_config={
+        "path": (
+            "Sample/privatedata/定位/usable_projection_csv/"
+            "G1_shouzhen_ch01_ch42_projection_coordinates.csv"
+        ),
+        "reference_dir": "References/NIRS_SPM_v4_r1",
+        "coordinate_set_id": "G1_shouzhen_ch01_ch42",
+        "head_coordinate_columns": {
+            "x": "projected_head_x",
+            "y": "projected_head_y",
+            "z": "projected_head_z",
+        },
+        "reference_coordinate_columns": {
+            "x": "projected_mni_x",
+            "y": "projected_mni_y",
+            "z": "projected_mni_z",
+        },
+        "execution_scope": "group",
+        "readiness_status": "needs_attention",
+        "method_note": (
+            "Implements projection_CS only. Full NIRS-SPM equivalence also depends on the "
+            "preceding registration and head-surface MNI coordinate generation."
+        ),
+    },
+    ports=[
+        AtomPort(name="head_surface_mni_csv", direction="in", schema="ProjectionCoordinateCSV"),
+        AtomPort(name="nirsspm_projected_mni", direction="out", schema="ProjectedMNIChannels"),
+        AtomPort(name="projection_validation", direction="out", schema="ProjectionValidationReport"),
+    ],
+    reference="NIRS-SPM v4 r1: projection_CS.m",
+    tags=["data", "localization", "projection", "mni", "nirsspm", "group", "experimental"],
+)
+
 NIRX_READER = MethodAtomTemplate(
     template_id="nirx_reader",
     name="NIRx Reader",
@@ -1409,6 +1478,8 @@ ALL_NODE_TEMPLATES: list[MethodAtomTemplate] = [
     ISS_READER,
     TECHEN_READER,
     KERNEL_READER,
+    LOCALIZATION_PROJECTION_IMPORT,
+    NIRS_SPM_SURFACE_PROJECTION,
     # Design
     STUDY_DESIGN,
     EVENT_EXTRACTION,

@@ -309,11 +309,13 @@ test('AI draft review isolates, validates, confirms, and discards candidates', a
   await expect(page.getByRole('heading', { name: 'AI Draft Review' })).toBeVisible();
   await page.getByRole('button', { name: 'Generate draft' }).click();
   await expect(page.getByText('Draft generated in isolation. The current flow is unchanged.')).toBeVisible();
-  await expect(page.getByText('Diff from current flow')).toBeVisible();
+  await expect(page.getByText('Candidate summary')).toBeVisible();
   expect(flowState.value.flow_id).toBe('flow-1');
 
   await page.getByRole('button', { name: 'Validate draft' }).click();
   await expect(page.getByText('AI_CONFIRMATION_REQUIRED')).toBeVisible();
+  await page.getByRole('button', { name: /^3 Review$/ }).click();
+  await expect(page.getByText('Diff from current flow')).toBeVisible();
   const confirmations = page.locator('.confirmation-item input[type="checkbox"]');
   await expect(confirmations).toHaveCount(2);
   await confirmations.nth(0).check();
@@ -333,4 +335,274 @@ test('AI draft review isolates, validates, confirms, and discards candidates', a
   await expect(page.getByText('Pending AI draft discarded. The current flow was not changed.')).toBeVisible();
   expect(pendingDraft).toBeNull();
   expect(flowState.value.flow_id).toBe(draftFlow.flow_id);
+});
+
+test('flow checklist recommends, builds, skips, persists, and links validation risks', async ({ page }) => {
+  const taskGlmChecklist = {
+    scenario_id: 'task_glm',
+    label: 'Task GLM',
+    description: 'Guided task GLM flow.',
+    version: 'e2e',
+    steps: [
+      {
+        slot_id: 'data_input',
+        label: 'Data input',
+        required: true,
+        recommended_template_ids: ['dataset_discovery'],
+        recommended_atom_types: ['dataset_discovery'],
+        default_template_id: 'dataset_discovery',
+        alternative_template_ids: [],
+        input_requirements: [],
+        depends_on: [],
+        allow_empty_marker: false,
+        category: 'data',
+        guidance: 'Discover files.',
+      },
+      {
+        slot_id: 'read_run',
+        label: 'Read run',
+        required: true,
+        recommended_template_ids: ['read_run'],
+        recommended_atom_types: ['read_run'],
+        default_template_id: 'read_run',
+        alternative_template_ids: [],
+        input_requirements: ['DataManifest'],
+        depends_on: ['data_input'],
+        allow_empty_marker: false,
+        category: 'data',
+        guidance: 'Read runs.',
+      },
+      {
+        slot_id: 'quality_control',
+        label: 'Quality control',
+        required: false,
+        recommended_template_ids: ['qc_metrics', 'sci_check'],
+        recommended_atom_types: ['signal_qc'],
+        default_template_id: 'qc_metrics',
+        alternative_template_ids: ['sci_check'],
+        input_requirements: ['RawData'],
+        depends_on: ['read_run'],
+        allow_empty_marker: false,
+        category: 'validation',
+        guidance: 'Review quality.',
+      },
+      {
+        slot_id: 'filtering',
+        label: 'Filtering',
+        required: false,
+        recommended_template_ids: ['bandpass_filter'],
+        recommended_atom_types: ['filter'],
+        default_template_id: 'bandpass_filter',
+        alternative_template_ids: [],
+        input_requirements: ['RawData'],
+        depends_on: ['read_run'],
+        allow_empty_marker: true,
+        category: 'preprocessing',
+        guidance: 'Filter or mark as reviewed empty processing.',
+      },
+    ],
+  };
+  const mlChecklist = {
+    ...taskGlmChecklist,
+    scenario_id: 'ml_classification',
+    label: 'ML Classification',
+    description: 'Guided ML flow.',
+    steps: [{
+      ...taskGlmChecklist.steps[0],
+      slot_id: 'model',
+      label: 'Model',
+      recommended_template_ids: ['ml_model'],
+      recommended_atom_types: ['ml_classification'],
+      default_template_id: 'ml_model',
+      guidance: 'Train model.',
+    }],
+  };
+  const summaries = [
+    { scenario_id: 'task_glm', label: 'Task GLM', description: 'Guided task GLM flow.', version: 'e2e', step_count: 4 },
+    { scenario_id: 'ml_classification', label: 'ML Classification', description: 'Guided ML flow.', version: 'e2e', step_count: 1 },
+  ];
+  const templates = [
+    {
+      id: 'dataset_discovery',
+      atom_type: 'dataset_discovery',
+      display_name: 'Dataset discovery',
+      category: 'data',
+      operation: 'dataset_discovery',
+      description: 'Discover data',
+      input_ports: [],
+      output_ports: [{ name: 'manifest', schema: 'DataManifest', required: true }],
+      evidence_refs: [],
+    },
+    {
+      id: 'read_run',
+      atom_type: 'read_run',
+      display_name: 'Read run',
+      category: 'data',
+      operation: 'read_run',
+      description: 'Read run',
+      input_ports: [{ name: 'manifest', schema: 'DataManifest', required: true }],
+      output_ports: [{ name: 'raw', schema: 'RawData', required: true }],
+      evidence_refs: [],
+    },
+    {
+      id: 'qc_metrics',
+      atom_type: 'signal_qc',
+      display_name: 'QC metrics',
+      category: 'validation',
+      operation: 'qc_metrics',
+      description: 'QC',
+      input_ports: [{ name: 'raw', schema: 'RawData', required: true }],
+      output_ports: [{ name: 'qc', schema: 'QCReport', required: true }],
+      evidence_refs: [],
+    },
+    {
+      id: 'sci_check',
+      atom_type: 'signal_qc',
+      display_name: 'SCI check',
+      category: 'validation',
+      operation: 'sci_check',
+      description: 'SCI',
+      input_ports: [{ name: 'raw', schema: 'RawData', required: true }],
+      output_ports: [{ name: 'sci', schema: 'FloatArray', required: true }],
+      evidence_refs: [],
+    },
+    {
+      id: 'ml_model',
+      atom_type: 'ml_classification',
+      display_name: 'ML model',
+      category: 'analysis',
+      operation: 'ml_model',
+      description: 'ML',
+      input_ports: [],
+      output_ports: [],
+      evidence_refs: [],
+    },
+  ];
+  const emptySpecs = [{
+    category: 'preprocessing',
+    input_schema: 'RawData',
+    output_schema: 'RawData',
+    label: 'Empty preprocessing',
+    atom_id: 'empty_preprocessing',
+    template_id: 'empty_preprocessing',
+  }];
+  const flowState = {
+    value: {
+      flow_id: 'flow-1',
+      nodes: [{
+        id: 'model-1',
+        atom_type: 'ml_classification',
+        template_id: 'ml_model',
+        operation: 'ml_model',
+        category: 'analysis',
+        position: { x: 50, y: 50 },
+        ports: [],
+      }],
+      edges: [],
+      metadata: {},
+    } as Record<string, unknown>,
+  };
+
+  await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
+    if (path === '/api/projects/p1/flow' && request.method() === 'GET') return json(route, flowState.value);
+    if (path === '/api/projects/p1/flow' && request.method() === 'PUT') {
+      flowState.value = request.postDataJSON().flow;
+      return json(route, { status: 'updated' });
+    }
+    if (path === '/api/projects/p1/status') return json(route, readiness);
+    if (path === '/api/projects/p1/import-status') return json(route, { imported: false, read_only: false, quarantined_atoms: [] });
+    if (path === '/api/projects/p1/attempts') return json(route, []);
+    if (path === '/api/projects/p1/progress') return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+    if (path === '/api/atom-templates') return json(route, templates);
+    if (path === '/api/empty-marker-specs') return json(route, emptySpecs);
+    if (path === '/api/flow-checklists') return json(route, summaries);
+    if (path === '/api/flow-checklists/task_glm') return json(route, taskGlmChecklist);
+    if (path === '/api/flow-checklists/ml_classification') return json(route, mlChecklist);
+    if (path === '/api/projects/p1/validate' && request.method() === 'POST') {
+      return json(route, {
+        is_valid: true,
+        errors: [],
+        warnings: [],
+        risks: [{
+          risk_id: 'checklist-empty-task_glm-filtering',
+          code: 'CHECKLIST_STEP_EMPTY_MARKER',
+          severity: 'low',
+          domain: 'design',
+          affected_object: 'checklist:filtering',
+          message: "Checklist step 'Filtering' is marked as empty/no-op",
+          suggested_action: 'Replace with real processing when available',
+        }],
+      });
+    }
+    return json(route, {});
+  });
+
+  await page.goto('/projects/p1/flow');
+  await expect(page.getByLabel('Scenario')).toHaveValue('ml_classification');
+  await page.locator('.checklist-step').filter({ hasText: 'Model' }).click();
+  await expect(page.locator('.atom-item.checklist-recommended')).toContainText('ML model');
+  await expect(page.locator('.atom-item').filter({ hasText: 'ML model' })).toContainText('Best fit');
+  await expect(page.getByLabel('Checklist progress')).toContainText('100%');
+
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Flow saved')).toBeVisible();
+  expect((flowState.value.metadata as Record<string, any>).checklist.scenario_id).toBe('ml_classification');
+  expect((flowState.value.metadata as Record<string, any>).checklist.recommendation_source).toBe('flow_atoms');
+
+  await page.getByLabel('Scenario').selectOption('task_glm');
+  await expect(page.getByLabel('Checklist progress')).toContainText('0%');
+  await expect(page.locator('.checklist-next-action')).toContainText('Next: Add Data input');
+  await expect(page.locator('.checklist-step.priority')).toContainText('Data input');
+  await page.locator('.checklist-step').filter({ hasText: 'Quality control' }).click();
+  await expect(page.locator('.atom-item').filter({ hasText: 'QC metrics' })).toContainText('Best fit');
+  await expect(page.locator('.atom-item').filter({ hasText: 'QC metrics' })).toContainText('Default for this step');
+  await expect(page.locator('.atom-item').filter({ hasText: 'SCI check' })).toContainText('Recommended');
+  await expect(page.locator('.atom-item').filter({ hasText: 'SCI check' })).toContainText('Matches this processing slot');
+  await page.locator('.checklist-step').filter({ hasText: 'Quality control' }).locator('select').selectOption('sci_check');
+  await page.getByRole('button', { name: 'Add missing' }).click();
+  await expect(page.locator('.checklist-preview')).toContainText('Add 3 atoms');
+  await page.locator('.checklist-preview').getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByRole('status')).toContainText('Connected 2 links');
+  await page.getByRole('button', { name: 'Add missing' }).click();
+  await expect(page.locator('.checklist-preview')).toContainText('No new atoms are needed');
+  await page.locator('.checklist-preview').getByRole('button', { name: 'Cancel' }).click();
+  await page.locator('.checklist-step').filter({ hasText: 'Filtering' }).locator('.checklist-skip-reason select')
+    .selectOption('method_not_needed');
+  await page.locator('.checklist-step').filter({ hasText: 'Filtering' }).getByRole('button', { name: 'Skip' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Flow saved')).toBeVisible();
+
+  const savedFlow = flowState.value as Record<string, any>;
+  expect(savedFlow.metadata.checklist.scenario_id).toBe('task_glm');
+  expect(savedFlow.metadata.checklist.choices.quality_control.template_id).toBe('sci_check');
+  expect(savedFlow.metadata.checklist.choices.filtering.skipped).toBe(true);
+  expect(savedFlow.metadata.checklist.choices.filtering.skip_reason).toBe('method_not_needed');
+  expect(savedFlow.metadata.order_policy.allow_empty_edges).toBe(true);
+  const emptyAtom = savedFlow.nodes.find((node: Record<string, unknown>) => node.id === 'empty_preprocessing');
+  expect(emptyAtom).toBeTruthy();
+  expect(emptyAtom.metadata.skip_reason).toBe('method_not_needed');
+  expect(savedFlow.edges.some((edge: Record<string, unknown>) => edge.source === 'dataset_discovery_2' && edge.target === 'read_run_3')).toBe(true);
+  expect(savedFlow.edges.some((edge: Record<string, unknown>) => edge.source === 'read_run_3' && edge.target === 'sci_check_4')).toBe(true);
+
+  await page.getByRole('button', { name: 'Validate' }).click();
+  await expect(page.getByText('CHECKLIST_STEP_EMPTY_MARKER')).toBeVisible();
+  await page.getByText("Checklist step 'Filtering' is marked as empty/no-op").click();
+  await expect(page.locator('.checklist-step.selected')).toContainText('Filtering');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Report' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('task_glm_checklist_report.json');
+
+  await page.getByRole('button', { name: 'Empty risk' }).click();
+  await expect(page.getByRole('dialog', { name: 'Disable Empty risk' })).toContainText('Remove 1 empty atom');
+  await page.getByRole('dialog', { name: 'Disable Empty risk' }).getByRole('button', { name: 'Apply' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Flow saved')).toBeVisible();
+  expect((flowState.value as Record<string, any>).metadata.order_policy.allow_empty_edges).toBe(false);
+  expect((flowState.value as Record<string, any>).metadata.checklist.choices.filtering.skipped).toBeUndefined();
+  expect((flowState.value as Record<string, any>).nodes.some((node: Record<string, unknown>) => node.id === 'empty_preprocessing')).toBe(false);
 });

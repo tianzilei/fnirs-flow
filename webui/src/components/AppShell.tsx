@@ -46,6 +46,10 @@ export function AppShell() {
   const navigate = useNavigate();
   const { id: projectId } = useParams();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [desktopViewport, setDesktopViewport] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(min-width: 900px)').matches;
+  });
 
   const project = useStore((s) => s.project);
   const loading = useStore((s) => s.loading);
@@ -70,6 +74,14 @@ export function AppShell() {
       }
     }
   }, [projectId, project, projects, selectProject]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 900px)');
+    const handleChange = () => setDesktopViewport(query.matches);
+    handleChange();
+    query.addEventListener('change', handleChange);
+    return () => query.removeEventListener('change', handleChange);
+  }, []);
 
   // Subscribe to SSE progress
   useEffect(() => {
@@ -124,122 +136,135 @@ export function AppShell() {
 
   return (
     <div className="app shell">
-      <aside className="app-rail">
-        <button className="brand-mark" onClick={() => navigate('/projects')} title="Projects">
-          <FlaskConical size={20} />
-        </button>
-        <nav className="rail-nav" aria-label="Main navigation">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const disabled = !canOpen(item.id);
-            return (
-              <button
-                key={item.id}
-                className={activeNav === item.id ? 'active' : ''}
-                onClick={() => !disabled && handleNavClick(item.id)}
-                disabled={disabled}
-                title={item.label}
-                aria-label={item.label}
-                aria-current={activeNav === item.id ? 'page' : undefined}
-              >
-                <Icon size={18} />
-              </button>
-            );
-          })}
-          <div className="rail-more">
-            <button
-              className={moreActive || moreOpen ? 'active' : ''}
-              onClick={() => setMoreOpen((open) => !open)}
-              title="More"
-              aria-label="More navigation"
-              aria-expanded={moreOpen}
-            >
-              <MoreHorizontal size={18} />
+      <div className="mobile-unsupported" role="alert">
+        <div>
+          <span className="mobile-unsupported-kicker">Desktop required</span>
+          <h1>Open fnirs-flow on a larger screen</h1>
+          <p>
+            The workflow canvas, checklist, validation, and results tables require a desktop-width workspace.
+          </p>
+        </div>
+      </div>
+      {desktopViewport && (
+        <>
+          <aside className="app-rail">
+            <button className="brand-mark" onClick={() => navigate('/projects')} title="Projects">
+              <FlaskConical size={20} />
             </button>
-            {moreOpen && (
-              <div className="rail-more-menu" role="menu">
-                {moreNavItems.map((item) => {
-                  const Icon = item.icon;
-                  const disabled = !canOpen(item.id);
-                  return (
-                    <button
-                      key={item.id}
-                      className={activeNav === item.id ? 'active' : ''}
-                      onClick={() => !disabled && handleNavClick(item.id)}
-                      disabled={disabled}
-                      role="menuitem"
-                      aria-current={activeNav === item.id ? 'page' : undefined}
-                    >
-                      <Icon size={16} />
-                      <span>{item.label}</span>
+            <nav className="rail-nav" aria-label="Main navigation">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const disabled = !canOpen(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    className={activeNav === item.id ? 'active' : ''}
+                    onClick={() => !disabled && handleNavClick(item.id)}
+                    disabled={disabled}
+                    title={item.label}
+                    aria-label={item.label}
+                    aria-current={activeNav === item.id ? 'page' : undefined}
+                  >
+                    <Icon size={18} />
+                  </button>
+                );
+              })}
+              <div className="rail-more">
+                <button
+                  className={moreActive || moreOpen ? 'active' : ''}
+                  onClick={() => setMoreOpen((open) => !open)}
+                  title="More"
+                  aria-label="More navigation"
+                  aria-expanded={moreOpen}
+                >
+                  <MoreHorizontal size={18} />
+                </button>
+                {moreOpen && (
+                  <div className="rail-more-menu" role="menu">
+                    {moreNavItems.map((item) => {
+                      const Icon = item.icon;
+                      const disabled = !canOpen(item.id);
+                      return (
+                        <button
+                          key={item.id}
+                          className={activeNav === item.id ? 'active' : ''}
+                          onClick={() => !disabled && handleNavClick(item.id)}
+                          disabled={disabled}
+                          role="menuitem"
+                          aria-current={activeNav === item.id ? 'page' : undefined}
+                        >
+                          <Icon size={16} />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </nav>
+          </aside>
+
+          <section className="app-workbench">
+            <header className="flow-toolbar">
+              <div className="flow-title-block">
+                <span className="toolbar-kicker">fnirs-flow</span>
+                <h1>{project ? project.name : 'Project Workspace'}</h1>
+              </div>
+              <div className="workflow-steps">
+                <Step label="Flow" done={status.flowSaved} />
+                <Step label="Validated" done={status.validated} />
+                <Step label="Compiled" done={status.compiled} />
+                <Step label="Data" done={status.dataDiscovered} />
+                <Step label="Executed" done={status.executed} />
+              </div>
+              <div className="toolbar-actions">
+                {project && (
+                  <>
+                    <button className="ghost-button" onClick={saveFlow} disabled={loading || readOnly} title={readOnly ? 'Fork the imported package before editing' : 'Save flow'}>
+                      <Save size={16} />
+                      <span>Save</span>
                     </button>
-                  );
-                })}
+                    <button className="ghost-button" onClick={validate} disabled={loading} title="Validate flow">
+                      {loading ? <Loader2 size={16} className="spin" /> : <FileCheck2 size={16} />}
+                      <span>Validate</span>
+                    </button>
+                    <button className="ghost-button" onClick={compile} disabled={loading || readOnly} title={readOnly ? 'Fork the imported package before compiling' : 'Compile flow'}>
+                      <Save size={16} />
+                      <span>Compile</span>
+                    </button>
+                    <button
+                      className="primary-button"
+                      onClick={execute}
+                      disabled={loading || !status.compiled || !status.dataDiscovered || status.hasFatalRisk}
+                      title={status.hasFatalRisk ? 'Cannot execute: fatal validation risks detected' : 'Execute project'}
+                    >
+                      <Play size={16} />
+                      <span>Run</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </header>
+
+            {error && (
+              <div className={`toast-banner ${isSuccessNotice ? 'success' : 'error'}`}>
+                {isSuccessNotice ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+                <div>
+                  <strong>{error.message}</strong>
+                  {error.detail && <span>{error.detail}</span>}
+                </div>
+                <button onClick={clearError} aria-label="Dismiss">
+                  <X size={16} />
+                </button>
               </div>
             )}
-          </div>
-        </nav>
-      </aside>
 
-      <section className="app-workbench">
-        <header className="flow-toolbar">
-          <div className="flow-title-block">
-            <span className="toolbar-kicker">fnirs-flow</span>
-            <h1>{project ? project.name : 'Project Workspace'}</h1>
-          </div>
-          <div className="workflow-steps">
-            <Step label="Flow" done={status.flowSaved} />
-            <Step label="Validated" done={status.validated} />
-            <Step label="Compiled" done={status.compiled} />
-            <Step label="Data" done={status.dataDiscovered} />
-            <Step label="Executed" done={status.executed} />
-          </div>
-          <div className="toolbar-actions">
-            {project && (
-              <>
-                <button className="ghost-button" onClick={saveFlow} disabled={loading || readOnly} title={readOnly ? 'Fork the imported package before editing' : 'Save flow'}>
-                  <Save size={16} />
-                  <span>Save</span>
-                </button>
-                <button className="ghost-button" onClick={validate} disabled={loading} title="Validate flow">
-                  {loading ? <Loader2 size={16} className="spin" /> : <FileCheck2 size={16} />}
-                  <span>Validate</span>
-                </button>
-                <button className="ghost-button" onClick={compile} disabled={loading || readOnly} title={readOnly ? 'Fork the imported package before compiling' : 'Compile flow'}>
-                  <Save size={16} />
-                  <span>Compile</span>
-                </button>
-                <button
-                  className="primary-button"
-                  onClick={execute}
-                  disabled={loading || !status.compiled || !status.dataDiscovered || status.hasFatalRisk}
-                  title={status.hasFatalRisk ? 'Cannot execute: fatal validation risks detected' : 'Execute project'}
-                >
-                  <Play size={16} />
-                  <span>Run</span>
-                </button>
-              </>
-            )}
-          </div>
-        </header>
-
-        {error && (
-          <div className={`toast-banner ${isSuccessNotice ? 'success' : 'error'}`}>
-            {isSuccessNotice ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
-            <div>
-              <strong>{error.message}</strong>
-              {error.detail && <span>{error.detail}</span>}
-            </div>
-            <button onClick={clearError} aria-label="Dismiss">
-              <X size={16} />
-            </button>
-          </div>
-        )}
-
-        <main className="app-main">
-          <Outlet />
-        </main>
-      </section>
+            <main className="app-main">
+              <Outlet />
+            </main>
+          </section>
+        </>
+      )}
     </div>
   );
 }

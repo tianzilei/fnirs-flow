@@ -312,6 +312,50 @@
             "confirmed_at": { "type": "string" },
             "not_used_for_execution": { "type": "boolean", "default": true }
           }
+        },
+        "order_policy": {
+          "type": "object",
+          "description": "Reviewed risk acceptance switches for atom ordering and empty-link handling.",
+          "properties": {
+            "allow_order_violations": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, order violations are retained as non-fatal risks."
+            },
+            "allow_empty_edges": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, empty or floating-edge handling is retained as a non-fatal risk."
+            }
+          }
+        },
+        "checklist": {
+          "type": "object",
+          "description": "Optional guided-flow checklist selection and UI state.",
+          "properties": {
+            "scenario_id": { "type": "string" },
+            "version": { "type": "string" },
+            "recommendation_source": {
+              "type": "string",
+              "enum": ["flow_atoms", "user", "imported", "unknown"],
+              "description": "How the active checklist scenario was selected."
+            },
+            "choices": {
+              "type": "object",
+              "description": "Per-checklist-slot user choices and reviewed empty-processing markers.",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "template_id": { "type": "string" },
+                  "atom_id": { "type": "string" },
+                  "skipped": { "type": "boolean" },
+                  "skip_reason": { "type": "string" },
+                  "updated_at": { "type": "string" }
+                }
+              }
+            },
+            "updated_at": { "type": "string" }
+          }
         }
       }
     },

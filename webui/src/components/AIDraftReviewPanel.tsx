@@ -28,6 +28,9 @@ const SCENARIOS: Array<{ value: AIDraftScenario; label: string }> = [
 
 const DEFAULT_AI_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_AI_MODEL = 'gpt-5-mini';
+const DEFAULT_AI_TEMPERATURE = 0.1;
+const DEFAULT_AI_MAX_TOKENS = 12000;
+const DEFAULT_AI_TIMEOUT_SECONDS = 120;
 const DRAFT_STEPS = [
   { id: 'generate', label: 'Generate' },
   { id: 'validate', label: 'Validate' },
@@ -80,13 +83,12 @@ export function AIDraftReviewPanel({
   const [aiMode, setAiMode] = useState<'template' | 'openai-compatible'>('template');
   const [aiProvider, setAiProvider] = useState('OpenAI compatible');
   const [aiBaseUrl, setAiBaseUrl] = useState(DEFAULT_AI_BASE_URL);
-  const [aiApiKey, setAiApiKey] = useState('');
   const [aiModel, setAiModel] = useState(DEFAULT_AI_MODEL);
   const [aiOrganization, setAiOrganization] = useState('');
   const [aiProject, setAiProject] = useState('');
-  const [aiTemperature, setAiTemperature] = useState(0.2);
-  const [aiMaxTokens, setAiMaxTokens] = useState(4096);
-  const [aiTimeoutSeconds, setAiTimeoutSeconds] = useState(60);
+  const [aiTemperature, setAiTemperature] = useState(DEFAULT_AI_TEMPERATURE);
+  const [aiMaxTokens, setAiMaxTokens] = useState(DEFAULT_AI_MAX_TOKENS);
+  const [aiTimeoutSeconds, setAiTimeoutSeconds] = useState(DEFAULT_AI_TIMEOUT_SECONDS);
   const [draft, setDraft] = useState<AIDraftFlow | null>(null);
   const [validation, setValidation] = useState<AIDraftValidation | null>(null);
   const [confirmedItems, setConfirmedItems] = useState<Set<string>>(new Set());
@@ -134,7 +136,6 @@ export function AIDraftReviewPanel({
           mode: aiMode,
           provider: aiProvider.trim() || 'OpenAI compatible',
           base_url: aiBaseUrl.trim() || DEFAULT_AI_BASE_URL,
-          api_key_present: aiApiKey.trim().length > 0,
           model: aiModel.trim() || DEFAULT_AI_MODEL,
           organization: aiOrganization.trim() || undefined,
           project: aiProject.trim() || undefined,
@@ -147,7 +148,12 @@ export function AIDraftReviewPanel({
       setValidation(null);
       setConfirmedItems(new Set(generated.metadata.ai_generation.confirmed_parameters ?? []));
       setDraftStep('validate');
-      setNotice('Draft generated in isolation. The current flow is unchanged.');
+      if (generated.metadata.ai_generation.settings?.direct_import) {
+        onApplied(await getFlow(projectId));
+        setNotice('External API generated a FlowGraph and imported it into the current flow. Confirm its AI status before execution.');
+      } else {
+        setNotice('Draft generated in isolation. The current flow is unchanged.');
+      }
     } catch (generateError) {
       setError(formatApiError(generateError));
     } finally {
@@ -160,7 +166,7 @@ export function AIDraftReviewPanel({
       setWorking(true);
       setError(null);
       setValidation(await validateProjectAIDraft(projectId));
-      setDraftStep('review');
+      setDraftStep('validate');
     } catch (validateError) {
       setError(formatApiError(validateError));
     } finally {
@@ -289,15 +295,6 @@ export function AIDraftReviewPanel({
                   <label className="span-2">Base URL
                     <input value={aiBaseUrl} onChange={(event) => setAiBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" />
                   </label>
-                  <label className="span-2">API key
-                    <input
-                      value={aiApiKey}
-                      onChange={(event) => setAiApiKey(event.target.value)}
-                      placeholder="sk-..."
-                      type="password"
-                      autoComplete="off"
-                    />
-                  </label>
                   <label>Model
                     <input value={aiModel} onChange={(event) => setAiModel(event.target.value)} placeholder={DEFAULT_AI_MODEL} />
                   </label>
@@ -335,7 +332,7 @@ export function AIDraftReviewPanel({
                   <label>Project
                     <input value={aiProject} onChange={(event) => setAiProject(event.target.value)} placeholder="optional" />
                   </label>
-                  <p className="ai-safety-note span-2">Current generation still uses the built-in template workflow. The API key stays in this browser session and is not saved into the Flow.</p>
+                  <p className="ai-safety-note span-2">OpenAI-compatible mode uses server-side environment variables for credentials. The browser never accepts or stores the API key.</p>
                 </div>
               )}
             </div>

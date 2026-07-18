@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.2.0",
+  "flow_id": "ml-leakage-flow-001",
+  "name": "ML Leakage Flow",
+  "description": "A machine-learning flow with a prohibited trial-wise split.",
+  "nodes": [
+    {
+      "id": "features",
+      "type": "feature_extraction",
+      "category": "analysis",
+      "position": {"x": 0, "y": 0},
+      "config": {},
+      "status": "ready",
+      "ports": [
+        {"name": "features", "direction": "out", "schema": "FeatureMatrix", "required": true}
+      ]
+    },
+    {
+      "id": "model",
+      "type": "ml_model",
+      "category": "analysis",
+      "position": {"x": 200, "y": 0},
+      "config": {"split_strategy": "random_trial"},
+      "status": "ready",
+      "ports": [
+        {"name": "features", "direction": "in", "schema": "FeatureMatrix", "required": true}
+      ]
+    }
+  ],
+  "edges": [
+    {"id": "edge-ml", "source": "features", "target": "model", "source_handle": "features", "target_handle": "features"}
+  ],
+  "adapter_registry": [],
+  "metadata": {
+    "created_at": "2026-01-01T00:00:00Z",
+    "modified_at": "2026-01-01T00:00:00Z"
+  }
+}

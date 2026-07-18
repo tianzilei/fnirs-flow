@@ -1,0 +1,34 @@
+{
+  "valid_flow.json": {
+    "valid": true,
+    "has_fatal_risks": false,
+    "risk_contains": [],
+    "error_contains": []
+  },
+  "invalid_order_flow.json": {
+    "valid": false,
+    "has_fatal_risks": true,
+    "risk_contains": ["No adapter found to convert OpticalDensityData -> RawData"],
+    "error_contains": ["cycle"]
+  },
+  "backend_mismatch_flow.json": {
+    "valid": true,
+    "has_fatal_risks": true,
+    "risk_contains": ["Mixed backend connection without bridge"],
+    "error_contains": []
+  },
+  "missing_metadata_flow.json": {
+    "valid": true,
+    "has_fatal_risks": false,
+    "scenario_id": "task",
+    "risk_contains": ["requires atom type"],
+    "error_contains": []
+  },
+  "ml_leakage_flow.json": {
+    "valid": true,
+    "has_fatal_risks": true,
+    "scenario_id": "machine_learning",
+    "risk_contains": ["Prohibited split strategy"],
+    "error_contains": []
+  }
+}

@@ -105,6 +105,79 @@ def test_ai_draft_legacy_api_key_is_not_persisted():
     assert "sk-secret" not in json.dumps(draft)
 
 
+def test_ai_draft_openai_compatible_uses_server_provider(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from fnirs_flow.ai.draft_generator import generate_draft_flow
+
+    monkeypatch.setenv("FNIRS_FLOW_ALLOW_EXTERNAL_AI_IN_TESTS", "1")
+    generated_flow = generate_draft_flow(
+        "task",
+        study_name="Provider Draft",
+        data_format="snirf",
+        conditions=["left", "right"],
+        model_name="deepseek-v4-pro",
+        assumptions=["LLM assumption: inspect event timing."],
+        user_confirmations=["LLM confirmation: verify GLM basis function."],
+    )
+    generated_flow["flow_id"] = "provider-flow-001"
+    with patch("fnirs_flow.ai.openai_compatible.generate_openai_compatible_flow") as generate:
+        generate.return_value = {
+            "flow": generated_flow,
+            "settings": {
+                "mode": "openai-compatible",
+                "provider": "DeepSeek compatible",
+                "base_url": "https://api.deepseek.com",
+                "model": "deepseek-v4-pro",
+                "temperature": 0.2,
+                "max_tokens": 4096,
+                "timeout_seconds": 60,
+                "api_key_present": True,
+                "endpoint": "chat/completions",
+                "direct_import": True,
+                "generation_source": "external_api_flow_json",
+            },
+            "usage": {"total_tokens": 64},
+        }
+
+        client = TestClient(app)
+        project = client.post("/api/projects", json={"name": "Server Provider Draft"}).json()
+        response = client.post(
+            f"/api/projects/{project['id']}/ai/draft-flow",
+            json={
+                "scenario": "task",
+                "study_name": "Provider Draft",
+                "data_format": "snirf",
+                "conditions": ["left", "right"],
+                "ai_settings": {
+                    "mode": "openai-compatible",
+                    "provider": "OpenAI compatible",
+                    "base_url": "https://api.openai.com/v1",
+                    "model": "gpt-5-mini",
+                    "temperature": 0.2,
+                    "max_tokens": 4096,
+                    "timeout_seconds": 60,
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["imported_to_flow"] is True
+    generate.assert_called_once()
+    draft = client.get(f"/api/projects/{project['id']}/ai/draft").json()["draft"]
+    current_flow = client.get(f"/api/projects/{project['id']}/flow").json()
+    assert current_flow["flow_id"] == "provider-flow-001"
+    assert draft["flow_id"] == "provider-flow-001"
+    ai = draft["metadata"]["ai_generation"]
+    assert ai["model"] == "deepseek-v4-pro"
+    assert "LLM assumption: inspect event timing." in ai["assumptions"]
+    assert "LLM confirmation: verify GLM basis function." in ai["requires_user_confirmation"]
+    assert ai["settings"]["direct_import"] is True
+    assert ai["settings"]["endpoint"] == "chat/completions"
+    assert "api_key" not in ai["settings"]
+    assert "sk-secret" not in json.dumps(draft)
+
+
 def test_invalid_content_length_returns_400():
     from fastapi.testclient import TestClient
 
@@ -534,6 +607,43 @@ def test_atom_templates():
     resp = client.get("/api/atom-templates")
     assert resp.status_code == 200
     assert isinstance(resp.json(), (dict, list))
+
+
+def test_empty_marker_specs():
+    """Test empty marker specs endpoint."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.get("/api/empty-marker-specs")
+    assert resp.status_code == 200
+    specs = resp.json()
+    assert isinstance(specs, list)
+    assert any(spec["atom_id"] == "empty_preprocessing" for spec in specs)
+    assert all(spec["input_schema"] and spec["output_schema"] for spec in specs)
+
+
+def test_flow_checklists():
+    """Test guided flow checklist endpoints."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    resp = client.get("/api/flow-checklists")
+    assert resp.status_code == 200
+    summaries = resp.json()
+    assert any(item["scenario_id"] == "task_glm" for item in summaries)
+    assert any(item["scenario_id"] == "ml_classification" for item in summaries)
+
+    detail = client.get("/api/flow-checklists/task_glm")
+    assert detail.status_code == 200
+    payload = detail.json()
+    assert payload["scenario_id"] == "task_glm"
+    assert payload["version"]
+    assert payload["steps"][0]["slot_id"] == "data_input"
+    assert payload["steps"][1]["input_requirements"] == ["DataManifest"]
+    assert payload["steps"][-1]["default_template_id"]
+
+    missing = client.get("/api/flow-checklists/unknown")
+    assert missing.status_code == 404
 
 
 def test_cors_headers():

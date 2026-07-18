@@ -21,6 +21,14 @@ def _is_loopback_host(host: str) -> bool:
         return False
 
 
+def _webui_dir() -> Path:
+    """Return the WebUI source directory for source-tree and packaged layouts."""
+    repo_webui = Path(__file__).resolve().parent.parent / "webui"
+    if repo_webui.is_dir():
+        return repo_webui
+    return Path(__file__).resolve().parent / "webui"
+
+
 def cmd_backends(args: argparse.Namespace) -> int:
     """Show backend status and capabilities."""
     from fnirs_flow.adapters.backend_registry import get_registry
@@ -745,7 +753,7 @@ def cmd_webui(args: argparse.Namespace) -> int:
             import subprocess
             import sys
 
-            webui_dir = Path(__file__).parent / "webui"
+            webui_dir = _webui_dir()
             if not (webui_dir / "node_modules").exists():
                 print("Installing frontend dependencies...")
                 subprocess.run(["npm", "install"], cwd=webui_dir, check=True)
@@ -769,13 +777,13 @@ def cmd_webui(args: argparse.Namespace) -> int:
                 vite_proc.wait(timeout=5)
         else:
             # Production mode: serve built frontend from FastAPI
-            dist_dir = Path(__file__).parent / "webui" / "dist"
+            webui_dir = _webui_dir()
+            dist_dir = webui_dir / "dist"
             if not dist_dir.exists():
                 print("Frontend not built. Building now...")
                 import subprocess
                 import sys
 
-                webui_dir = Path(__file__).parent / "webui"
                 if not (webui_dir / "node_modules").exists():
                     print("Installing frontend dependencies...")
                     subprocess.run(["npm", "install"], cwd=webui_dir, check=True)

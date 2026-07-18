@@ -416,6 +416,7 @@ class TestOperationRegistry:
         assert "participant_dpf_projection" in ops
         assert "participant_outcome_projection" in ops
         assert "combat_preflight" in ops
+        assert "empty_marker" in ops
 
     def test_registry_has_category(self):
         from fnirs_flow.execution.operations import create_default_registry
@@ -424,6 +425,9 @@ class TestOperationRegistry:
         spec = registry.get("optical_density")
         assert spec is not None
         assert spec.category == "preprocessing"
+        empty_spec = registry.get("empty_marker")
+        assert empty_spec is not None
+        assert empty_spec.category == "control"
 
     def test_registry_no_duplicates(self):
         from fnirs_flow.execution.operations import OperationRegistry, OperationSpec
@@ -561,6 +565,66 @@ class TestExecutionFailureAggregation:
 
         assert result.status == "failed"
         assert [(item.atom_id, item.status) for item in result.atom_results] == [("bad-atom", "failed")]
+
+
+class TestEmptyMarkerExecution:
+    class _Artifacts:
+        def all(self):
+            return []
+
+    class _Adapter:
+        versions = {}
+
+        def __init__(self):
+            self.artifacts = TestEmptyMarkerExecution._Artifacts()
+
+        def read_run(self, path):
+            return {"raw_path": path}
+
+        def apply_filter(self, *_args, **_kwargs):
+            raise AssertionError("empty_marker must not dispatch preprocessing")
+
+        def to_optical_density(self, *_args, **_kwargs):
+            raise AssertionError("empty_marker must not dispatch preprocessing")
+
+    class _Registry:
+        def create(self, backend_id, **kwargs):
+            return TestEmptyMarkerExecution._Adapter()
+
+    def test_empty_marker_marks_state_without_processing(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "empty_preprocessing",
+                    "step_id": "empty_preprocessing",
+                    "operation": "empty_marker",
+                    "category": "preprocessing",
+                    "parameters": {"state_marker": "empty_preprocessing"},
+                }
+            ],
+            "execution_layers": [["empty_preprocessing"]],
+            "edges": [],
+        }
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=self._Registry()):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)),
+                {},
+                dag,
+                tmp_path,
+                continue_on_failure=True,
+            )
+
+        assert result.status == "completed"
+        assert len(result.atom_results) == 1
+        atom_result = result.atom_results[0]
+        assert atom_result.status == "completed"
+        assert atom_result.output_handles["marker"]["status"] == "empty"
+        assert atom_result.provenance["empty_processing"] is True
 
 
 class TestDagBranchIsolation:
@@ -1044,6 +1108,134 @@ class TestGroupScopeExecution:
         assert summary["successful_runs"] == 1
         assert (compiled / "participant_table_manifest.json").exists()
 
+    def test_localization_projection_import_runs_as_group_atom(self, tmp_path):
+        compiled = tmp_path / "compiled"
+        compiled.mkdir()
+        data_path = tmp_path / "sub-01.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        csv_path = tmp_path / "projection.csv"
+        csv_path.write_text(
+            (
+                "group_id,projection_label,projection_kind,projected_mni_x,projected_mni_y,projected_mni_z,match_status\n"
+                "G1,CH01,channel,1,2,3,matched\n"
+            ),
+            encoding="utf-8",
+        )
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "loc",
+                    "operation": "localization_projection_import",
+                    "category": "data",
+                    "execution_scope": "group",
+                    "parameters": {"path": str(csv_path), "coordinate_set_id": "G1"},
+                },
+                {
+                    "atom_id": "run-design",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "execution_scope": "run",
+                    "parameters": {"events": "task"},
+                },
+            ],
+            "edges": [],
+        }
+        (compiled / "plan.json").write_text("{}", encoding="utf-8")
+        (compiled / "execution_dag.json").write_text(json.dumps(dag), encoding="utf-8")
+        (compiled / "data_manifest.json").write_text(
+            json.dumps({"subject_session_runs": [{"subject": "01", "task": "test", "path": str(data_path)}]}),
+            encoding="utf-8",
+        )
+
+        with patch(
+            "fnirs_flow.adapters.backend_registry.get_registry",
+            return_value=TestDagBranchIsolation._Registry(),
+        ):
+            result = ExecutionService().execute(
+                ExecutionRequest(project_dir=str(tmp_path), outdir=str(tmp_path), attempt_id="attempt-localization")
+            )
+
+        group_result = next(item for item in result.run_results if item.run_id == "group")
+        loc_result = group_result.atom_results[0]
+        assert loc_result.status == "completed"
+        assert loc_result.output_handles["type"] == "ProjectedMNIChannels"
+        assert loc_result.output_handles["rows"] == 1
+        assert loc_result.output_handles["not_nirsspm_equivalent"] is True
+        assert (tmp_path / "derivatives" / "localization" / "G1_projected_mni_channels.csv").exists()
+        manifest = json.loads((tmp_path / "logs" / "artifact_manifest.json").read_text(encoding="utf-8"))
+        assert any(item["artifact_type"] == "ProjectedMNIChannels" for item in manifest["artifacts"])
+
+    def test_nirs_spm_surface_projection_runs_as_group_atom(self, tmp_path):
+        from fnirs_flow.adapters import nirsspm_projection
+
+        class TinyProjector:
+            reference_dir = "synthetic-nirsspm-reference"
+            surface_reference_count = 1
+
+            def project_head_to_cortex(self, points):
+                return np.asarray(points, dtype=float)
+
+        compiled = tmp_path / "compiled"
+        compiled.mkdir()
+        data_path = tmp_path / "sub-01.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        csv_path = tmp_path / "projection.csv"
+        csv_path.write_text(
+            (
+                "group_id,projection_label,projection_kind,projected_head_x,projected_head_y,projected_head_z,"
+                "projected_mni_x,projected_mni_y,projected_mni_z\n"
+                "G1,CH01,channel,1,2,3,1,2,3\n"
+            ),
+            encoding="utf-8",
+        )
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "nirsspm-proj",
+                    "operation": "nirs_spm_surface_projection",
+                    "category": "data",
+                    "execution_scope": "group",
+                    "parameters": {"path": str(csv_path), "coordinate_set_id": "G1"},
+                },
+                {
+                    "atom_id": "run-design",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "execution_scope": "run",
+                    "parameters": {"events": "task"},
+                },
+            ],
+            "edges": [],
+        }
+        (compiled / "plan.json").write_text("{}", encoding="utf-8")
+        (compiled / "execution_dag.json").write_text(json.dumps(dag), encoding="utf-8")
+        (compiled / "data_manifest.json").write_text(
+            json.dumps({"subject_session_runs": [{"subject": "01", "task": "test", "path": str(data_path)}]}),
+            encoding="utf-8",
+        )
+
+        with (
+            patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=TestDagBranchIsolation._Registry()),
+            patch.object(
+                nirsspm_projection.NirsspmSurfaceProjector,
+                "from_reference_dir",
+                classmethod(lambda cls, reference_dir: TinyProjector()),
+            ),
+        ):
+            result = ExecutionService().execute(
+                ExecutionRequest(project_dir=str(tmp_path), outdir=str(tmp_path), attempt_id="attempt-nirsspm")
+            )
+
+        group_result = next(item for item in result.run_results if item.run_id == "group")
+        projection_result = group_result.atom_results[0]
+        assert projection_result.status == "completed"
+        assert projection_result.output_handles["type"] == "NirsspmSurfaceProjection"
+        assert projection_result.output_handles["rows"] == 1
+        assert projection_result.output_handles["validation"]["max_distance_mm"] == 0
+        assert (tmp_path / "derivatives" / "localization" / "G1_nirsspm_surface_projection.csv").exists()
+        manifest = json.loads((tmp_path / "logs" / "artifact_manifest.json").read_text(encoding="utf-8"))
+        assert any(item["artifact_type"] == "NirsspmSurfaceProjection" for item in manifest["artifacts"])
+
 
 # ============================================================================
 # Group summary tests
@@ -1430,9 +1622,52 @@ class TestGroupSummary:
         assert (tmp_path / "derivatives" / "group" / "analysis_table.csv").exists()
         assert (tmp_path / "derivatives" / "group" / "group_design_matrix.csv").exists()
         assert (tmp_path / "derivatives" / "group" / "group_glm_results.csv").exists()
+        assert (tmp_path / "derivatives" / "group" / "group_glm_results.json").exists()
         assert (tmp_path / "derivatives" / "group" / "contrast_matrix.csv").exists()
+        assert (tmp_path / "derivatives" / "group" / "contrast_results.csv").exists()
+        assert (tmp_path / "derivatives" / "group" / "contrast_results.json").exists()
+        assert (tmp_path / "derivatives" / "group" / "contrast_effects.svg").exists()
         assert (tmp_path / "derivatives" / "group" / "effect_sizes.csv").exists()
         assert (tmp_path / "derivatives" / "group" / "multiple_comparison_results.csv").exists()
+        artifacts = ExecutionService()._collect_group_result_artifacts(tmp_path)
+        artifact_types = {artifact["type"] for artifact in artifacts}
+        assert "ContrastResultsJson" in artifact_types
+        assert "ContrastEffectFigure" in artifact_types
+
+    def test_group_config_merges_contrast_atom_parameters(self):
+        config = ExecutionService._extract_group_config(
+            {},
+            {
+                "atoms": [
+                    {
+                        "atom_id": "design",
+                        "operation": "group_design_matrix",
+                        "parameters": {"design_type": "two_sample_t", "group_column": "group"},
+                    },
+                    {
+                        "atom_id": "contrast",
+                        "operation": "group_contrast",
+                        "parameters": {
+                            "contrast_name": "patient > control",
+                            "contrast_type": "T",
+                            "contrast_expression": "group[patient] - group[control]",
+                        },
+                    },
+                ]
+            },
+        )
+
+        assert config["design_type"] == "two_sample_t"
+        assert config["contrasts"] == [
+            {
+                "name": "patient > control",
+                "type": "T",
+                "expression": "group[patient] - group[control]",
+                "weights": None,
+                "weight_matrix": None,
+                "terms": None,
+            }
+        ]
 
     def test_group_summary_writes_advanced_design_inference_artifacts(self, tmp_path):
         from fnirs_flow.data.participants import read_participant_table, write_participant_table_artifacts

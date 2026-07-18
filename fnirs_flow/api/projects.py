@@ -410,10 +410,19 @@ class ProjectStore:
     def update_flow(self, project_id: str, flow: dict[str, Any], *, debounce: bool = False) -> bool:
         if project_id not in self._materialized_projects and not self.ensure_project_loaded(project_id):
             return False
+        from fnirs_flow.flow.empty_markers import normalize_empty_markers, remove_unconnected_auto_empty_markers
+
+        metadata = flow.get("metadata") if isinstance(flow.get("metadata"), dict) else {}
+        policy = metadata.get("order_policy") if isinstance(metadata.get("order_policy"), dict) else {}
+        normalized_flow = (
+            normalize_empty_markers(flow)
+            if policy.get("allow_empty_edges") is True
+            else remove_unconnected_auto_empty_markers(flow)
+        )
         with self._lock:
             if project_id not in self._projects:
                 return False
-            self._projects[project_id]["flow"] = flow
+            self._projects[project_id]["flow"] = normalized_flow
             self._projects[project_id]["state"] = {}
             if debounce:
                 self._debounced_persist(project_id, reason="flow_saved")

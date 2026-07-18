@@ -254,6 +254,27 @@ class ExecutionService:
                             message=ar.error or "Unknown error",
                         )
 
+        for atom in group_atom_results:
+            for artifact_index, art in enumerate(atom.artifacts):
+                artifact_store.register(
+                    ArtifactRecord(
+                        artifact_id=art.get("artifact_id") or f"group_{atom.atom_id}_{artifact_index}",
+                        step_id=art.get("step_id") or atom.atom_id,
+                        artifact_type=art.get("type", ""),
+                        uri=art.get("uri", art.get("path", "")),
+                        path=art.get("uri", art.get("path", "")),
+                        sha256=art.get("checksum", ""),
+                    )
+                )
+            provenance.log(
+                step_id=f"group/{atom.atom_id}",
+                parameters={
+                    "status": atom.status,
+                    "output_handles": atom.output_handles,
+                    "lineage": atom.provenance,
+                },
+            )
+
         # Summarize
         successful = sum(1 for r in run_results if r.status == "completed")
         failed = sum(1 for r in run_results if r.status == "failed")
@@ -291,7 +312,10 @@ class ExecutionService:
                     else []
                 ),
             ],
-            artifacts=[artifact for run in run_results for artifact in run.artifacts],
+            artifacts=[
+                *[artifact for run in run_results for artifact in run.artifacts],
+                *[artifact for atom in group_atom_results for artifact in atom.artifacts],
+            ],
             failure_ids=failure_ids,
             started_at=started_at,
             completed_at=completed_at,
@@ -322,6 +346,20 @@ class ExecutionService:
         )
         if group_path:
             result.reports.append(str(group_path))
+        group_artifacts = self._collect_group_result_artifacts(outdir)
+        if group_artifacts:
+            result.artifacts.extend(group_artifacts)
+            group_run = next((run for run in result.run_results if run.run_id == "group"), None)
+            if group_run is not None:
+                group_run.artifacts.extend(group_artifacts)
+                for atom_result in group_run.atom_results:
+                    operation = str(atom_result.provenance.get("operation", ""))
+                    matching = []
+                    for artifact in group_artifacts:
+                        artifact_atom_id = str(artifact.get("atom_id", ""))
+                        if artifact_atom_id in {atom_result.atom_id, operation}:
+                            matching.append({**artifact, "atom_id": atom_result.atom_id})
+                    atom_result.artifacts.extend(matching)
 
         self._emit_progress(
             "execution_completed",
@@ -336,9 +374,11 @@ class ExecutionService:
     def _execute_group_scope_atoms(self, dag: dict[str, Any], outdir: Path) -> list[AtomExecutionResult]:
         atoms = dag.get("atoms", dag.get("nodes", []))
         group_atoms = [
-            atom for atom in atoms
+            atom
+            for atom in atoms
             if atom.get("execution_scope") == "group"
-            and (atom.get("operation") or atom.get("atom_type")) in {
+            and (atom.get("operation") or atom.get("atom_type"))
+            in {
                 "participant_table_input",
                 "participant_metadata_validate",
                 "participant_label_projection",
@@ -346,9 +386,13 @@ class ExecutionService:
                 "participant_covariate_projection",
                 "participant_dpf_projection",
                 "participant_outcome_projection",
+                "localization_projection_import",
+                "nirs_spm_surface_projection",
                 "combat_preflight",
                 "observation_pairing_projection",
                 "group_design_matrix",
+                "group_level_glm",
+                "group_contrast",
             }
         ]
         if not group_atoms:
@@ -386,10 +430,9 @@ class ExecutionService:
                 if operation == "participant_table_input":
                     path = params.get("path") or params.get("table_path")
                     if not path:
-                        loaded = (
-                            load_participant_table_from_artifacts(compiled_dir)
-                            or load_participant_table_from_artifacts(outdir)
-                        )
+                        loaded = load_participant_table_from_artifacts(
+                            compiled_dir
+                        ) or load_participant_table_from_artifacts(outdir)
                         if loaded is None:
                             raise ValueError("GROUP_METADATA_MISSING: participant_table_input requires path")
                         table = loaded
@@ -424,10 +467,9 @@ class ExecutionService:
                         "manifest": bundle.participant_table_manifest.model_dump(),
                     }
                 elif operation == "participant_metadata_validate":
-                    validate_table: ParticipantTable | None = (
-                        state.get("participant_table")
-                        or load_participant_table_from_artifacts(compiled_dir)
-                    )
+                    validate_table: ParticipantTable | None = state.get(
+                        "participant_table"
+                    ) or load_participant_table_from_artifacts(compiled_dir)
                     if validate_table is None:
                         raise ValueError("GROUP_METADATA_MISSING: no participant table to validate")
                     manifest_path = compiled_dir / "data_manifest.json"
@@ -442,30 +484,27 @@ class ExecutionService:
                         raise ValueError("; ".join(report.errors))
                     result.output_handles = {"validation_report": report.model_dump()}
                 elif operation == "participant_label_projection":
-                    label_table: ParticipantTable | None = (
-                        state.get("participant_table")
-                        or load_participant_table_from_artifacts(compiled_dir)
-                    )
+                    label_table: ParticipantTable | None = state.get(
+                        "participant_table"
+                    ) or load_participant_table_from_artifacts(compiled_dir)
                     if label_table is None:
                         raise ValueError("GROUP_METADATA_MISSING: no participant table for labels")
                     labels = project_label_vector(label_table, params.get("label_column"))
                     state["labels"] = labels
                     result.output_handles = labels
                 elif operation == "participant_site_projection":
-                    site_table: ParticipantTable | None = (
-                        state.get("participant_table")
-                        or load_participant_table_from_artifacts(compiled_dir)
-                    )
+                    site_table: ParticipantTable | None = state.get(
+                        "participant_table"
+                    ) or load_participant_table_from_artifacts(compiled_dir)
                     if site_table is None:
                         raise ValueError("GROUP_METADATA_MISSING: no participant table for site metadata")
                     site_metadata = project_site_metadata(site_table, params.get("site_column"))
                     state["site_metadata"] = site_metadata
                     result.output_handles = site_metadata
                 elif operation == "participant_covariate_projection":
-                    covariate_table: ParticipantTable | None = (
-                        state.get("participant_table")
-                        or load_participant_table_from_artifacts(compiled_dir)
-                    )
+                    covariate_table: ParticipantTable | None = state.get(
+                        "participant_table"
+                    ) or load_participant_table_from_artifacts(compiled_dir)
                     if covariate_table is None:
                         raise ValueError("GROUP_METADATA_MISSING: no participant table for covariates")
                     covariates_raw = params.get("covariates", params.get("covariate_columns", []))
@@ -474,10 +513,9 @@ class ExecutionService:
                     state["covariate_matrix"] = covariate_matrix
                     result.output_handles = covariate_matrix
                 elif operation == "participant_dpf_projection":
-                    dpf_table: ParticipantTable | None = (
-                        state.get("participant_table")
-                        or load_participant_table_from_artifacts(compiled_dir)
-                    )
+                    dpf_table: ParticipantTable | None = state.get(
+                        "participant_table"
+                    ) or load_participant_table_from_artifacts(compiled_dir)
                     if dpf_table is None:
                         raise ValueError("GROUP_METADATA_MISSING: no participant table for DPF projection")
                     dpf_inputs = project_dpf_inputs(
@@ -488,10 +526,9 @@ class ExecutionService:
                     state["dpf_inputs"] = dpf_inputs
                     result.output_handles = dpf_inputs
                 elif operation == "participant_outcome_projection":
-                    outcome_table: ParticipantTable | None = (
-                        state.get("participant_table")
-                        or load_participant_table_from_artifacts(compiled_dir)
-                    )
+                    outcome_table: ParticipantTable | None = state.get(
+                        "participant_table"
+                    ) or load_participant_table_from_artifacts(compiled_dir)
                     if outcome_table is None:
                         raise ValueError("GROUP_METADATA_MISSING: no participant table for outcome projection")
                     outcome = project_outcome_vector(
@@ -501,11 +538,85 @@ class ExecutionService:
                     )
                     state["outcome_vector"] = outcome
                     result.output_handles = outcome
-                elif operation == "combat_preflight":
-                    combat_table: ParticipantTable | None = (
-                        state.get("participant_table")
-                        or load_participant_table_from_artifacts(compiled_dir)
+                elif operation == "localization_projection_import":
+                    from fnirs_flow.adapters.localization_import import import_projection_coordinate_csv
+
+                    path = params.get("path") or params.get("csv_path") or params.get("projection_csv")
+                    if not path:
+                        raise ValueError(
+                            "LOCALIZATION_PROJECTION_MISSING: localization_projection_import requires path"
+                        )
+                    import_result = import_projection_coordinate_csv(
+                        path,
+                        outdir / "derivatives" / "localization",
+                        base_dir=outdir,
+                        atom_id=atom_id,
+                        coordinate_set_id=str(params.get("coordinate_set_id", "")),
+                        coordinate_columns=params.get("coordinate_columns"),
+                        label_column=str(params.get("label_column", "")),
+                        include_match_statuses=params.get("include_match_statuses"),
+                        accuracy_caveat=str(params.get("accuracy_caveat", "not_claimed_to_reproduce_nirsspm_accuracy")),
+                        method_id=str(params.get("method_id", operation)),
                     )
+                    state["projected_mni_channels"] = import_result["output"]
+                    result.output_handles = import_result["output_handles"]
+                    result.provenance.update(import_result["provenance"])
+                    result.warnings.extend(import_result["warnings"])
+                    result.artifacts.extend(
+                        [
+                            self._path_artifact_summary(
+                                path,
+                                outdir,
+                                artifact_type="ProjectedMNIChannels"
+                                if path.name.endswith("_projected_mni_channels.csv")
+                                else "ProjectionImportManifest",
+                                artifact_id=f"{atom_id}-{path.stem}",
+                                atom_id=atom_id,
+                                step_id=atom_id,
+                            )
+                            for path in import_result["artifact_paths"]
+                        ]
+                    )
+                elif operation == "nirs_spm_surface_projection":
+                    from fnirs_flow.adapters.nirsspm_projection import run_nirsspm_surface_projection_csv
+
+                    path = params.get("path") or params.get("csv_path") or params.get("head_surface_mni_csv")
+                    if not path:
+                        raise ValueError("NIRS_SPM_PROJECTION_MISSING: nirs_spm_surface_projection requires path")
+                    projection_result = run_nirsspm_surface_projection_csv(
+                        path,
+                        outdir / "derivatives" / "localization",
+                        reference_dir=params.get("reference_dir"),
+                        base_dir=outdir,
+                        atom_id=atom_id,
+                        coordinate_set_id=str(params.get("coordinate_set_id", "")),
+                        label_column=str(params.get("label_column", "")),
+                        head_coordinate_columns=params.get("head_coordinate_columns"),
+                        reference_coordinate_columns=params.get("reference_coordinate_columns"),
+                    )
+                    state["nirsspm_projected_mni"] = projection_result["output"]
+                    result.output_handles = projection_result["output_handles"]
+                    result.provenance.update(projection_result["provenance"])
+                    result.warnings.extend(projection_result["warnings"])
+                    result.artifacts.extend(
+                        [
+                            self._path_artifact_summary(
+                                path,
+                                outdir,
+                                artifact_type="NirsspmSurfaceProjection"
+                                if path.name.endswith("_nirsspm_surface_projection.csv")
+                                else "ProjectionValidationReport",
+                                artifact_id=f"{atom_id}-{path.stem}",
+                                atom_id=atom_id,
+                                step_id=atom_id,
+                            )
+                            for path in projection_result["artifact_paths"]
+                        ]
+                    )
+                elif operation == "combat_preflight":
+                    combat_table: ParticipantTable | None = state.get(
+                        "participant_table"
+                    ) or load_participant_table_from_artifacts(compiled_dir)
                     if combat_table is None:
                         raise ValueError("GROUP_METADATA_MISSING: no participant table for ComBat preflight")
                     combat_manifest = project_combat_manifest(
@@ -524,10 +635,9 @@ class ExecutionService:
                     state["combat_preflight"] = preflight.model_dump()
                     result.output_handles = preflight.model_dump()
                 elif operation == "observation_pairing_projection":
-                    pairing_table: ParticipantTable | None = (
-                        state.get("participant_table")
-                        or load_participant_table_from_artifacts(compiled_dir)
-                    )
+                    pairing_table: ParticipantTable | None = state.get(
+                        "participant_table"
+                    ) or load_participant_table_from_artifacts(compiled_dir)
                     if pairing_table is None:
                         raise ValueError("GROUP_METADATA_MISSING: no observation table for pairing")
                     if getattr(pairing_table, "table_kind", "participant") != "observation":
@@ -535,12 +645,24 @@ class ExecutionService:
                             "GROUP_METADATA_MISSING: observation_pairing_projection requires ObservationTable"
                         )
                     from fnirs_flow.data.participants import ObservationTable
+
                     observation_table = ObservationTable(**pairing_table.model_dump())
                     pairing = project_pairing_structure(observation_table)
                     dyad = project_dyad_structure(observation_table)
                     result.output_handles = {"pairing_structure": pairing, "dyad_structure": dyad}
                 elif operation == "group_design_matrix":
                     result.output_handles = {"status": "deferred_to_group_summary"}
+                elif operation == "group_level_glm":
+                    result.output_handles = {
+                        "status": "deferred_to_group_summary",
+                        "expected_tables": ["group_glm_results.csv", "group_glm_results.json"],
+                    }
+                elif operation == "group_contrast":
+                    result.output_handles = {
+                        "status": "deferred_to_group_summary",
+                        "expected_tables": ["contrast_results.csv", "contrast_results.json"],
+                        "expected_figures": ["contrast_effects.svg"],
+                    }
                 result.status = "completed"
             except (OSError, ValueError, TypeError) as exc:
                 result.status = "failed"
@@ -551,12 +673,40 @@ class ExecutionService:
 
     @staticmethod
     def _extract_group_config(plan: dict[str, Any], dag: dict[str, Any]) -> dict[str, Any]:
+        config: dict[str, Any] = {}
         for atom in dag.get("atoms", dag.get("nodes", [])):
-            if atom.get("operation") == "group_design_matrix" or atom.get("atom_type") == "group_design_matrix":
-                params = atom.get("parameters", {})
-                return dict(params) if isinstance(params, dict) else {}
+            operation = atom.get("operation") or atom.get("atom_type")
+            if operation not in {"group_design_matrix", "group_level_glm", "group_contrast"}:
+                continue
+            params = atom.get("parameters", {})
+            if not isinstance(params, dict):
+                continue
+            if operation == "group_contrast":
+                contrast_params = dict(params)
+                if "contrasts" not in contrast_params and (
+                    contrast_params.get("contrast_expression")
+                    or contrast_params.get("weights")
+                    or contrast_params.get("weight_matrix")
+                ):
+                    contrast_params["contrasts"] = [
+                        {
+                            "name": contrast_params.get("contrast_name")
+                            or contrast_params.get("name")
+                            or "Group contrast",
+                            "type": contrast_params.get("contrast_type") or contrast_params.get("type") or "T",
+                            "expression": contrast_params.get("contrast_expression", ""),
+                            "weights": contrast_params.get("weights"),
+                            "weight_matrix": contrast_params.get("weight_matrix"),
+                            "terms": contrast_params.get("terms"),
+                        }
+                    ]
+                config.update({key: value for key, value in contrast_params.items() if value not in (None, "")})
+            else:
+                config.update(params)
         group_model = plan.get("group_model", {})
-        return dict(group_model) if isinstance(group_model, dict) else {}
+        if isinstance(group_model, dict):
+            return {**group_model, **config}
+        return config
 
     def _load_plan(self, compiled_dir: Path) -> dict[str, Any]:
         """Load plan.json from compiled directory."""
@@ -589,9 +739,11 @@ class ExecutionService:
             raise FileNotFoundError(f"data_manifest.json not found in {compiled_dir}")
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        data_root = Path(request.data_root or manifest.get("local_root", "")).resolve() if (
-            request.data_root or manifest.get("local_root")
-        ) else None
+        data_root = (
+            Path(request.data_root or manifest.get("local_root", "")).resolve()
+            if (request.data_root or manifest.get("local_root"))
+            else None
+        )
         runs: list[RunContext] = []
         seen_run_ids: set[str] = set()
 
@@ -768,9 +920,7 @@ class ExecutionService:
             for row_index, row in enumerate(rows):
                 for key, value in row.items():
                     if isinstance(value, float) and not math.isfinite(value):
-                        raise ValueError(
-                            f"Non-finite {kind} result at row {row_index}, field '{key}'"
-                        )
+                        raise ValueError(f"Non-finite {kind} result at row {row_index}, field '{key}'")
             result_dir = outdir / "derivatives" / kind
             result_dir.mkdir(parents=True, exist_ok=True)
             stem = f"{run_result.run_id}_{kind}_results"
@@ -784,11 +934,7 @@ class ExecutionService:
                 writer.writerows(rows)
             for path in (json_path, csv_path):
                 source_atom_ids = sorted(
-                    {
-                        str(row.get("source_atom_id", ""))
-                        for row in rows
-                        if row.get("source_atom_id")
-                    }
+                    {str(row.get("source_atom_id", "")) for row in rows if row.get("source_atom_id")}
                 )
                 artifact = self._path_artifact_summary(
                     path,
@@ -852,15 +998,9 @@ class ExecutionService:
         """Attach newly emitted adapter artifacts to their atom and run."""
         from fnirs_flow.api.uri import create_project_uri
 
-        existing_run = {
-            (str(item.get("artifact_id", "")), str(item.get("path", "")))
-            for item in run_result.artifacts
-        }
+        existing_run = {(str(item.get("artifact_id", "")), str(item.get("path", ""))) for item in run_result.artifacts}
         existing_atom = (
-            {
-                (str(item.get("artifact_id", "")), str(item.get("path", "")))
-                for item in atom_result.artifacts
-            }
+            {(str(item.get("artifact_id", "")), str(item.get("path", ""))) for item in atom_result.artifacts}
             if atom_result is not None
             else set()
         )
@@ -892,6 +1032,45 @@ class ExecutionService:
             if identity not in existing_run:
                 run_result.artifacts.append(artifact)
                 existing_run.add(identity)
+
+    def _collect_group_result_artifacts(self, outdir: Path) -> list[dict[str, Any]]:
+        group_dir = outdir / "derivatives" / "group"
+        if not group_dir.is_dir():
+            return []
+        artifact_specs = {
+            "analysis_table.csv": ("GroupAnalysisTable", "group_design_matrix"),
+            "group_design_matrix.csv": ("GroupDesignMatrix", "group_design_matrix"),
+            "group_design_spec.json": ("GroupDesignSpec", "group_design_matrix"),
+            "group_summary.csv": ("GroupSummaryTable", "group_summary"),
+            "group_summary.json": ("GroupSummaryJson", "group_summary"),
+            "group_glm_results.csv": ("GroupGLMResultsTable", "group_level_glm"),
+            "group_glm_results.json": ("GroupGLMResultsJson", "group_level_glm"),
+            "contrast_matrix.csv": ("ContrastMatrixTable", "group_contrast"),
+            "contrast_results.csv": ("ContrastResultsTable", "group_contrast"),
+            "contrast_results.json": ("ContrastResultsJson", "group_contrast"),
+            "effect_sizes.csv": ("ContrastEffectSizesTable", "group_contrast"),
+            "effect_sizes.json": ("ContrastEffectSizesJson", "group_contrast"),
+            "multiple_comparison_results.csv": ("MultipleComparisonResultsTable", "group_contrast"),
+            "multiple_comparison_results.json": ("MultipleComparisonResultsJson", "group_contrast"),
+            "group_contrasts.json": ("GroupContrastSpec", "group_contrast"),
+            "contrast_effects.svg": ("ContrastEffectFigure", "group_contrast"),
+        }
+        artifacts: list[dict[str, Any]] = []
+        for filename, (artifact_type, atom_id) in artifact_specs.items():
+            path = group_dir / filename
+            if not path.exists():
+                continue
+            artifacts.append(
+                self._path_artifact_summary(
+                    path,
+                    outdir,
+                    artifact_type=artifact_type,
+                    artifact_id=f"group-{path.stem}-{path.suffix.lstrip('.')}",
+                    atom_id=atom_id,
+                    step_id=atom_id,
+                )
+            )
+        return artifacts
 
     def _execute_dag(
         self,
@@ -942,11 +1121,7 @@ class ExecutionService:
 
         # Read data using the default adapter
         raw = default_adapter.read_run(run_ctx.data_path)
-        initial_artifacts = (
-            default_adapter.artifacts.all()
-            if hasattr(default_adapter, "artifacts")
-            else []
-        )
+        initial_artifacts = default_adapter.artifacts.all() if hasattr(default_adapter, "artifacts") else []
 
         # Build atom map from DAG (reuse atoms_list from above)
         atom_map = {a.get("atom_id") or a.get("step_id"): a for a in atoms_list}
@@ -1083,9 +1258,7 @@ class ExecutionService:
                         },
                     )
                     if is_read_atom:
-                        matching_records = [
-                            record for record in initial_artifacts if record.step_id == "read_run"
-                        ]
+                        matching_records = [record for record in initial_artifacts if record.step_id == "read_run"]
                         self._append_adapter_artifacts(
                             run_result,
                             data_result,
@@ -1121,6 +1294,38 @@ class ExecutionService:
                     run_id=run_ctx.run_id,
                     atom_id=atom_id,
                 )
+
+                if operation == "empty_marker":
+                    marker = {
+                        "status": "empty",
+                        "operation": operation,
+                        "category": category,
+                        "no_op": True,
+                        "predecessor_atom_ids": sorted(predecessors),
+                        "state_marker": params.get("state_marker") or f"empty_{category or atom_id}",
+                    }
+                    intermediate_state[atom_id] = marker
+                    raw_outputs[atom_id] = raw_input
+                    atom_result.status = "completed"
+                    atom_result.output_handles = {
+                        "marker": marker,
+                        "data": type(raw_input).__name__,
+                    }
+                    atom_result.provenance.update(
+                        {
+                            "empty_processing": True,
+                            "backend_id": "none",
+                        }
+                    )
+                    atom_result.warnings.append("Empty marker only updates state metadata; no processing was run.")
+                    run_result.atom_results.append(atom_result)
+                    self._emit_progress(
+                        "atom_completed",
+                        run_id=run_ctx.run_id,
+                        atom_id=atom_id,
+                        status=atom_result.status,
+                    )
+                    continue
 
                 adapter = None
                 artifact_offset = 0
@@ -1724,10 +1929,9 @@ class ExecutionService:
 
         all_roi_results: list[ROIResult] = []
         excluded_subjects: set[str] = set()
-        participant_table = (
-            load_participant_table_from_artifacts(outdir / "compiled")
-            or load_participant_table_from_artifacts(outdir)
-        )
+        participant_table = load_participant_table_from_artifacts(
+            outdir / "compiled"
+        ) or load_participant_table_from_artifacts(outdir)
         included_subjects: set[str] | None = None
         metadata_by_subject: dict[str, dict[str, Any]] = {}
         if participant_table is not None:
@@ -1739,8 +1943,7 @@ class ExecutionService:
             excluded_subjects.update(join["excluded_subjects"])
             included_subjects = set(join["matched_subjects"]) - set(join["excluded_subjects"])
             metadata_by_subject = {
-                str(row.get(participant_table.column_role_map.id_column, "")): row
-                for row in participant_table.rows
+                str(row.get(participant_table.column_role_map.id_column, "")): row for row in participant_table.rows
             }
 
         for rr in run_results:
@@ -1955,10 +2158,17 @@ class ExecutionService:
             )
             return
         self._write_rows(group_dir / "group_glm_results.csv", glm.coefficients)
+        self._write_json_rows(group_dir / "group_glm_results.json", glm.coefficients)
         self._write_rows(group_dir / "contrast_matrix.csv", glm.contrasts)
+        self._write_rows(group_dir / "contrast_results.csv", glm.contrasts)
+        self._write_json_rows(group_dir / "contrast_results.json", glm.contrasts)
         self._write_rows(group_dir / "effect_sizes.csv", glm.effect_sizes)
+        self._write_json_rows(group_dir / "effect_sizes.json", glm.effect_sizes)
         self._write_rows(group_dir / "multiple_comparison_results.csv", glm.corrected)
+        self._write_json_rows(group_dir / "multiple_comparison_results.json", glm.corrected)
         self._write_rows(group_dir / "sensitivity_analysis_results.csv", glm.sensitivity or [])
+        self._write_json_rows(group_dir / "sensitivity_analysis_results.json", glm.sensitivity or [])
+        self._write_contrast_effects_svg(group_dir / "contrast_effects.svg", glm.corrected or glm.contrasts)
         if cluster_inference:
             from fnirs_flow.data.participants import summarize_cluster_inference
 
@@ -1998,6 +2208,96 @@ class ExecutionService:
             writer.writeheader()
             writer.writerows(rows)
 
+    @staticmethod
+    def _write_json_rows(path: Path, rows: list[dict[str, Any]]) -> None:
+        if not rows:
+            return
+        path.write_text(json.dumps({"rows": rows}, indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _write_contrast_effects_svg(path: Path, rows: list[dict[str, Any]], *, limit: int = 20) -> None:
+        if not rows:
+            return
+        candidates: list[dict[str, Any]] = []
+        for row in rows:
+            raw_value = row.get("estimate")
+            if raw_value in ("", None):
+                raw_value = row.get("t_value", row.get("f_value", 0.0))
+            try:
+                value = float(raw_value)
+            except (TypeError, ValueError):
+                continue
+            label_parts = [
+                str(row.get("roi") or row.get("channel") or row.get("source_atom_id") or "feature"),
+                str(row.get("source_contrast") or row.get("contrast_name") or "contrast"),
+            ]
+            candidates.append({**row, "_value": value, "_label": " · ".join(part for part in label_parts if part)})
+        if not candidates:
+            return
+        selected = sorted(candidates, key=lambda item: abs(float(item["_value"])), reverse=True)[:limit]
+        max_abs = max(abs(float(item["_value"])) for item in selected) or 1.0
+        width = 860
+        row_height = 28
+        top = 48
+        left = 250
+        plot_width = 520
+        height = top + row_height * len(selected) + 34
+        zero_x = left + plot_width / 2
+
+        def esc(value: Any) -> str:
+            return (
+                str(value)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+            )
+
+        parts = [
+            (
+                f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" '
+                f'height="{height}" viewBox="0 0 {width} {height}">'
+            ),
+            '<rect width="100%" height="100%" fill="#ffffff"/>',
+            (
+                '<text x="24" y="28" font-family="Arial, sans-serif" '
+                'font-size="18" font-weight="700" fill="#0f172a">'
+                "Top group contrast effects</text>"
+            ),
+            (
+                f'<line x1="{zero_x:.1f}" y1="{top - 14}" '
+                f'x2="{zero_x:.1f}" y2="{height - 24}" '
+                'stroke="#94a3b8" stroke-width="1"/>'
+            ),
+        ]
+        for index, row in enumerate(selected):
+            value = float(row["_value"])
+            y = top + index * row_height
+            bar_width = abs(value) / max_abs * (plot_width / 2)
+            x = zero_x if value >= 0 else zero_x - bar_width
+            color = "#2563eb" if value >= 0 else "#b45309"
+            label = esc(row["_label"])
+            value_label = esc(f"{value:.3g}")
+            p_value = row.get("adjusted_p_value", row.get("p_value", ""))
+            p_label = esc(f"p={float(p_value):.3g}" if isinstance(p_value, int | float) else str(p_value))
+            parts.extend(
+                [
+                    (
+                        f'<text x="24" y="{y + 17}" '
+                        'font-family="Arial, sans-serif" font-size="12" '
+                        f'fill="#334155">{label}</text>'
+                    ),
+                    f'<rect x="{x:.1f}" y="{y + 5}" width="{bar_width:.1f}" height="14" rx="3" fill="{color}"/>',
+                    (
+                        f'<text x="{left + plot_width + 14}" y="{y + 17}" '
+                        'font-family="Arial, sans-serif" font-size="12" '
+                        f'fill="#334155">{value_label} {p_label}</text>'
+                    ),
+                ]
+            )
+        parts.append("</svg>")
+        path.write_text("\n".join(parts), encoding="utf-8")
+
     def _generate_channel_group_summary(
         self,
         run_results: list[RunExecutionResult],
@@ -2005,10 +2305,9 @@ class ExecutionService:
     ) -> Path | None:
         """Export subject-level channel values and aggregate channel statistics."""
         rows: list[dict[str, Any]] = []
-        participant_table = (
-            load_participant_table_from_artifacts(outdir / "compiled")
-            or load_participant_table_from_artifacts(outdir)
-        )
+        participant_table = load_participant_table_from_artifacts(
+            outdir / "compiled"
+        ) or load_participant_table_from_artifacts(outdir)
         included_subjects: set[str] | None = None
         if participant_table is not None:
             join = join_participant_metadata(

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store';
 import { formatApiError, getProjectResults, type ArtifactSummary, type ProjectResults } from '../api/client';
+import { sanitizeSvg } from '../utils/sanitizeSvg';
 
 interface LocatedArtifact extends ArtifactSummary {
   run_id?: string;
@@ -291,8 +292,11 @@ function ResultDataPanel({
   if (loading) return <div className="loading-state">Loading {title}...</div>;
   if (error) return <div className="error-message">{error}</div>;
   if (!result || result.file_count === 0) {
-    return <div className="empty-state compact"><p>No {title.toLowerCase()} files available.</p></div>;
+    if (!result?.figures?.length) {
+      return <div className="empty-state compact"><p>No {title.toLowerCase()} files available.</p></div>;
+    }
   }
+  const figures = result.figures || [];
   const rows: Array<Record<string, unknown>> = result.files.flatMap((file) => {
     const data = file.data as Record<string, unknown> | unknown[];
     const values = Array.isArray(data)
@@ -309,19 +313,31 @@ function ResultDataPanel({
   const columns = Array.from(new Set(previewRows.flatMap((row) => Object.keys(row)))).slice(0, 10);
   return (
     <div className="artifacts-panel">
-      <p className="muted">{result.file_count} files · {rows.length} rows{rows.length > 100 ? ' · showing 100 representative rows' : ''}</p>
-      <table className="artifacts-table">
-        <thead><tr>{columns.map((column) => <th key={column}>{column.replace(/^__/, '')}</th>)}</tr></thead>
-        <tbody>
-          {previewRows.map((row, index) => (
-            <tr key={`${String(row.__file)}-${index}`}>
-              {columns.map((column) => (
-                <td key={column}><code>{formatCell(row[column])}</code></td>
-              ))}
-            </tr>
+      <p className="muted">{result.file_count} files · {rows.length} rows{figures.length ? ` · ${figures.length} figures` : ''}{rows.length > 100 ? ' · showing 100 representative rows' : ''}</p>
+      {figures.length > 0 && (
+        <div className="result-figures">
+          {figures.map((figure) => (
+            <figure key={figure.path}>
+              <figcaption>{figure.path}</figcaption>
+              <div className="result-svg-frame" dangerouslySetInnerHTML={{ __html: sanitizeSvg(figure.svg) }} />
+            </figure>
           ))}
-        </tbody>
-      </table>
+        </div>
+      )}
+      {rows.length > 0 && (
+        <table className="artifacts-table">
+          <thead><tr>{columns.map((column) => <th key={column}>{column.replace(/^__/, '')}</th>)}</tr></thead>
+          <tbody>
+            {previewRows.map((row, index) => (
+              <tr key={`${String(row.__file)}-${index}`}>
+                {columns.map((column) => (
+                  <td key={column}><code>{formatCell(row[column])}</code></td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

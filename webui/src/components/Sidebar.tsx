@@ -1,6 +1,12 @@
 import { useMemo, useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Layers, Search, Sparkles } from 'lucide-react';
 import { listAtomTemplates, type AtomTemplate } from '../api/client';
+import {
+  recommendationReasonForTemplate,
+  recommendationTierForTemplate,
+  type ChecklistTemplateRecommendation,
+  type ChecklistRecommendationTier,
+} from '../flow/atomFactory';
 
 const categoryColors: Record<string, string> = {
   data: '#0f766e',
@@ -14,7 +20,31 @@ const categoryColors: Record<string, string> = {
 
 const categoryOrder = ['data', 'design', 'preprocessing', 'analysis', 'output', 'validation', 'export'];
 
-export function Sidebar() {
+interface SidebarProps {
+  highlightedTemplateIds?: string[];
+  checklistRecommendations?: ChecklistTemplateRecommendation[];
+  activeChecklistLabel?: string;
+}
+
+const tierLabels: Record<ChecklistRecommendationTier, string> = {
+  best: 'Best fit',
+  recommended: 'Recommended',
+  alternative: 'Alternative',
+  off_path: 'Off path',
+};
+
+const tierRank: Record<ChecklistRecommendationTier, number> = {
+  best: 0,
+  recommended: 1,
+  alternative: 2,
+  off_path: 3,
+};
+
+export function Sidebar({
+  highlightedTemplateIds = [],
+  checklistRecommendations = [],
+  activeChecklistLabel = '',
+}: SidebarProps) {
   const [templates, setTemplates] = useState<AtomTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set(categoryOrder));
@@ -28,6 +58,12 @@ export function Sidebar() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (highlightedTemplateIds.length === 0) return;
+    setActiveCategory('checklist');
+    setExpanded(new Set(categoryOrder));
+  }, [highlightedTemplateIds]);
+
   const categories = useMemo(() => {
     const seen = new Set(templates.map((template) => template.category));
     return categoryOrder.filter((category) => seen.has(category)).concat(
@@ -37,8 +73,11 @@ export function Sidebar() {
 
   const filteredTemplates = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
+    const highlighted = new Set(highlightedTemplateIds);
     return templates.filter((template) => {
-      const inCategory = activeCategory === 'all' || template.category === activeCategory;
+      const highlightedTemplate = highlighted.has(template.id) || highlighted.has(template.operation);
+      const inCategory = activeCategory === 'all' || template.category === activeCategory ||
+        (activeCategory === 'checklist' && highlightedTemplate);
       const text = [
         template.display_name,
         template.atom_type,
@@ -48,12 +87,19 @@ export function Sidebar() {
       ].join(' ').toLowerCase();
       return inCategory && (!normalizedQuery || text.includes(normalizedQuery));
     });
-  }, [activeCategory, query, templates]);
+  }, [activeCategory, highlightedTemplateIds, query, templates]);
 
   const grouped = filteredTemplates.reduce<Record<string, AtomTemplate[]>>((acc, template) => {
     (acc[template.category] = acc[template.category] || []).push(template);
     return acc;
   }, {});
+  Object.keys(grouped).forEach((category) => {
+    grouped[category] = grouped[category].slice().sort((a, b) => {
+      const aTier = recommendationTierForTemplate(checklistRecommendations, a);
+      const bTier = recommendationTierForTemplate(checklistRecommendations, b);
+      return tierRank[aTier] - tierRank[bTier] || a.display_name.localeCompare(b.display_name);
+    });
+  });
 
   const toggleCategory = (category: string) => {
     setExpanded((previous) => {
@@ -89,10 +135,29 @@ export function Sidebar() {
         />
       </label>
 
+      {highlightedTemplateIds.length > 0 && (
+        <button
+          className="checklist-library-focus"
+          onClick={() => {
+            setActiveCategory('checklist');
+            setExpanded(new Set(categoryOrder));
+          }}
+          type="button"
+        >
+          <Sparkles size={14} />
+          <span>{activeChecklistLabel ? `Recommended for ${activeChecklistLabel}` : 'Checklist recommendations'}</span>
+        </button>
+      )}
+
       <div className="category-tabs" aria-label="Atom categories">
         <button className={activeCategory === 'all' ? 'active' : ''} onClick={() => setActiveCategory('all')}>
           All
         </button>
+        {highlightedTemplateIds.length > 0 && (
+          <button className={activeCategory === 'checklist' ? 'active' : ''} onClick={() => setActiveCategory('checklist')}>
+            Checklist
+          </button>
+        )}
         {categories.map((category) => (
           <button
             key={category}
@@ -123,10 +188,16 @@ export function Sidebar() {
                 </button>
                 {open && (
                   <div className="category-atoms">
-                    {atoms.map((atom) => (
+                    {atoms.map((atom) => {
+                      const highlighted = highlightedTemplateIds.includes(atom.id) ||
+                        highlightedTemplateIds.includes(atom.operation);
+                      const tier = recommendationTierForTemplate(checklistRecommendations, atom);
+                      const reason = highlighted ? recommendationReasonForTemplate(checklistRecommendations, atom) : '';
+                      const showTier = highlighted && tier !== 'off_path';
+                      return (
                       <div
                         key={atom.id}
-                        className="atom-item"
+                        className={`atom-item ${highlighted ? 'checklist-recommended' : ''} checklist-tier-${tier}`}
                         draggable
                         onDragStart={(event) => onDragStart(event, atom)}
                         title={atom.description || atom.atom_type}
@@ -141,8 +212,11 @@ export function Sidebar() {
                             E{atom.evidence_refs.length}
                           </span>
                         )}
+                        {showTier && <span className={`atom-recommendation tier-${tier}`}>{tierLabels[tier]}</span>}
+                        {reason && <span className="atom-recommendation-reason">{reason}</span>}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </section>

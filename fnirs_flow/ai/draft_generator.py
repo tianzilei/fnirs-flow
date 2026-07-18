@@ -65,8 +65,7 @@ def _connect_schema_matched_ports(nodes: list[dict[str, Any]]) -> list[dict[str,
     edges: list[dict[str, Any]] = []
     for target_index, target in enumerate(nodes):
         target_ports = [
-            port for port in target.get("ports", [])
-            if port.get("direction") == "in" and port.get("required", True)
+            port for port in target.get("ports", []) if port.get("direction") == "in" and port.get("required", True)
         ]
         for target_port in target_ports:
             target_schema = target_port.get("schema")
@@ -74,7 +73,8 @@ def _connect_schema_matched_ports(nodes: list[dict[str, Any]]) -> list[dict[str,
             for source in reversed(nodes[:target_index]):
                 source_port = next(
                     (
-                        port for port in source.get("ports", [])
+                        port
+                        for port in source.get("ports", [])
                         if port.get("direction") == "out" and port.get("schema") == target_schema
                     ),
                     None,
@@ -87,10 +87,7 @@ def _connect_schema_matched_ports(nodes: list[dict[str, Any]]) -> list[dict[str,
             source, source_port = source_match
             edges.append(
                 {
-                    "id": (
-                        f"e_{source['id']}_{source_port['name']}"
-                        f"_{target['id']}_{target_port['name']}"
-                    ),
+                    "id": (f"e_{source['id']}_{source_port['name']}_{target['id']}_{target_port['name']}"),
                     "source": source["id"],
                     "target": target["id"],
                     "source_handle": source_port["name"],
@@ -161,9 +158,7 @@ def generate_draft_flow(
     nodes: list[dict[str, Any]] = []
     template_plan = _scenario_template_plan(scenario_id, scenario.required_atom_types)
     missing_templates = [
-        f"{atom_type} ({template_id})"
-        for atom_type, template_id in template_plan
-        if node_lib.get(template_id) is None
+        f"{atom_type} ({template_id})" for atom_type, template_id in template_plan if node_lib.get(template_id) is None
     ]
     if missing_templates:
         raise ValueError(
@@ -209,6 +204,11 @@ def generate_draft_flow(
         if atom_type in HIGH_IMPACT_TYPES or node.get("type") in HIGH_IMPACT_TYPES:
             node["readiness_status"] = "needs_attention"
             node["requires_review"] = True
+        if atom_type == "design_matrix":
+            metadata = node.setdefault("metadata", {})
+            metadata["order_contract"] = {
+                "allowed_upstream_categories": ["design", "preprocessing"],
+            }
 
         nodes.append(node)
 
@@ -243,8 +243,7 @@ def generate_draft_flow(
         "flow_id": f"draft-{scenario_id}-{uuid.uuid4().hex[:8]}",
         "name": study_name or f"AI Draft: {scenario.name}",
         "description": (
-            f"AI-generated candidate flow for {scenario.description}. "
-            "Requires user review before execution."
+            f"AI-generated candidate flow for {scenario.description}. Requires user review before execution."
         ),
         "metadata": {
             "author": "ai-draft",

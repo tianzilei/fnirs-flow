@@ -250,12 +250,48 @@ def test_results_endpoint_reads_imported_group_results(tmp_path):
         json.dumps({"summaries": [{"roi": "motor", "mean_beta": 1.25}]}),
         encoding="utf-8",
     )
+    (group_dir / "contrast_effects.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg"><text>contrast</text></svg>',
+        encoding="utf-8",
+    )
 
     response = client.get(f"/api/projects/{project['id']}/results/group")
 
     assert response.status_code == 200
     assert response.json()["file_count"] == 1
     assert response.json()["files"][0]["data"]["summaries"][0]["roi"] == "motor"
+    assert response.json()["figures"][0]["path"] == "derivatives/group/contrast_effects.svg"
+    assert "contrast" in response.json()["figures"][0]["svg"]
+
+
+def test_results_endpoint_sanitizes_svg_figures(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    project = client.post("/api/projects", json={"name": "Sanitize Results"}).json()
+    import fnirs_flow.api.app as api_module
+
+    outdir = api_module.get_store().get_output_dir(project["id"])
+    group_dir = outdir / "compiled" / "derivatives" / "group"
+    group_dir.mkdir(parents=True)
+    (group_dir / "contrast_effects.svg").write_text(
+        (
+            '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">'
+            '<script>alert(1)</script><a href="javascript:alert(2)"><text>bad</text></a>'
+            '<text onclick="alert(3)">contrast</text></svg>'
+        ),
+        encoding="utf-8",
+    )
+
+    response = client.get(f"/api/projects/{project['id']}/results/group")
+
+    assert response.status_code == 200
+    svg = response.json()["figures"][0]["svg"]
+    assert "contrast" in svg
+    assert "script" not in svg.lower()
+    assert "javascript:" not in svg.lower()
+    assert "onload" not in svg.lower()
+    assert "onclick" not in svg.lower()
 
 
 # ============================================================================

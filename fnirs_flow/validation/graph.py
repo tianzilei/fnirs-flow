@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fnirs_flow.flow.models import FlowGraph
 from fnirs_flow.validation.models import RiskItem
+from fnirs_flow.validation.order import validate_order_and_empty_policy
 
 
 def validate_atom_slot_contracts(flow: FlowGraph) -> list[RiskItem]:
@@ -120,6 +121,7 @@ def validate_graph(flow: FlowGraph) -> tuple[list[str], list[str], list[RiskItem
 
     # Check atom slot contracts (schema compatibility)
     risks.extend(validate_atom_slot_contracts(flow))
+    risks.extend(validate_order_and_empty_policy(flow))
 
     # Cycle detection via DFS
     adjacency: dict[str, list[str]] = {nid: [] for nid in node_ids}

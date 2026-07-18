@@ -93,12 +93,21 @@ class FlowEdge(BaseModel):
     schema_version: str = "0.1.0"
 
 
+class FlowOrderPolicy(BaseModel):
+    """Risk acceptance switches for atom ordering and empty-link handling."""
+
+    allow_order_violations: bool = False
+    allow_empty_edges: bool = False
+
+
 class FlowMetadata(BaseModel):
     created_at: str = ""
     modified_at: str = ""
     author: str = ""
     tags: list[str] = Field(default_factory=list)
     ai_generation: AIGenerationMetadata | None = None
+    order_policy: FlowOrderPolicy = Field(default_factory=FlowOrderPolicy)
+    checklist: dict[str, Any] = Field(default_factory=dict)
 
 
 class FlowGraph(BaseModel):

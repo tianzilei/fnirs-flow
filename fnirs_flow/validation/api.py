@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
+from fnirs_flow.flow.checklists import validate_checklist_coverage
+from fnirs_flow.flow.empty_markers import normalize_empty_markers
 from fnirs_flow.flow.models import FlowGraph
 from fnirs_flow.flow.schemas import validate_flow_dict
 from fnirs_flow.registry.validators import validate_scenario_constraints
@@ -33,6 +35,7 @@ def validate_flow(flow_dict: dict, scenario_id: str | None = None) -> Validation
     9. Scenario-specific validation (if scenario_id provided)
     """
     report = ValidationReport()
+    flow_dict = normalize_empty_markers(flow_dict)
 
     # 1. Schema validation
     schema_errors = validate_flow_dict(flow_dict)
@@ -81,6 +84,12 @@ def validate_flow(flow_dict: dict, scenario_id: str | None = None) -> Validation
     if scenario_id:
         scenario_risks = validate_scenario_constraints(flow, scenario_id)
         report.risks.extend(scenario_risks)
+
+    metadata = flow.metadata.model_dump() if flow.metadata is not None else {}
+    checklist_meta = metadata.get("checklist", {}) if isinstance(metadata.get("checklist"), dict) else {}
+    checklist_scenario_id = scenario_id or checklist_meta.get("scenario_id")
+    if checklist_scenario_id:
+        report.risks.extend(validate_checklist_coverage(flow, str(checklist_scenario_id)))
 
     # 10. AI-generated flow confirmation gate
     ai_generation = flow.metadata.ai_generation

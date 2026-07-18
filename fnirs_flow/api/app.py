@@ -67,6 +67,7 @@ from fnirs_flow.api.projects import (
     validate_project_execution,
     validate_project_flow,
 )
+from fnirs_flow.api.svg_sanitizer import sanitize_svg
 from fnirs_flow.data.registry import DatasetRegistry
 from fnirs_flow.filesystem import is_macos_metadata_path
 
@@ -1013,6 +1014,67 @@ def _sanitize_ai_settings(body: dict[str, Any]) -> dict[str, Any]:
     return sanitized
 
 
+def _draft_generation_inputs(body: dict[str, Any], ai_settings: dict[str, Any]) -> dict[str, Any]:
+    assumptions = list(body.get("assumptions") or [])
+    user_confirmations = list(body.get("user_confirmations") or [])
+    model_name = str(ai_settings.get("model") or body.get("model", "api_template"))
+    external_flow: dict[str, Any] | None = None
+
+    if ai_settings.get("mode") == "openai-compatible":
+        if os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("FNIRS_FLOW_ALLOW_EXTERNAL_AI_IN_TESTS"):
+            ai_settings["provider_status"] = "disabled_in_tests"
+            return {
+                "assumptions": assumptions,
+                "user_confirmations": user_confirmations,
+                "model_name": model_name,
+                "ai_settings": ai_settings,
+                "external_flow": external_flow,
+            }
+
+        from fnirs_flow.ai.openai_compatible import (
+            AIProviderError,
+            AIProviderNotConfigured,
+            generate_openai_compatible_flow,
+        )
+
+        try:
+            generated = generate_openai_compatible_flow(
+                scenario=str(body.get("scenario", "task")),
+                study_name=str(body.get("study_name", "")),
+                data_format=str(body.get("data_format", "snirf")),
+                conditions=[str(item) for item in body.get("conditions") or []],
+                settings=ai_settings,
+            )
+        except AIProviderNotConfigured:
+            ai_settings["provider_status"] = "not_configured"
+        except AIProviderError as exc:
+            raise _api_error(
+                502,
+                "AI_PROVIDER_REQUEST_FAILED",
+                str(exc),
+                "ai_draft",
+                recoverable=True,
+                suggested_action=(
+                    "Check OPENAI_BASE_URL, OPENAI_MODEL, OPENAI_API_KEY, "
+                    "and provider chat/completions support."
+                ),
+            ) from exc
+        else:
+            external_flow = generated.get("flow") if isinstance(generated.get("flow"), dict) else None
+            ai_settings.update(generated.get("settings") or {})
+            if generated.get("usage"):
+                ai_settings["usage"] = generated["usage"]
+            model_name = str(ai_settings.get("model") or model_name)
+
+    return {
+        "assumptions": assumptions,
+        "user_confirmations": user_confirmations,
+        "model_name": model_name,
+        "ai_settings": ai_settings,
+        "external_flow": external_flow,
+    }
+
+
 @app.post("/api/ai/draft-flow")
 async def generate_ai_draft_endpoint(body: dict[str, Any]):
     """Generate a candidate flow from a scenario template."""
@@ -1020,19 +1082,21 @@ async def generate_ai_draft_endpoint(body: dict[str, Any]):
 
     scenario = body.get("scenario", "task")
     ai_settings = _sanitize_ai_settings(body)
-    model_name = ai_settings.get("model") or body.get("model", "api_template")
+    draft_inputs = _draft_generation_inputs(body, ai_settings)
+    if draft_inputs["external_flow"] is not None:
+        return draft_inputs["external_flow"]
     try:
         flow = generate_draft_flow(
             scenario,
             study_name=body.get("study_name", ""),
             data_format=body.get("data_format", "snirf"),
             conditions=body.get("conditions"),
-            model_name=str(model_name),
-            assumptions=body.get("assumptions"),
-            user_confirmations=body.get("user_confirmations"),
+            model_name=draft_inputs["model_name"],
+            assumptions=draft_inputs["assumptions"],
+            user_confirmations=draft_inputs["user_confirmations"],
         )
-        if ai_settings:
-            flow.setdefault("metadata", {}).setdefault("ai_generation", {})["settings"] = ai_settings
+        if draft_inputs["ai_settings"]:
+            flow.setdefault("metadata", {}).setdefault("ai_generation", {})["settings"] = draft_inputs["ai_settings"]
         return flow
     except ValueError as exc:
         raise _api_error(
@@ -1057,38 +1121,49 @@ async def generate_ai_draft_for_project_endpoint(project_id: str, body: dict[str
 
     scenario = body.get("scenario", "task")
     ai_settings = _sanitize_ai_settings(body)
-    model_name = ai_settings.get("model") or body.get("model", "api_template")
-    try:
-        flow = generate_draft_flow(
-            scenario,
-            study_name=body.get("study_name", ""),
-            data_format=body.get("data_format", "snirf"),
-            conditions=body.get("conditions"),
-            model_name=str(model_name),
-            assumptions=body.get("assumptions"),
-            user_confirmations=body.get("user_confirmations"),
-        )
-        if ai_settings:
-            flow.setdefault("metadata", {}).setdefault("ai_generation", {})["settings"] = ai_settings
-    except ValueError as exc:
-        raise _api_error(
-            422,
-            "INVALID_SCENARIO",
-            str(exc),
-            "ai_draft",
-            recoverable=True,
-            suggested_action="Use task or resting_state, or add the missing MethodAtom templates and input bindings.",
-        ) from exc
+    draft_inputs = _draft_generation_inputs(body, ai_settings)
+    if draft_inputs["external_flow"] is not None:
+        flow = draft_inputs["external_flow"]
+        flow.setdefault("metadata", {}).setdefault("ai_generation", {})["settings"] = draft_inputs["ai_settings"]
+    else:
+        try:
+            flow = generate_draft_flow(
+                scenario,
+                study_name=body.get("study_name", ""),
+                data_format=body.get("data_format", "snirf"),
+                conditions=body.get("conditions"),
+                model_name=draft_inputs["model_name"],
+                assumptions=draft_inputs["assumptions"],
+                user_confirmations=draft_inputs["user_confirmations"],
+            )
+            if draft_inputs["ai_settings"]:
+                flow.setdefault("metadata", {}).setdefault("ai_generation", {})["settings"] = draft_inputs[
+                    "ai_settings"
+                ]
+        except ValueError as exc:
+            raise _api_error(
+                422,
+                "INVALID_SCENARIO",
+                str(exc),
+                "ai_draft",
+                recoverable=True,
+                suggested_action=(
+                    "Use task or resting_state, or add the missing MethodAtom templates and input bindings."
+                ),
+            ) from exc
 
     store = get_store()
     if store.get(project_id) is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
     store.save_draft(project_id, flow)
+    if draft_inputs["external_flow"] is not None:
+        store.update_flow(project_id, flow)
     return {
         "status": "draft_pending",
         "flow_id": flow.get("flow_id"),
         "ai_generation": flow.get("metadata", {}).get("ai_generation"),
+        "imported_to_flow": draft_inputs["external_flow"] is not None,
         "message": (
             "Draft saved. Confirm with POST /api/projects/{id}/ai/confirm-draft"
             " or discard with DELETE /api/projects/{id}/ai/draft"
@@ -1461,6 +1536,11 @@ async def project_results_endpoint(project_id: str, kind: str):
         for base in (outdir / "derivatives" / kind, outdir / "compiled" / "derivatives" / kind):
             if base.is_dir():
                 paths.extend(base.glob("*.json"))
+    figure_paths: list[Path] = []
+    if kind == "group":
+        for base in (outdir / "derivatives" / "group", outdir / "compiled" / "derivatives" / "group"):
+            if base.is_dir():
+                figure_paths.extend(base.glob("*.svg"))
     files = []
     seen: set[str] = set()
     for path in sorted(paths):
@@ -1476,7 +1556,22 @@ async def project_results_endpoint(project_id: str, kind: str):
         except (OSError, json.JSONDecodeError):
             continue
         files.append({"path": logical_name, "data": data})
-    return {"kind": kind, "file_count": len(files), "files": files}
+    figures = []
+    seen_figures: set[str] = set()
+    for path in sorted(figure_paths):
+        relative = path.relative_to(outdir).as_posix()
+        if is_macos_metadata_path(relative):
+            continue
+        logical_name = relative.removeprefix("compiled/")
+        if logical_name in seen_figures:
+            continue
+        seen_figures.add(logical_name)
+        try:
+            svg = sanitize_svg(path.read_text(encoding="utf-8"))
+        except OSError:
+            continue
+        figures.append({"path": logical_name, "svg": svg})
+    return {"kind": kind, "file_count": len(files), "files": files, "figures": figures}
 
 
 # --- Dependency Management (§9.1) ---
@@ -1845,6 +1940,33 @@ async def list_atom_templates():
             }
         )
     return templates
+
+
+@app.get("/api/empty-marker-specs")
+async def list_empty_marker_specs():
+    """List schema-preserving no-op marker specs used by Empty risk handling."""
+    from fnirs_flow.flow.empty_markers import empty_marker_specs_json
+
+    return empty_marker_specs_json()
+
+
+@app.get("/api/flow-checklists")
+async def list_checklists():
+    """List available guided flow checklists."""
+    from fnirs_flow.flow.checklists import list_flow_checklists
+
+    return list_flow_checklists()
+
+
+@app.get("/api/flow-checklists/{scenario_id}")
+async def get_checklist(scenario_id: str):
+    """Return one guided flow checklist contract."""
+    from fnirs_flow.flow.checklists import checklist_to_dict, get_flow_checklist
+
+    checklist = get_flow_checklist(scenario_id)
+    if checklist is None:
+        raise HTTPException(status_code=404, detail="Checklist not found")
+    return checklist_to_dict(checklist)
 
 
 # Register the SPA fallback last. Starlette resolves routes in declaration order,
