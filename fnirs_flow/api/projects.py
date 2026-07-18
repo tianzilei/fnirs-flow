@@ -800,11 +800,65 @@ def compile_project_flow(
     )
 
 
+def load_project_compile_result(store: ProjectStore, project_id: str) -> CompileResult | None:
+    """Rehydrate the last compiled summary from persisted plan/DAG artifacts."""
+    if store.get(project_id) is None:
+        return None
+    compiled_dir = store.get_output_dir(project_id) / "compiled"
+    plan_path = compiled_dir / "plan.json"
+    dag_path = compiled_dir / "execution_dag.json"
+    if not plan_path.exists() or not dag_path.exists():
+        return None
+    try:
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        dag = json.loads(dag_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+    nodes = list(dag.get("nodes") or dag.get("atoms") or [])
+    layers = list(dag.get("execution_layers") or [])
+    node_by_id = {
+        str(node.get("atom_id") or node.get("step_id") or node.get("id")): node
+        for node in nodes
+    }
+    dag_layers = [
+        [
+            {
+                "id": str(node.get("atom_id") or node.get("step_id") or atom_id),
+                "atom_type": str(node.get("atom_type") or node.get("node_type") or ""),
+                "node_type": str(node.get("node_type") or ""),
+                "operation": str(node.get("operation") or ""),
+            }
+            for atom_id in layer
+            if (node := node_by_id.get(str(atom_id))) is not None
+        ]
+        for layer in layers
+    ]
+    atom_types = sorted(
+        {
+            str(node.get("atom_type") or node.get("node_type") or "")
+            for node in nodes
+            if node.get("atom_type") or node.get("node_type")
+        }
+    )
+    return CompileResult(
+        flow_id=str(plan.get("flow_id") or dag.get("flow_id") or ""),
+        flow_hash=str(plan.get("flow_hash") or dag.get("flow_hash") or ""),
+        steps=len(nodes),
+        layers=len(layers),
+        output_files=[f.name for f in sorted(compiled_dir.iterdir()) if is_visible_data_file(f, root=compiled_dir)],
+        dag_layers=dag_layers,
+        atoms=len(nodes),
+        atom_types=atom_types,
+    )
+
+
 def discover_project_data(
     store: ProjectStore,
     project_id: str,
     dataset_id: str,
     *,
+    data_root: str | Path | None = None,
     base_revision: int | None = None,
 ) -> DiscoverResult:
     """Discover a dataset for a project."""
@@ -814,7 +868,7 @@ def discover_project_data(
         store, project_id, reason="discover_data", base_revision=base_revision
     ) as tx:
         outdir = tx.output_dir
-        manifest = discover_dataset(dataset_id, outdir)
+        manifest = discover_dataset(dataset_id, outdir, local_root=data_root)
         if manifest.runtime_local_root:
             store.bind_dataset(manifest.dataset_id, Path(manifest.runtime_local_root))
         result = DiscoverResult(
@@ -829,6 +883,26 @@ def discover_project_data(
         tx.commit()
 
     return result
+
+
+def load_project_discover_result(store: ProjectStore, project_id: str) -> DiscoverResult | None:
+    """Rehydrate the last dataset discovery summary from data_manifest.json."""
+    if store.get(project_id) is None:
+        return None
+    compiled_dir = store.get_output_dir(project_id) / "compiled"
+    manifest = _load_data_manifest(compiled_dir)
+    if not manifest:
+        return None
+    dataset_id = str(manifest.get("dataset_id", ""))
+    binding = store.get_dataset_binding(dataset_id) if dataset_id else None
+    return DiscoverResult(
+        dataset_id=dataset_id,
+        files=len(manifest.get("files", []) or []),
+        runs=len(manifest.get("subject_session_runs", []) or []),
+        local_root=str(binding or manifest.get("runtime_local_root", "") or manifest.get("local_root", "")),
+        source_url=str((manifest.get("source") or {}).get("url", "")),
+        metadata_tables=len(manifest.get("metadata_tables", []) or []),
+    )
 
 
 def import_project_participant_table(

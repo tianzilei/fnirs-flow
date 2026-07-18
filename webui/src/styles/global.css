@@ -1134,6 +1134,15 @@ pre {
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
 }
 
+.example-flow-panel {
+  padding: 14px;
+}
+
+.example-flow-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .ready-panel {
   display: flex;
   align-items: center;
@@ -1184,6 +1193,10 @@ pre {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
+}
+
+.dataset-root-grid {
+  margin-top: 16px;
 }
 
 .metadata-grid label:first-child {
@@ -1715,6 +1728,12 @@ pre {
   display: grid;
   gap: 8px;
   padding: 12px;
+}
+
+.atom-count-note {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-left: 6px;
 }
 
 .atom-result-card {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import { formatApiError, listDatasets } from '../api/client';
+import { formatApiError, listDatasets, type DiscoverResult } from '../api/client';
 import { useStore } from '../store';
 
 interface Dataset {
@@ -41,6 +41,7 @@ export function DataWorkspace() {
   const participantTableResult = useStore((s) => s.participantTableResult);
   const [activeStep, setActiveStep] = useState<DataStep>('dataset');
   const [selectedDataset, setSelectedDataset] = useState('');
+  const [dataRoot, setDataRoot] = useState('');
   const [datasets, setDatasets] = useState<Dataset[]>(DEFAULT_DATASETS);
   const [datasetsLoading, setDatasetsLoading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -110,7 +111,7 @@ export function DataWorkspace() {
     setLoading(true);
     setError('');
     try {
-      await discover(selectedDataset);
+      await discover(selectedDataset, dataRoot.trim() || undefined);
     } catch (err) {
       setError(formatApiError(err));
     } finally {
@@ -210,6 +211,17 @@ export function DataWorkspace() {
               </div>
             ))}
           </div>
+          <div className="metadata-grid dataset-root-grid">
+            <label>
+              Local dataset root
+              <input
+                value={dataRoot}
+                onChange={(event) => setDataRoot(event.target.value)}
+                placeholder="/path/to/BIDS-NIRS-Tapping-master"
+              />
+            </label>
+          </div>
+          {discoverResult && <DiscoverySummary result={discoverResult} />}
         </section>
       )}
 
@@ -292,35 +304,7 @@ export function DataWorkspace() {
       </section>
       )}
 
-      {activeStep === 'join' && discoverResult && (
-        <div className="discovery-result">
-          <h3>Discovery Result</h3>
-          <dl>
-            <dt>Dataset ID</dt>
-            <dd>{discoverResult.dataset_id}</dd>
-            <dt>Files Found</dt>
-            <dd>{discoverResult.files}</dd>
-            <dt>Subject/Session/Runs</dt>
-            <dd>{discoverResult.runs}</dd>
-            <dt>Metadata Tables</dt>
-            <dd>{discoverResult.metadata_tables}</dd>
-            <dt>Local Root</dt>
-            <dd>{discoverResult.local_root}</dd>
-            {discoverResult.source_url && (
-              <>
-                <dt>Source URL</dt>
-                <dd><a href={discoverResult.source_url} target="_blank" rel="noopener noreferrer">{discoverResult.source_url}</a></dd>
-              </>
-            )}
-          </dl>
-
-          {discoverResult.files === 0 && (
-            <div className="warning">
-              No local files found. Data may need to be downloaded from the source URL.
-            </div>
-          )}
-        </div>
-      )}
+      {activeStep === 'join' && discoverResult && <DiscoverySummary result={discoverResult} />}
 
       {activeStep === 'join' && participantTableResult && (
         <div className="discovery-result">
@@ -478,6 +462,38 @@ export function DataWorkspace() {
             Review details
           </button>
         </section>
+      )}
+    </div>
+  );
+}
+
+function DiscoverySummary({ result }: { result: DiscoverResult }) {
+  return (
+    <div className="discovery-result">
+      <h3>Discovery Result</h3>
+      <dl>
+        <dt>Dataset ID</dt>
+        <dd>{result.dataset_id}</dd>
+        <dt>Files Found</dt>
+        <dd>{result.files}</dd>
+        <dt>Subject/Session/Runs</dt>
+        <dd>{result.runs}</dd>
+        <dt>Metadata Tables</dt>
+        <dd>{result.metadata_tables}</dd>
+        <dt>Local Root</dt>
+        <dd>{result.local_root}</dd>
+        {result.source_url && (
+          <>
+            <dt>Source URL</dt>
+            <dd><a href={result.source_url} target="_blank" rel="noopener noreferrer">{result.source_url}</a></dd>
+          </>
+        )}
+      </dl>
+
+      {result.files === 0 && (
+        <div className="warning">
+          No local files found. Data may need to be downloaded from the source URL or bound with a local dataset root.
+        </div>
       )}
     </div>
   );

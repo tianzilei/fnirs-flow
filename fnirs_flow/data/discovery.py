@@ -131,9 +131,18 @@ def _is_ignored_sidecar(path: Path) -> bool:
     return is_macos_metadata_path(path)
 
 
-def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest:
+def _discover_local_bids_nirs(
+    entry: DatasetEntry,
+    outdir: Path,
+    *,
+    local_root_override: Path | None = None,
+) -> DataManifest:
     """Discover local BIDS-NIRS files and generate a manifest."""
-    local_root = (_find_workspace_root() / entry.folder_name).resolve()
+    local_root = (
+        local_root_override.expanduser().resolve()
+        if local_root_override is not None
+        else (_find_workspace_root() / entry.folder_name).resolve()
+    )
 
     from fnirs_flow.api.uri import create_external_data_uri
 
@@ -254,7 +263,12 @@ def _discover_local_bids_nirs(entry: DatasetEntry, outdir: Path) -> DataManifest
     )
 
 
-def discover_dataset(dataset_id: str, outdir: str | Path) -> DataManifest:
+def discover_dataset(
+    dataset_id: str,
+    outdir: str | Path,
+    *,
+    local_root: str | Path | None = None,
+) -> DataManifest:
     """Discover a dataset and generate data_manifest.json.
 
     Writes data_manifest.json and run_table.csv to ``outdir/compiled/``
@@ -272,7 +286,11 @@ def discover_dataset(dataset_id: str, outdir: str | Path) -> DataManifest:
     if entry.source_kind == "mne_nirs_dataset":
         manifest = _discover_mne_dataset(entry, compiled_dir)
     elif entry.source_kind == "local_bids_nirs":
-        manifest = _discover_local_bids_nirs(entry, compiled_dir)
+        manifest = _discover_local_bids_nirs(
+            entry,
+            compiled_dir,
+            local_root_override=Path(local_root) if local_root else None,
+        )
     else:
         manifest = DataManifest(
             dataset_id=dataset_id,

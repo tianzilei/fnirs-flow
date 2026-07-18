@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from fnirs_flow.api.app import app
 from fnirs_flow.api.jobs import ExecutionJobManager
-from fnirs_flow.api.models import ExecuteResult
+from fnirs_flow.api.models import ExecuteResult, ExecutionJobRead
 from fnirs_flow.api.projects import ProjectStore
 from fnirs_flow.execution.service import ExecutionCancelledError
 
@@ -52,6 +52,65 @@ def test_job_persists_result_and_supports_attempt_query(tmp_path):
         (store.get_output_dir(project.id) / "attempts" / job.attempt_id / "job.json").read_text(encoding="utf-8")
     )
     assert persisted["status"] == "completed"
+    manager.shutdown()
+
+
+def test_attempt_queries_rewrite_staging_artifact_paths(tmp_path):
+    store = ProjectStore(tmp_path)
+    project = store.create("artifact paths")
+    attempt_id = "attempt-paths"
+    artifact_file = store.get_output_dir(project.id) / "derivatives" / "qc" / "summary.json"
+    artifact_file.parent.mkdir(parents=True)
+    artifact_file.write_text("{}", encoding="utf-8")
+    stale_path = tmp_path / ".staging" / "tx" / project.id / "outputs" / "derivatives" / "qc" / "summary.json"
+    artifact = {
+        "artifact_id": "qc-summary",
+        "type": "QC",
+        "uri": "project://outputs/derivatives/qc/summary.json",
+        "path": "project://outputs/derivatives/qc/summary.json",
+        "resolved_path": str(stale_path),
+        "relative_path": "derivatives/qc/summary.json",
+        "checksum": "",
+        "exists": True,
+        "atom_id": "qc_metrics",
+        "step_id": "qc_metrics",
+    }
+    job = ExecutionJobRead(
+        attempt_id=attempt_id,
+        project_id=project.id,
+        status="completed",
+        created_at="2026-01-01T00:00:00+00:00",
+        result=ExecuteResult(
+            attempt_id=attempt_id,
+            total_runs=1,
+            successful=1,
+            failed=0,
+            runs=[
+                {
+                    "run_id": "sub-01",
+                    "status": "completed",
+                    "artifacts": [artifact],
+                    "atom_results": [
+                        {
+                            "atom_id": "qc_metrics",
+                            "status": "completed",
+                            "artifacts": [artifact],
+                        }
+                    ],
+                }
+            ],
+        ),
+    )
+    manager = ExecutionJobManager(store, recover=False)
+    manager._jobs[(project.id, attempt_id)] = job
+
+    listed = manager.list(project.id)[0]
+    resolved = listed.result.runs[0].artifacts[0].resolved_path
+    atom_resolved = listed.result.runs[0].atom_results[0].artifacts[0].resolved_path
+
+    assert resolved == str(artifact_file.resolve())
+    assert atom_resolved == str(artifact_file.resolve())
+    assert ".staging" not in resolved
     manager.shutdown()
 
 

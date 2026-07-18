@@ -14,6 +14,7 @@ from pathlib import Path
 from fnirs_flow.api.models import ExecuteResult, ExecutionJobRead
 from fnirs_flow.api.portability import portable_json_value
 from fnirs_flow.api.projects import ProjectStore, execute_project_runs
+from fnirs_flow.api.uri import create_project_uri
 from fnirs_flow.execution.service import ExecutionCancelledError
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,43 @@ _TERMINAL_STATES = {"completed", "failed", "cancelled"}
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _canonicalize_artifact_paths(store: ProjectStore, project_id: str, artifact: dict) -> dict:
+    """Rewrite transaction-local resolved paths to committed workspace paths."""
+    relative_path = str(artifact.get("relative_path", ""))
+    if not relative_path:
+        return artifact
+    try:
+        uri = str(create_project_uri(f"outputs/{relative_path}"))
+    except ValueError:
+        return artifact
+    outdir = store.get_output_dir(project_id).resolve()
+    resolved_path = (outdir / relative_path).resolve()
+    return {
+        **artifact,
+        "uri": uri,
+        "path": uri,
+        "resolved_path": str(resolved_path),
+        "exists": resolved_path.is_file(),
+    }
+
+
+def _canonicalize_execute_result(
+    store: ProjectStore,
+    project_id: str,
+    result: ExecuteResult | None,
+) -> ExecuteResult | None:
+    if result is None:
+        return None
+    payload = result.model_dump(mode="json")
+    for run in payload.get("runs", []):
+        for artifact in run.get("artifacts", []):
+            artifact.update(_canonicalize_artifact_paths(store, project_id, artifact))
+        for atom in run.get("atom_results", []):
+            for artifact in atom.get("artifacts", []):
+                artifact.update(_canonicalize_artifact_paths(store, project_id, artifact))
+    return ExecuteResult.model_validate(payload)
 
 
 class ExecutionJobManager:
@@ -152,6 +190,7 @@ class ExecutionJobManager:
                 if result is None:
                     raise RuntimeError("Project or compiled plan not found")
                 tx.commit()
+                result = _canonicalize_execute_result(self.store, project_id, result)
         except ExecutionCancelledError:
             with self._lock:
                 self._mark_cancelled(self._jobs[key])
@@ -185,11 +224,17 @@ class ExecutionJobManager:
     def get(self, project_id: str, attempt_id: str) -> ExecutionJobRead | None:
         with self._lock:
             job = self._jobs.get((project_id, attempt_id))
-            return job.model_copy(deep=True) if job is not None else None
+            if job is None:
+                return None
+            copy = job.model_copy(deep=True)
+            copy.result = _canonicalize_execute_result(self.store, project_id, copy.result)
+            return copy
 
     def list(self, project_id: str) -> list[ExecutionJobRead]:
         with self._lock:
             jobs = [job.model_copy(deep=True) for key, job in self._jobs.items() if key[0] == project_id]
+        for job in jobs:
+            job.result = _canonicalize_execute_result(self.store, project_id, job.result)
         return sorted(jobs, key=lambda job: job.created_at, reverse=True)
 
     def cancel(self, project_id: str, attempt_id: str) -> ExecutionJobRead | None:

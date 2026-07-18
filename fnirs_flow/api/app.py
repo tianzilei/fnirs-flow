@@ -63,6 +63,8 @@ from fnirs_flow.api.projects import (
     export_project_package,
     get_project_status,
     import_project_participant_table,
+    load_project_compile_result,
+    load_project_discover_result,
     load_flow_from_compiled_package,
     validate_project_execution,
     validate_project_flow,
@@ -532,6 +534,22 @@ async def compile_flow_endpoint(
     return result
 
 
+@app.get("/api/projects/{project_id}/compile", response_model=CompileResult)
+async def get_compile_result_endpoint(project_id: str):
+    result = load_project_compile_result(get_store(), project_id)
+    if result is None:
+        status = 404 if get_store().get(project_id) is None else 409
+        raise _api_error(
+            status,
+            "PROJECT_NOT_FOUND" if status == 404 else "PLAN_NOT_COMPILED",
+            "Compiled plan not found",
+            "compile",
+            recoverable=status == 409,
+            suggested_action="Compile the Flow first",
+        )
+    return result
+
+
 # --- Dataset Discovery ---
 
 
@@ -554,10 +572,47 @@ async def list_datasets_endpoint():
     ]
 
 
+_EXAMPLE_FLOWS = {
+    "demo_task_glm_real": {
+        "label": "Demo Task GLM Real Data",
+        "path": Path("configs/demo_task_glm_real.json"),
+    },
+    "demo_task_flow": {
+        "label": "Demo Task GLM",
+        "path": Path("configs/demo_task_flow.json"),
+    },
+    "demo_resting_state_flow": {
+        "label": "Demo Resting State",
+        "path": Path("configs/demo_resting_state_flow.json"),
+    },
+}
+
+
+@app.get("/api/example-flows")
+async def list_example_flows_endpoint():
+    return [
+        {"id": example_id, "label": spec["label"]}
+        for example_id, spec in _EXAMPLE_FLOWS.items()
+    ]
+
+
+@app.get("/api/example-flows/{example_id}")
+async def get_example_flow_endpoint(example_id: str):
+    spec = _EXAMPLE_FLOWS.get(example_id)
+    if spec is None:
+        raise HTTPException(status_code=404, detail="Example flow not found")
+    path = Path(__file__).resolve().parents[2] / spec["path"]
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=500, detail="Example flow could not be loaded") from exc
+
+
 @app.post("/api/projects/{project_id}/discover-data", response_model=DiscoverResult)
 async def discover_data_endpoint(
     project_id: str,
     dataset_id: str,
+    data_root: str | None = Query(None, description="Optional local dataset root for local BIDS-NIRS datasets"),
     base_revision: int | None = Query(None, description="Expected current revision for optimistic concurrency"),
 ):
     if get_store().get(project_id) is None:
@@ -575,6 +630,7 @@ async def discover_data_endpoint(
             get_store(),
             project_id,
             dataset_id,
+            data_root=data_root,
             base_revision=base_revision,
         )
     except ValueError as exc:
@@ -596,6 +652,22 @@ async def discover_data_endpoint(
             recoverable=True,
             suggested_action="Check data access and server logs",
         ) from exc
+    return result
+
+
+@app.get("/api/projects/{project_id}/discover-data", response_model=DiscoverResult)
+async def get_discover_data_endpoint(project_id: str):
+    result = load_project_discover_result(get_store(), project_id)
+    if result is None:
+        status = 404 if get_store().get(project_id) is None else 409
+        raise _api_error(
+            status,
+            "PROJECT_NOT_FOUND" if status == 404 else "DATA_NOT_DISCOVERED",
+            "Dataset discovery result not found",
+            "discovery",
+            recoverable=status == 409,
+            suggested_action="Discover a dataset first",
+        )
     return result
 
 
@@ -1519,6 +1591,26 @@ async def relink_project_data_endpoint(project_id: str, data_root: str):
     }
 
 
+@app.post("/api/projects/{project_id}/bind-dataset")
+async def bind_project_dataset_endpoint(project_id: str, dataset_id: str, data_root: str):
+    """Bind a registered dataset ID to a local directory for later discovery/execution."""
+    store = get_store()
+    if store.get(project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    root = Path(data_root).expanduser().resolve()
+    if not root.is_dir():
+        raise HTTPException(status_code=422, detail="Data root does not exist or is not a directory")
+    if DatasetRegistry().get(dataset_id) is None:
+        raise HTTPException(status_code=404, detail="Unknown dataset")
+    store.bind_dataset(dataset_id, root)
+    return {
+        "status": "bound",
+        "dataset_id": dataset_id,
+        "data_root": str(root),
+        "data_uri": f"external-data://{dataset_id}/",
+    }
+
+
 @app.get("/api/projects/{project_id}/results/{kind}")
 async def project_results_endpoint(project_id: str, kind: str):
     """Read bounded, generated result JSON for the Results Workspace."""
@@ -1971,23 +2063,28 @@ async def get_checklist(scenario_id: str):
 
 # Register the SPA fallback last. Starlette resolves routes in declaration order,
 # so a catch-all registered before API routes would return index.html for them.
-if _DIST_DIR.is_dir():
-    _ASSETS_DIR = _DIST_DIR / "assets"
-    if _ASSETS_DIR.is_dir():
-        app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="static-assets")
+_ASSETS_DIR = _DIST_DIR / "assets"
+if _ASSETS_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="static-assets")
 
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        """Serve the SPA index.html for all non-API routes."""
-        file_path = (_DIST_DIR / full_path).resolve()
-        if not file_path.is_relative_to(_DIST_DIR.resolve()):
-            return JSONResponse(status_code=403, content={"detail": "Access denied"})
-        if full_path and file_path.is_file():
-            return Response(content=file_path.read_bytes(), media_type=_guess_mime(full_path))
-        index = _DIST_DIR / "index.html"
-        if index.is_file():
-            return Response(content=index.read_bytes(), media_type="text/html")
-        return JSONResponse(
-            status_code=404,
-            content={"detail": "Frontend not built. Run: cd webui && npm run build"},
-        )
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve the SPA index.html for all non-API routes.
+
+    The route is always registered because ``fnirs-flow webui`` may build the
+    frontend after importing this module on a fresh checkout.
+    """
+    dist_root = _DIST_DIR.resolve()
+    file_path = (_DIST_DIR / full_path).resolve()
+    if not file_path.is_relative_to(dist_root):
+        return JSONResponse(status_code=403, content={"detail": "Access denied"})
+    if full_path and file_path.is_file():
+        return Response(content=file_path.read_bytes(), media_type=_guess_mime(full_path))
+    index = _DIST_DIR / "index.html"
+    if index.is_file():
+        return Response(content=index.read_bytes(), media_type="text/html")
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Frontend not built. Run: cd webui && npm run build"},
+    )

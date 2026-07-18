@@ -99,7 +99,7 @@ interface StoreState {
   saveFlow: () => Promise<void>;
   validate: () => Promise<void>;
   compile: () => Promise<void>;
-  discover: (datasetId: string) => Promise<DiscoverResult>;
+  discover: (datasetId: string, dataRoot?: string) => Promise<DiscoverResult>;
   importParticipantTable: (
     path: string,
     idColumn?: string,
@@ -228,6 +228,22 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       const readiness = await api.getProjectStatus(project.id);
       set({ readiness });
+      if (readiness.compiled) {
+        try {
+          const compileResult = await api.getCompileResult(project.id);
+          set({ compileResult });
+        } catch {
+          set({ compileResult: null });
+        }
+      }
+      if (readiness.data_discovered) {
+        try {
+          const discoverResult = await api.getDiscoverResult(project.id);
+          set({ discoverResult });
+        } catch {
+          set({ discoverResult: null });
+        }
+      }
     } catch {
       set({ readiness: null });
     }
@@ -292,7 +308,17 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       const result = await api.validateFlow(project.id);
       const readiness = await api.getProjectStatus(project.id);
-      set({ validation: result, readiness, loading: false });
+      set({
+        validation: result,
+        readiness,
+        loading: false,
+        error: {
+          message: result.is_valid ? 'Validation passed' : 'Validation completed',
+          detail: result.is_valid
+            ? 'Flow is ready to compile.'
+            : `${result.errors.length} error(s), ${result.warnings.length} warning(s).`,
+        },
+      });
     } catch (e: any) {
       set({ error: { message: 'Validation failed', detail: api.formatApiError(e) }, loading: false });
     }
@@ -306,20 +332,29 @@ export const useStore = create<StoreState>((set, get) => ({
       await api.updateFlow(project.id, flow);
       const result = await api.compileFlow(project.id);
       const readiness = await api.getProjectStatus(project.id);
-      set({ compileResult: result, readiness, loading: false });
+      set({
+        compileResult: result,
+        readiness,
+        loading: false,
+        error: { message: 'Compile complete', detail: `${result.steps} step(s), ${result.layers} DAG layer(s).` },
+      });
     } catch (e: any) {
       set({ error: { message: 'Compilation failed', detail: api.formatApiError(e) }, loading: false });
     }
   },
 
-  discover: async (datasetId: string) => {
+  discover: async (datasetId: string, dataRoot?: string) => {
     const { project } = get();
     if (!project) throw new Error('No project selected');
     set({ error: null });
     try {
-      const result = await api.discoverData(project.id, datasetId);
+      const result = await api.discoverData(project.id, datasetId, dataRoot);
       const readiness = await api.getProjectStatus(project.id);
-      set({ discoverResult: result, readiness });
+      set({
+        discoverResult: result,
+        readiness,
+        error: { message: 'Dataset discovered', detail: `${result.files} file(s), ${result.runs} run(s).` },
+      });
       return result;
     } catch (e: any) {
       set({ error: { message: 'Data discovery failed', detail: api.formatApiError(e) } });

@@ -112,7 +112,7 @@ export function ExportPackage() {
 
         {currentProfile && (
           <section className="package-contents">
-            <h3>Package Contents: {currentProfile.name}</h3>
+            <h3>{exportResult ? 'Exported Package Contents' : `Expected Package Contents: ${currentProfile.name}`}</h3>
             <ul>
               {(exportResult?.contents || currentProfile.include_patterns).map((item) => (
                 <li key={item}>

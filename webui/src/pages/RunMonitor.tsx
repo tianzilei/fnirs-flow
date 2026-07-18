@@ -133,6 +133,7 @@ export function RunMonitor() {
                   const Icon = statusIcons[run.status] || Clock3;
                   const isExpanded = expandedRunId === run.run_id;
                   const derivativeCount = run.artifacts?.filter((artifact) => artifact.path).length || 0;
+                  const skippedAtoms = run.atom_results?.filter((atom) => atom.status === 'skipped').length || 0;
                   return (
                     <Fragment key={run.run_id}>
                       <tr>
@@ -156,6 +157,7 @@ export function RunMonitor() {
                             >
                               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                               {run.atom_results.filter((atom) => atom.status === 'completed').length}/{run.atom_results.length}
+                              {skippedAtoms > 0 && <span className="atom-count-note">{skippedAtoms} skipped</span>}
                             </button>
                           ) : '-'}
                         </td>

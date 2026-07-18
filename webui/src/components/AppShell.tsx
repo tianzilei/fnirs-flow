@@ -113,7 +113,16 @@ export function AppShell() {
   const activeNav = getActiveNav();
   const moreActive = moreNavItems.some((item) => item.id === activeNav);
   const isSuccessNotice = error
-    ? ['Fork created', 'Flow saved', 'Execution cancelled'].includes(error.message)
+    ? [
+        'Fork created',
+        'Flow saved',
+        'Execution cancelled',
+        'Validation passed',
+        'Validation completed',
+        'Compile complete',
+        'Dataset discovered',
+        'Example flow loaded',
+      ].includes(error.message)
     : false;
 
   const handleNavClick = (navId: NavId) => {
@@ -224,11 +233,11 @@ export function AppShell() {
                       <Save size={16} />
                       <span>Save</span>
                     </button>
-                    <button className="ghost-button" onClick={validate} disabled={loading} title="Validate flow">
+                    <button className="ghost-button" onClick={validate} disabled={loading} title="Validate flow" aria-label="Validate flow">
                       {loading ? <Loader2 size={16} className="spin" /> : <FileCheck2 size={16} />}
                       <span>Validate</span>
                     </button>
-                    <button className="ghost-button" onClick={compile} disabled={loading || readOnly} title={readOnly ? 'Fork the imported package before compiling' : 'Compile flow'}>
+                    <button className="ghost-button" onClick={compile} disabled={loading || readOnly} title={readOnly ? 'Fork the imported package before compiling' : 'Compile flow'} aria-label="Compile flow">
                       <Save size={16} />
                       <span>Compile</span>
                     </button>

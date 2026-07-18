@@ -293,7 +293,10 @@ function ResultDataPanel({
   if (error) return <div className="error-message">{error}</div>;
   if (!result || result.file_count === 0) {
     if (!result?.figures?.length) {
-      return <div className="empty-state compact"><p>No {title.toLowerCase()} files available.</p></div>;
+      const emptyCopy = title === 'ROI Results'
+        ? 'No ROI result files are available. This can happen when the selected demo flow completes channel and group summaries without ROI-level exports.'
+        : `No ${title.toLowerCase()} files available.`;
+      return <div className="empty-state compact"><p>{emptyCopy}</p></div>;
     }
   }
   const figures = result.figures || [];

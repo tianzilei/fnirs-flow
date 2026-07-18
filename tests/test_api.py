@@ -40,6 +40,24 @@ def test_atom_templates_api_is_not_shadowed_by_spa_fallback():
     assert isinstance(response.json(), list)
 
 
+def test_spa_fallback_is_registered_before_frontend_build(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import fnirs_flow.api.app as api_module
+
+    dist = tmp_path / "webui-dist"
+    monkeypatch.setattr(api_module, "_DIST_DIR", dist)
+    response = TestClient(app).get("/")
+    assert response.status_code == 404
+    assert "Frontend not built" in response.json()["detail"]
+
+    dist.mkdir()
+    (dist / "index.html").write_text("<div id=\"root\"></div>", encoding="utf-8")
+    response = TestClient(app).get("/")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+
+
 def test_datasets_api_lists_builtin_registry():
     from fastapi.testclient import TestClient
 
@@ -47,6 +65,19 @@ def test_datasets_api_lists_builtin_registry():
     assert response.status_code == 200
     dataset_ids = {item["dataset_id"] for item in response.json()}
     assert {"mne-fnirs-motor", "bids-nirs-tapping", "ds007738"} <= dataset_ids
+
+
+def test_example_flow_api_loads_official_demo():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    listing = client.get("/api/example-flows")
+    assert listing.status_code == 200
+    assert any(item["id"] == "demo_task_glm_real" for item in listing.json())
+
+    response = client.get("/api/example-flows/demo_task_glm_real")
+    assert response.status_code == 200
+    assert response.json()["flow_id"] == "demo-task-glm-real"
 
 
 def test_ai_draft_openai_settings_are_sanitized():
@@ -260,6 +291,52 @@ def test_compile_flow():
     assert data["dag_layers"]
     assert sum(len(layer) for layer in data["dag_layers"]) == data["steps"]
     assert {"id", "atom_type", "node_type", "operation"} <= set(data["dag_layers"][0][0])
+
+
+def test_get_compile_result_rehydrates_from_disk():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    proj = client.post("/api/projects", json={"name": "Compile hydrate"}).json()
+    pid = proj["id"]
+    flow = json.loads((Path(__file__).parent.parent / "configs" / "demo_task_flow.json").read_text())
+    client.put(f"/api/projects/{pid}/flow", json={"flow": flow})
+    posted = client.post(f"/api/projects/{pid}/compile").json()
+
+    response = client.get(f"/api/projects/{pid}/compile")
+
+    assert response.status_code == 200
+    hydrated = response.json()
+    assert hydrated["flow_hash"] == posted["flow_hash"]
+    assert hydrated["steps"] == posted["steps"]
+    assert hydrated["dag_layers"] == posted["dag_layers"]
+
+
+def test_discover_data_accepts_explicit_local_bids_root(tmp_path):
+    from fastapi.testclient import TestClient
+
+    dataset_root = tmp_path / "BIDS-NIRS-Tapping-master"
+    nirs_dir = dataset_root / "sub-01" / "nirs"
+    nirs_dir.mkdir(parents=True)
+    (dataset_root / "participants.tsv").write_text("participant_id\tinclude\nsub-01\t1\n", encoding="utf-8")
+    (nirs_dir / "sub-01_task-tapping_nirs.snirf").write_bytes(b"snirf")
+    (nirs_dir / "sub-01_task-tapping_events.tsv").write_text("onset\tduration\n0\t1\n", encoding="utf-8")
+
+    client = TestClient(app)
+    pid = client.post("/api/projects", json={"name": "Discover explicit root"}).json()["id"]
+    response = client.post(
+        f"/api/projects/{pid}/discover-data",
+        params={"dataset_id": "bids-nirs-tapping", "data_root": str(dataset_root)},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["files"] >= 3
+    assert body["runs"] == 1
+    assert body["local_root"] == str(dataset_root.resolve())
+    hydrated = client.get(f"/api/projects/{pid}/discover-data")
+    assert hydrated.status_code == 200
+    assert hydrated.json() == body
 
 
 def test_design_history_endpoint_before_initialize_returns_empty_state():

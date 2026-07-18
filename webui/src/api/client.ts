@@ -138,11 +138,36 @@ export async function compileFlow(projectId: string): Promise<CompileResult> {
   return data;
 }
 
-export async function discoverData(projectId: string, datasetId: string): Promise<DiscoverResult> {
+export async function getCompileResult(projectId: string): Promise<CompileResult> {
+  const { data } = await api.get(`/projects/${projectId}/compile`);
+  return data;
+}
+
+export async function discoverData(projectId: string, datasetId: string, dataRoot?: string): Promise<DiscoverResult> {
   const { data } = await api.post(`/projects/${projectId}/discover-data`, null, {
-    params: { dataset_id: datasetId },
+    params: { dataset_id: datasetId, ...(dataRoot ? { data_root: dataRoot } : {}) },
     timeout: 120000,
   });
+  return data;
+}
+
+export async function getDiscoverResult(projectId: string): Promise<DiscoverResult> {
+  const { data } = await api.get(`/projects/${projectId}/discover-data`);
+  return data;
+}
+
+export interface ExampleFlowSummary {
+  id: string;
+  label: string;
+}
+
+export async function listExampleFlows(): Promise<ExampleFlowSummary[]> {
+  const { data } = await api.get('/example-flows');
+  return data;
+}
+
+export async function getExampleFlow(exampleId: string): Promise<Record<string, unknown>> {
+  const { data } = await api.get(`/example-flows/${exampleId}`);
   return data;
 }
 
