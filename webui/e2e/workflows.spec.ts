@@ -85,13 +85,25 @@ function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
-async function installProjectApi(page: Page, flowState: { value: Record<string, unknown> }) {
+async function installProjectApi(
+  page: Page,
+  flowState: { value: Record<string, unknown> },
+  examples: Array<{ id: string; label: string; flow: Record<string, unknown> }> = []
+) {
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
     if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
     if (path === '/api/atom-templates') return json(route, []);
+    if (path === '/api/example-flows' && request.method() === 'GET') {
+      return json(route, examples.map(({ id, label }) => ({ id, label })));
+    }
+    const exampleMatch = path.match(/^\/api\/example-flows\/([^/]+)$/);
+    if (exampleMatch && request.method() === 'GET') {
+      const example = examples.find((item) => item.id === exampleMatch[1]);
+      return json(route, example?.flow || {}, example ? 200 : 404);
+    }
     if (path === '/api/projects/p1/flow' && request.method() === 'GET') return json(route, flowState.value);
     if (path === '/api/projects/p1/flow' && request.method() === 'PUT') {
       flowState.value = request.postDataJSON().flow;
@@ -109,6 +121,49 @@ async function installProjectApi(page: Page, flowState: { value: Record<string, 
   });
 }
 
+test('project creation accepts a typed local data folder path', async ({ page }) => {
+  let createdBody: Record<string, unknown> | null = null;
+  await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === '/api/projects' && request.method() === 'GET') return json(route, []);
+    if (path === '/api/projects' && request.method() === 'POST') {
+      createdBody = request.postDataJSON();
+      return json(route, {
+        ...project,
+        id: 'typed-data-root',
+        name: String(createdBody?.name || ''),
+        description: String(createdBody?.description || ''),
+        data_root: String(createdBody?.data_root || ''),
+      });
+    }
+    if (path === '/api/projects/typed-data-root' && request.method() === 'GET') {
+      return json(route, { ...project, id: 'typed-data-root', data_root: String(createdBody?.data_root || '') });
+    }
+    if (path === '/api/projects/typed-data-root/flow') return json(route, { flow_id: 'flow-typed', nodes: [], edges: [] });
+    if (path === '/api/projects/typed-data-root/status') return json(route, readiness);
+    if (path === '/api/projects/typed-data-root/import-status') {
+      return json(route, { imported: false, read_only: false, quarantined_atoms: [] });
+    }
+    if (path === '/api/projects/typed-data-root/attempts') return json(route, []);
+    if (path === '/api/projects/typed-data-root/progress') {
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+    }
+    if (path === '/api/atom-templates') return json(route, []);
+    return json(route, {});
+  });
+
+  await page.goto('/projects');
+  await page.getByRole('button', { name: '+ New Project' }).click();
+  await page.getByPlaceholder('Project name').fill('Typed Root Project');
+  await page.getByLabel('Data folder path').fill('E:/data/bids-nirs-tapping');
+  await expect(page.getByText('Data folder ready')).toBeVisible();
+  await page.getByRole('button', { name: 'Create' }).click();
+
+  await expect(page).toHaveURL(/\/projects\/typed-data-root\/flow$/);
+  expect(createdBody?.data_root).toBe('E:/data/bids-nirs-tapping');
+});
+
 test('parameter edits persist across save and browser refresh', async ({ page }) => {
   const flowState = {
     value: {
@@ -120,7 +175,8 @@ test('parameter edits persist across save and browser refresh', async ({ page })
           operation: 'filtering',
           category: 'preprocessing',
           position: { x: 100, y: 100 },
-          config: { high_pass: 0.01 },
+          config: { high_pass: 0.01, method: 'fir | iir' },
+          parameter_specs: { high_pass: { minimum: 0, maximum: 0.5 } },
         },
       ],
       edges: [],
@@ -131,16 +187,61 @@ test('parameter edits persist across save and browser refresh', async ({ page })
 
   await page.getByText('filtering', { exact: true }).click();
   await page.getByRole('button', { name: /Parameters/ }).click();
-  const input = page.locator('.param-row').filter({ hasText: 'high_pass' }).locator('input');
+  const highPassRow = page.locator('.param-row').filter({ hasText: 'high_pass' });
+  await expect(highPassRow.getByText('Range:')).toBeVisible();
+  const methodRow = page.locator('.param-row').filter({ hasText: 'method' });
+  await expect(methodRow.locator('select')).toBeVisible();
+  await methodRow.locator('select').selectOption('iir');
+  const input = highPassRow.locator('input');
   await input.fill('0.02');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Flow saved')).toBeVisible();
   expect(((flowState.value.nodes as Array<Record<string, unknown>>)[0].config as Record<string, unknown>).high_pass).toBe(0.02);
+  expect(((flowState.value.nodes as Array<Record<string, unknown>>)[0].config as Record<string, unknown>).method).toBe('iir');
 
   await page.reload();
   await page.getByText('filtering', { exact: true }).click();
   await page.getByRole('button', { name: /Parameters/ }).click();
   await expect(page.locator('.param-row').filter({ hasText: 'high_pass' }).locator('input')).toHaveValue('0.02');
+});
+
+test('example flow replaces the current canvas instead of appending atoms', async ({ page }) => {
+  const flowState = {
+    value: {
+      flow_id: 'flow-1',
+      nodes: [
+        {
+          id: 'existing-filter',
+          atom_type: 'filtering',
+          operation: 'filtering',
+          category: 'preprocessing',
+          position: { x: 100, y: 100 },
+          config: { high_pass: 0.01 },
+        },
+      ],
+      edges: [],
+    },
+  };
+  await installProjectApi(page, flowState, [
+    {
+      id: 'blank_template',
+      label: 'Blank Template',
+      flow: {
+        schema_version: '0.3.0',
+        flow_id: 'blank-template',
+        nodes: [],
+        flow_atoms: [],
+        edges: [],
+        metadata: { checklist: {} },
+      },
+    },
+  ]);
+  await page.goto('/projects/p1/flow');
+
+  await expect(page.getByText('filtering', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Blank Template' }).click();
+  await expect(page.getByText('filtering', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('0 atoms')).toBeVisible();
 });
 
 test('selected canvas node can be deleted with keyboard', async ({ page }) => {

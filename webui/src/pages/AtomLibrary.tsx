@@ -179,10 +179,11 @@ export function AtomLibrary() {
 
               {selectedAtom.input_ports.length > 0 && (
                 <div className="atom-detail-section">
-                  <h4>Input Ports</h4>
+                  <h4>Ports: in</h4>
                   {selectedAtom.input_ports.map((port) => (
-                    <div key={port.name} className="port-row">
+                    <div key={port.name} className="port-row port-row-in">
                       <span className="port-dot in" />
+                      <span className="port-direction-badge in">in</span>
                       <span>{port.name}</span>
                       <code>{port.schema}</code>
                       {port.required && <span className="port-required">required</span>}
@@ -193,10 +194,11 @@ export function AtomLibrary() {
 
               {selectedAtom.output_ports.length > 0 && (
                 <div className="atom-detail-section">
-                  <h4>Output Ports</h4>
+                  <h4>Ports: out</h4>
                   {selectedAtom.output_ports.map((port) => (
-                    <div key={port.name} className="port-row">
+                    <div key={port.name} className="port-row port-row-out">
                       <span className="port-dot out" />
+                      <span className="port-direction-badge out">out</span>
                       <span>{port.name}</span>
                       <code>{port.schema}</code>
                     </div>

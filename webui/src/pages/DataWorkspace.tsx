@@ -1,18 +1,29 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
-import { formatApiError, listDatasets, type DiscoverResult } from '../api/client';
+import { CheckCircle2, ChevronLeft, FolderOpen } from 'lucide-react';
+import {
+  formatApiError,
+  listDatasets,
+  listProjectDataFolders,
+  type DiscoverResult,
+  type ProjectDataFolder,
+} from '../api/client';
 import { useStore } from '../store';
 
 interface Dataset {
   id: string;
   name: string;
   description: string;
-  sourceKind?: string;
 }
 
 const PREVIEW_COLUMN_LIMIT = 12;
 const PREVIEW_ROW_LIMIT = 10;
 const JOIN_LIST_LIMIT = 12;
+
+const PROJECT_LOCAL_DATASET: Dataset = {
+  id: 'project-local-data',
+  name: 'Project Local Folder',
+  description: 'Use the local data folder configured on this project',
+};
 
 const DEFAULT_DATASETS: Dataset[] = [
   { id: 'mne-fnirs-motor', name: 'MNE fNIRS Motor Task', description: 'Finger tapping experiment' },
@@ -27,6 +38,22 @@ const DATA_STEPS = [
 
 type DataStep = typeof DATA_STEPS[number]['id'];
 
+function normalizeRelativePathInput(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return '';
+  if (/^(?:[A-Za-z]:[\\/]|\/|\\\\|~|[a-z][a-z0-9+.-]*:\/\/)/i.test(raw)) return null;
+  const normalized = raw.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  const parts = normalized.split('/');
+  if (parts.some((part) => !part || part === '.' || part === '..' || part.includes(':'))) return null;
+  return parts.join('/');
+}
+
+function parentFolder(path: string): string {
+  const parts = path.split('/').filter(Boolean);
+  parts.pop();
+  return parts.join('/');
+}
+
 function formatMetadataValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return 'blank';
   if (Array.isArray(value)) return value.length ? value.map(formatMetadataValue).join(', ') : 'none';
@@ -35,15 +62,21 @@ function formatMetadataValue(value: unknown): string {
 }
 
 export function DataWorkspace() {
+  const project = useStore((s) => s.project);
   const discover = useStore((s) => s.discover);
   const importParticipantTable = useStore((s) => s.importParticipantTable);
   const discoverResult = useStore((s) => s.discoverResult);
   const participantTableResult = useStore((s) => s.participantTableResult);
   const [activeStep, setActiveStep] = useState<DataStep>('dataset');
   const [selectedDataset, setSelectedDataset] = useState('');
-  const [dataRoot, setDataRoot] = useState('');
+  const [datasetPath, setDatasetPath] = useState('');
   const [datasets, setDatasets] = useState<Dataset[]>(DEFAULT_DATASETS);
   const [datasetsLoading, setDatasetsLoading] = useState(false);
+  const [folderPickerOpen, setFolderPickerOpen] = useState(false);
+  const [folderParent, setFolderParent] = useState('');
+  const [folderEntries, setFolderEntries] = useState<ProjectDataFolder[]>([]);
+  const [folderLoading, setFolderLoading] = useState(false);
+  const [folderError, setFolderError] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [participantPath, setParticipantPath] = useState('');
   const [idColumn, setIdColumn] = useState('participant_id');
@@ -77,20 +110,56 @@ export function DataWorkspace() {
   }, [discoverResult, participantTableResult]);
 
   useEffect(() => {
+    const root = project?.data_root || '';
+    if (!root) {
+      setSelectedDataset((current) => current === 'project-local-data' ? '' : current);
+      return;
+    }
+    setSelectedDataset((current) => current || 'project-local-data');
+    setParticipantPath((current) => current || 'participants.tsv');
+  }, [project?.data_root]);
+
+  useEffect(() => {
+    if (!folderPickerOpen || !project?.id || !project?.data_root) return;
+    let active = true;
+    setFolderLoading(true);
+    setFolderError('');
+    listProjectDataFolders(project.id, folderParent)
+      .then((result) => {
+        if (!active) return;
+        setFolderEntries(result.folders);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setFolderEntries([]);
+        setFolderError(formatApiError(err));
+      })
+      .finally(() => {
+        if (active) setFolderLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [folderPickerOpen, folderParent, project?.id, project?.data_root]);
+
+  useEffect(() => {
     let active = true;
     setDatasetsLoading(true);
     listDatasets()
       .then((entries) => {
         if (!active) return;
-        const nextDatasets = entries.map((entry) => ({
+        const registeredDatasets = entries.map((entry) => ({
           id: entry.dataset_id,
           name: entry.name,
-          description: entry.description || entry.url || entry.source_kind,
-          sourceKind: entry.source_kind,
+          description: entry.description || entry.url || entry.name,
         }));
+        const nextDatasets = [
+          ...(project?.data_root ? [PROJECT_LOCAL_DATASET] : []),
+          ...registeredDatasets,
+        ];
         if (nextDatasets.length > 0) {
           setDatasets(nextDatasets);
-          setSelectedDataset((current) => current || nextDatasets[0].id);
+          setSelectedDataset((current) => current || (project?.data_root ? 'project-local-data' : nextDatasets[0].id));
         }
       })
       .catch((err) => {
@@ -104,14 +173,23 @@ export function DataWorkspace() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [project?.data_root]);
 
   const handleDiscover = async () => {
     if (!selectedDataset) return;
+    if (selectedDataset === 'project-local-data' && !project?.data_root) {
+      setError('Configure the project data folder before discovering project-local data.');
+      return;
+    }
+    const cleanPath = normalizeRelativePathInput(datasetPath);
+    if (cleanPath === null) {
+      setError('Dataset folder must be a relative path inside the project data folder.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      await discover(selectedDataset, dataRoot.trim() || undefined);
+      await discover(selectedDataset, cleanPath || undefined);
     } catch (err) {
       setError(formatApiError(err));
     } finally {
@@ -121,10 +199,15 @@ export function DataWorkspace() {
 
   const handleImportParticipantTable = async () => {
     if (!participantPath.trim()) return;
+    const cleanPath = normalizeRelativePathInput(participantPath);
+    if (cleanPath === null) {
+      setError('Table path must be relative to the project data folder.');
+      return;
+    }
     setMetadataLoading(true);
     setError('');
     try {
-      await importParticipantTable(participantPath.trim(), idColumn.trim() || 'participant_id', includeColumn.trim(), {
+      await importParticipantTable(cleanPath, idColumn.trim() || 'participant_id', includeColumn.trim(), {
         group_column: groupColumn.trim(),
         label_column: labelColumn.trim() || groupColumn.trim(),
         site_column: siteColumn.trim(),
@@ -183,7 +266,7 @@ export function DataWorkspace() {
           <div className="section-heading">
             <div>
               <h3>Select and Discover Dataset</h3>
-              <p className="muted">Choose a registered dataset, then discover local files and run metadata.</p>
+              <p className="muted">Choose a dataset source, then discover files from the project data folder.</p>
             </div>
             <button className="primary-button" onClick={handleDiscover} disabled={!selectedDataset || loading}>
               {loading ? 'Discovering...' : 'Discover Dataset'}
@@ -207,19 +290,74 @@ export function DataWorkspace() {
               >
                 <h4>{ds.name}</h4>
                 <p>{ds.description}</p>
-                {ds.sourceKind && <span className="dataset-source">{ds.sourceKind}</span>}
               </div>
             ))}
           </div>
           <div className="metadata-grid dataset-root-grid">
             <label>
-              Local dataset root
+              Dataset folder
               <input
-                value={dataRoot}
-                onChange={(event) => setDataRoot(event.target.value)}
-                placeholder="/path/to/BIDS-NIRS-Tapping-master"
+                value={datasetPath}
+                onChange={(event) => setDatasetPath(event.target.value.replace(/\\/g, '/'))}
+                placeholder="project-relative folder, blank = project root"
               />
             </label>
+          </div>
+          <div className="project-folder-browser">
+            <div className="folder-browser-toolbar">
+              <button
+                className="ghost-button compact"
+                onClick={() => setFolderPickerOpen((open) => !open)}
+                disabled={!project?.data_root}
+              >
+                <FolderOpen size={14} /> {folderPickerOpen ? 'Hide folders' : 'Browse project folders'}
+              </button>
+              {datasetPath && <span className="field-hint">Using <code>{datasetPath}</code> under the project data folder.</span>}
+            </div>
+            {folderPickerOpen && (
+              <div className="folder-browser-panel">
+                <div className="folder-browser-header">
+                  <button
+                    className="icon-button"
+                    onClick={() => setFolderParent((current) => parentFolder(current))}
+                    disabled={!folderParent}
+                    title="Up one folder"
+                  >
+                    <ChevronLeft size={15} />
+                  </button>
+                  <code>{folderParent || '/'}</code>
+                </div>
+                {folderLoading && <div className="panel-state">Loading folders...</div>}
+                {folderError && <div className="error-message">{folderError}</div>}
+                {!folderLoading && folderEntries.length === 0 && <div className="panel-state">No child folders.</div>}
+                <div className="folder-list">
+                  {folderEntries.map((folder) => (
+                    <button
+                      key={folder.path}
+                      className="folder-list-item"
+                      onClick={() => setFolderParent(folder.path)}
+                      onDoubleClick={() => {
+                        setDatasetPath(folder.path);
+                        setFolderPickerOpen(false);
+                      }}
+                    >
+                      <FolderOpen size={14} />
+                      <span>{folder.name}</span>
+                      <small>{folder.path}</small>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="secondary-button compact"
+                  onClick={() => {
+                    setDatasetPath(folderParent);
+                    setFolderPickerOpen(false);
+                  }}
+                >
+                  Use this folder
+                </button>
+              </div>
+            )}
           </div>
           {discoverResult && <DiscoverySummary result={discoverResult} />}
         </section>
@@ -230,7 +368,7 @@ export function DataWorkspace() {
         <div className="section-heading">
           <div>
             <h3>Import Participant Metadata</h3>
-            <p className="muted">Start with the table path and core identity columns. Advanced roles can stay at defaults.</p>
+            <p className="muted">Use a table path relative to the project data folder. Advanced roles can stay at defaults.</p>
           </div>
           <button className="primary-button" onClick={handleImportParticipantTable} disabled={!participantPath.trim() || metadataLoading}>
             {metadataLoading ? 'Importing...' : 'Import Table'}
@@ -241,8 +379,8 @@ export function DataWorkspace() {
             Table path
             <input
               value={participantPath}
-              onChange={(event) => setParticipantPath(event.target.value)}
-              placeholder="D:\\data\\participants.tsv"
+              onChange={(event) => setParticipantPath(event.target.value.replace(/\\/g, '/'))}
+              placeholder="participants.tsv"
             />
           </label>
           <label>

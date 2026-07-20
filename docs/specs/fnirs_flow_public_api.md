@@ -70,6 +70,17 @@ Input/output port on a FlowAtom.
 | `schema` | `string` | yes | Port schema type (see Port Schemas) |
 | `required` | `boolean` | no | Default: `true` |
 
+### MethodAtomTemplate Parameter UI Metadata
+
+The `/api/atom-templates` endpoint returns parameter UI metadata owned by each atom template:
+
+| Field | Type | Notes |
+|---|---|---|
+| `parameter_options` | `dict[str, list[Any]]` | Fixed candidate values for select controls. |
+| `parameter_specs` | `dict[str, dict[str, Any]]` | Per-parameter control metadata, including `type`, `control`, `description`, `placeholder`, `advanced`, `minimum`, `maximum`, and `range`. |
+
+WebUI parameter rendering must consume these fields instead of hardcoding atom-specific parameter names. See `docs/specs/method_atom_parameter_ui_contract.md` for the full contract.
+
 ## 2. Port Schema Types
 
 These schemas define data type compatibility between connected atoms.

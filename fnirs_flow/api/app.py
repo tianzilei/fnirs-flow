@@ -8,6 +8,7 @@ import ipaddress
 import json
 import logging
 import os
+import string
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -49,6 +50,7 @@ from fnirs_flow.api.models import (
     ProjectStatus,
     ValidationResult,
 )
+from fnirs_flow.api.project_bundle import ProjectBundleError
 from fnirs_flow.api.projects import (
     ProjectDataNotReadyError,
     ProjectQuarantineError,
@@ -63,9 +65,11 @@ from fnirs_flow.api.projects import (
     export_project_package,
     get_project_status,
     import_project_participant_table,
+    list_project_data_folders,
+    load_flow_from_compiled_package,
     load_project_compile_result,
     load_project_discover_result,
-    load_flow_from_compiled_package,
+    resolve_project_data_path,
     validate_project_execution,
     validate_project_flow,
 )
@@ -272,6 +276,9 @@ def _local_path_roots(project_id: str) -> list[Path]:
         store._bundles.workspace_path(project_id).resolve(),
         store.get_output_dir(project_id).resolve(),
     ]
+    project_data_root = store.get_project_data_root(project_id)
+    if project_data_root:
+        roots.append(Path(project_data_root).expanduser().resolve())
     roots.extend(path.resolve() for path in store.list_dataset_bindings().values())
     roots.extend(_configured_allowed_roots())
     return roots
@@ -382,6 +389,62 @@ async def transaction_error_handler(request: Request, exc: ProjectTransactionErr
 # --- Projects ---
 
 
+def _local_folder_roots() -> list[Path]:
+    roots: list[Path] = []
+    if os.name == "nt":
+        for letter in string.ascii_uppercase:
+            drive = Path(f"{letter}:/")
+            if drive.exists():
+                roots.append(drive)
+    roots.extend([Path.home(), Path.cwd()])
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for root in roots:
+        try:
+            resolved = root.expanduser().resolve()
+        except OSError:
+            continue
+        key = str(resolved).lower()
+        if key not in seen and resolved.is_dir():
+            seen.add(key)
+            unique.append(resolved)
+    return unique
+
+
+def _folder_entry(path: Path) -> dict[str, Any]:
+    try:
+        has_children = any(child.is_dir() and not child.name.startswith(".") for child in path.iterdir())
+    except OSError:
+        has_children = False
+    return {"name": path.name or str(path), "path": str(path), "has_children": has_children}
+
+
+@app.get("/api/local-folders")
+async def list_local_folders(path: str = Query("", description="Absolute local folder path to browse")):
+    try:
+        if not path.strip():
+            current = ""
+            parent = ""
+            folders = [_folder_entry(root) for root in _local_folder_roots()]
+        else:
+            current_path = Path(path).expanduser().resolve()
+            if not current_path.is_dir():
+                raise HTTPException(status_code=422, detail="Folder does not exist or is not a directory")
+            current = str(current_path)
+            parent_path = current_path.parent
+            parent = str(parent_path) if parent_path != current_path else ""
+            folders = []
+            for child in sorted(current_path.iterdir(), key=lambda item: item.name.lower()):
+                if not child.is_dir() or child.name.startswith("."):
+                    continue
+                folders.append(_folder_entry(child))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail="Permission denied while listing this folder") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"current": current, "parent": parent, "folders": folders}
+
+
 @app.get("/api/projects", response_model=list[ProjectRead])
 async def list_projects():
     return get_store().list_all()
@@ -389,7 +452,7 @@ async def list_projects():
 
 @app.post("/api/projects", response_model=ProjectRead)
 async def create_project(data: ProjectCreate):
-    return get_store().create(data.name, data.description)
+    return get_store().create(data.name, data.description, data_root=data.data_root)
 
 
 @app.get("/api/projects/{project_id}", response_model=ProjectRead)
@@ -453,7 +516,18 @@ async def update_flow(project_id: str, data: FlowUpdate):
             recoverable=True,
             suggested_action="Fork the imported project before editing",
         ) from exc
-    if not get_store().update_flow(project_id, data.flow, debounce=data.debounce):
+    try:
+        updated = get_store().update_flow(project_id, data.flow, debounce=data.debounce)
+    except ProjectBundleError as exc:
+        raise _api_error(
+            422,
+            "FLOW_PATH_INVALID",
+            str(exc),
+            "flow",
+            recoverable=True,
+            suggested_action="Use a project-relative path under the project's data folder",
+        ) from exc
+    if not updated:
         raise _api_error(
             404,
             "PROJECT_NOT_FOUND",
@@ -573,6 +647,27 @@ async def list_datasets_endpoint():
 
 
 _EXAMPLE_FLOWS = {
+    "blank_template": {
+        "label": "Blank Template",
+        "flow": {
+            "schema_version": "0.3.0",
+            "flow_id": "blank-template",
+            "name": "Blank Template",
+            "description": "Start with an empty flow canvas.",
+            "nodes": [],
+            "flow_atoms": [],
+            "edges": [],
+            "adapter_registry": [],
+            "metadata": {
+                "tags": [],
+                "order_policy": {
+                    "allow_order_violations": False,
+                    "allow_empty_edges": False,
+                },
+                "checklist": {},
+            },
+        },
+    },
     "demo_task_glm_real": {
         "label": "Demo Task GLM Real Data",
         "path": Path("configs/demo_task_glm_real.json"),
@@ -601,6 +696,8 @@ async def get_example_flow_endpoint(example_id: str):
     spec = _EXAMPLE_FLOWS.get(example_id)
     if spec is None:
         raise HTTPException(status_code=404, detail="Example flow not found")
+    if "flow" in spec:
+        return spec["flow"]
     path = Path(__file__).resolve().parents[2] / spec["path"]
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -613,6 +710,7 @@ async def discover_data_endpoint(
     project_id: str,
     dataset_id: str,
     data_root: str | None = Query(None, description="Optional local dataset root for local BIDS-NIRS datasets"),
+    data_path: str | None = Query(None, description="Project-relative dataset folder under the project data root"),
     base_revision: int | None = Query(None, description="Expected current revision for optimistic concurrency"),
 ):
     if get_store().get(project_id) is None:
@@ -631,6 +729,7 @@ async def discover_data_endpoint(
             project_id,
             dataset_id,
             data_root=data_root,
+            data_path=data_path,
             base_revision=base_revision,
         )
     except ValueError as exc:
@@ -651,6 +750,34 @@ async def discover_data_endpoint(
             "discovery",
             recoverable=True,
             suggested_action="Check data access and server logs",
+        ) from exc
+    return result
+
+
+@app.get("/api/projects/{project_id}/data-folders")
+async def list_project_data_folders_endpoint(
+    project_id: str,
+    parent: str = Query("", description="Project-relative parent folder"),
+):
+    if get_store().get(project_id) is None:
+        raise _api_error(
+            404,
+            "PROJECT_NOT_FOUND",
+            "Project not found",
+            "data",
+            recoverable=False,
+            suggested_action="Select an existing project",
+        )
+    try:
+        result = await run_in_threadpool(list_project_data_folders, get_store(), project_id, parent)
+    except (OSError, ValueError) as exc:
+        raise _api_error(
+            422,
+            "PROJECT_DATA_FOLDER_INVALID",
+            str(exc),
+            "data",
+            recoverable=True,
+            suggested_action="Choose a folder under the project's data directory",
         ) from exc
     return result
 
@@ -682,8 +809,14 @@ async def import_participant_table_endpoint(project_id: str, data: ParticipantTa
             recoverable=False,
             suggested_action="Select an existing project",
         )
-    table_path = _resolve_allowed_local_file(data.path, project_id, label="Participant table path")
     try:
+        table_path, _relative_path = resolve_project_data_path(
+            get_store(),
+            project_id,
+            data.path,
+            label="Participant table path",
+            must_be_file=True,
+        )
         result = import_project_participant_table(
             get_store(),
             project_id,
@@ -1693,7 +1826,7 @@ async def list_backends():
 async def resolve_dependencies_endpoint(project_id: str):
     """Resolve dependencies for a project's compiled flow.
 
-    §9.1: resolve is always read-only
+    §9.1: resolve 永远是只读操作
     """
     from fnirs_flow.api.transaction import ProjectTransaction
 
@@ -2008,11 +2141,52 @@ def _guess_mime(path: str) -> str:
 # --- Atom Templates (registry-driven palette) ---
 
 
+def _is_parameter_option_value(value: Any) -> bool:
+    return isinstance(value, str | int | float) and not isinstance(value, bool)
+
+
+def _unique_parameter_options(values: list[Any]) -> list[Any]:
+    seen: set[tuple[str, str]] = set()
+    options: list[Any] = []
+    for value in values:
+        if not _is_parameter_option_value(value):
+            continue
+        key = (type(value).__name__, str(value))
+        if key in seen:
+            continue
+        seen.add(key)
+        options.append(value)
+    return options
+
+
+def _template_parameter_options(template: Any, templates: list[Any]) -> dict[str, list[Any]]:
+    default_config = dict(getattr(template, "default_config", {}) or {})
+    explicit = dict(getattr(template, "parameter_options", {}) or {})
+    atom_type = getattr(template, "atom_type", "")
+    peer_templates = [item for item in templates if getattr(item, "atom_type", "") == atom_type]
+    options: dict[str, list[Any]] = {}
+
+    for name, value in default_config.items():
+        values = list(explicit.get(name, []))
+        values.extend(
+            dict(getattr(peer, "default_config", {}) or {}).get(name)
+            for peer in peer_templates
+        )
+        merged = _unique_parameter_options(values)
+        if len(merged) > 1 or explicit.get(name):
+            current_included = any(str(item) == str(value) for item in merged)
+            options[name] = merged if current_included or not _is_parameter_option_value(value) else [value, *merged]
+
+    return options
+
+
 @app.get("/api/atom-templates")
 async def list_atom_templates():
     """List all available MethodAtom templates from the backend registry."""
     from fnirs_flow.registry.atom_templates import ALL_ATOM_TEMPLATES
+    from fnirs_flow.registry.node_templates import attach_common_parameter_options
 
+    attach_common_parameter_options(ALL_ATOM_TEMPLATES)
     templates = []
     for t in ALL_ATOM_TEMPLATES:
         templates.append(
@@ -2023,6 +2197,15 @@ async def list_atom_templates():
                 "category": t.category.value if hasattr(t.category, "value") else str(t.category),
                 "operation": t.operation or t.atom_type,
                 "description": getattr(t, "description", ""),
+                "default_config": dict(getattr(t, "default_config", {}) or {}),
+                "parameter_options": _template_parameter_options(t, ALL_ATOM_TEMPLATES),
+                "parameter_specs": dict(getattr(t, "parameter_specs", {}) or {}),
+                "default_readiness_status": (
+                    t.default_readiness_status.value
+                    if getattr(t, "default_readiness_status", None) is not None
+                    else "not_configured"
+                ),
+                "default_execution_scope": getattr(t, "default_execution_scope", None) or "run",
                 "input_ports": [
                     {"name": p.name, "schema": p.port_schema, "required": p.required}
                     for p in getattr(t, "input_ports", [])

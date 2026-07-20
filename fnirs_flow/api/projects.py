@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
+from fnirs_flow.api.portability import is_absolute_local_path
 from fnirs_flow.api.project_bundle import ProjectBundleError, ProjectBundleManager
 from fnirs_flow.api.uri import URIBindingStore
 from fnirs_flow.filesystem import is_visible_data_file, remove_macos_metadata_paths
@@ -21,6 +23,113 @@ if TYPE_CHECKING:
     from fnirs_flow.api.transaction import ProjectTransaction
 
 logger = logging.getLogger(__name__)
+
+_PATH_FIELD_PATTERN = re.compile(
+    r"(^|_)(path|paths|file|files|dir|dirs|folder|folders|directory|csv|tsv|snirf|bids_dir|reference_dir)$"
+)
+
+
+def normalize_project_relative_path(value: str, *, label: str = "Project data path", allow_empty: bool = False) -> str:
+    """Normalize a project-data-root relative path, rejecting absolute or escaping paths."""
+    raw = str(value or "").strip()
+    if not raw:
+        if allow_empty:
+            return ""
+        raise ValueError(f"{label} must be a non-empty project-relative path")
+    normalized = raw.replace("\\", "/").strip("/")
+    if is_absolute_local_path(raw) or raw.startswith("~") or "://" in raw:
+        raise ValueError(f"{label} must be project-relative; absolute paths are not allowed")
+    if not normalized:
+        if allow_empty:
+            return ""
+        raise ValueError(f"{label} must be a non-empty project-relative path")
+    parts = normalized.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError(f"{label} contains an unsafe path segment")
+    if any(":" in part for part in parts):
+        raise ValueError(f"{label} cannot contain ':'")
+    return PurePosixPath(*parts).as_posix()
+
+
+def resolve_project_data_path(
+    store: ProjectStore,
+    project_id: str,
+    relative_path: str,
+    *,
+    label: str = "Project data path",
+    must_exist: bool = True,
+    must_be_file: bool = False,
+    must_be_dir: bool = False,
+    allow_empty: bool = False,
+) -> tuple[Path, str]:
+    """Resolve a project-relative data path inside the project's configured data root."""
+    root_value = store.get_project_data_root(project_id)
+    if not root_value:
+        raise ValueError("Project data folder is not configured")
+    root = Path(root_value).expanduser().resolve()
+    if not root.is_dir():
+        raise FileNotFoundError("Project data folder does not exist or is not a directory")
+    rel = normalize_project_relative_path(relative_path, label=label, allow_empty=allow_empty)
+    candidate = root if not rel else (root / Path(*PurePosixPath(rel).parts)).resolve()
+    if not candidate.is_relative_to(root):
+        raise ValueError(f"{label} must stay inside the project data folder")
+    if must_exist and not candidate.exists():
+        raise FileNotFoundError(f"{label} does not exist")
+    if must_be_file and not candidate.is_file():
+        raise FileNotFoundError(f"{label} does not exist or is not a file")
+    if must_be_dir and not candidate.is_dir():
+        raise FileNotFoundError(f"{label} does not exist or is not a directory")
+    return candidate, rel
+
+
+def _is_import_path_atom(atom: dict[str, Any]) -> bool:
+    fields = [
+        str(atom.get("category", "")),
+        str(atom.get("atom_type", "")),
+        str(atom.get("operation", "")),
+        str(atom.get("template_id", "")),
+    ]
+    lowered = " ".join(fields).lower()
+    return "data_import" in lowered or "import" in lowered or "reader" in lowered or "input" in lowered
+
+
+def _iter_path_field_values(value: Any, location: str = "$"):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            child_location = f"{location}.{key}"
+            key_text = str(key)
+            if isinstance(item, str) and _PATH_FIELD_PATTERN.search(key_text):
+                yield child_location, item
+            elif isinstance(item, (dict, list)):
+                yield from _iter_path_field_values(item, child_location)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            child_location = f"{location}[{index}]"
+            if isinstance(item, str) and _PATH_FIELD_PATTERN.search(location.rsplit(".", 1)[-1]):
+                yield child_location, item
+            elif isinstance(item, (dict, list)):
+                yield from _iter_path_field_values(item, child_location)
+
+
+def _validate_import_atom_project_paths(flow: dict[str, Any]) -> None:
+    atoms: list[Any] = []
+    for key in ("nodes", "flow_atoms"):
+        value = flow.get(key)
+        if isinstance(value, list):
+            atoms.extend(value)
+    for atom_index, atom in enumerate(atoms):
+        if not isinstance(atom, dict) or not _is_import_path_atom(atom):
+            continue
+        atom_id = str(atom.get("id") or atom.get("atom_id") or atom_index)
+        for field, path_value in _iter_path_field_values(atom):
+            if not path_value.strip():
+                continue
+            try:
+                normalize_project_relative_path(path_value, label=f"Atom {atom_id} {field}")
+            except ValueError as exc:
+                raise ProjectBundleError(
+                    f"Import atom paths must be project-relative; {exc}"
+                ) from exc
 
 
 class StaleCompiledPlanError(ValueError):
@@ -158,6 +267,43 @@ from fnirs_flow.flow.snapshots import ProjectSnapshot as Snapshot  # noqa: E402
 from fnirs_flow.validation.api import validate_flow  # noqa: E402
 
 
+class ProjectDataRootStore:
+    """Machine-local project data roots, kept out of portable project bundles."""
+
+    def __init__(self, base_dir: Path) -> None:
+        self._base_dir = Path(base_dir)
+        self._roots_file = self._base_dir / "project_data_roots.json"
+        self._roots: dict[str, str] = {}
+        self._load()
+
+    def _load(self) -> None:
+        if not self._roots_file.exists():
+            return
+        try:
+            data = json.loads(self._roots_file.read_text(encoding="utf-8"))
+            roots = data.get("roots", {})
+            if isinstance(roots, dict):
+                self._roots = {str(key): str(value) for key, value in roots.items()}
+        except (json.JSONDecodeError, OSError):
+            self._roots = {}
+
+    def _save(self) -> None:
+        self._base_dir.mkdir(parents=True, exist_ok=True)
+        data = {"version": "1.0.0", "roots": self._roots}
+        self._roots_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def set(self, project_id: str, data_root: str) -> None:
+        clean_root = data_root.strip()
+        if clean_root:
+            self._roots[project_id] = clean_root
+        else:
+            self._roots.pop(project_id, None)
+        self._save()
+
+    def get(self, project_id: str) -> str:
+        return self._roots.get(project_id, "")
+
+
 class ProjectStore:
     """Persistent project store backed by canonical single-file bundles."""
 
@@ -169,6 +315,7 @@ class ProjectStore:
         self._lock = threading.RLock()
         self._active_transactions: dict[str, ProjectTransaction] = {}
         self._uri_bindings = URIBindingStore(self._base_dir)
+        self._project_data_roots = ProjectDataRootStore(self._base_dir)
         self._debounce_timers: dict[str, threading.Timer] = {}
         self._debounce_delay: float = 1.0  # 1 second debounce
         self._load_all()
@@ -227,24 +374,29 @@ class ProjectStore:
 
             # Try to extract and verify the project. This replaces the
             # disposable workspace, so it must be serialized per store.
-            try:
-                self._bundles.extract_verified(project_id)
-                workspace = self._bundles.workspace_path(project_id)
-                metadata_path = workspace / "project.json"
-                if not metadata_path.exists():
-                    return False
-                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                if metadata.get("id") != project_id:
-                    return False
-                metadata["integrity_status"] = "verified"
-                metadata["last_verified_at"] = datetime.now(timezone.utc).isoformat()
-                metadata["verification_scope"] = "full"
-                self._projects[project_id] = metadata
-                self._materialized_projects.add(project_id)
-                return True
-            except (ProjectBundleError, json.JSONDecodeError, OSError) as exc:
-                logger.warning("Failed to load project '%s': %s", project_id, exc)
-                return False
+            last_error: Exception | None = None
+            for attempt in range(2):
+                try:
+                    self._bundles.extract_verified(project_id)
+                    workspace = self._bundles.workspace_path(project_id)
+                    metadata_path = workspace / "project.json"
+                    if not metadata_path.exists():
+                        return False
+                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                    if metadata.get("id") != project_id:
+                        return False
+                    metadata["integrity_status"] = "verified"
+                    metadata["last_verified_at"] = datetime.now(timezone.utc).isoformat()
+                    metadata["verification_scope"] = "full"
+                    self._projects[project_id] = metadata
+                    self._materialized_projects.add(project_id)
+                    return True
+                except (ProjectBundleError, json.JSONDecodeError, OSError) as exc:
+                    last_error = exc
+                    if attempt == 0:
+                        continue
+            logger.warning("Failed to load project '%s': %s", project_id, last_error)
+            return False
 
     def register_transaction(self, project_id: str, tx: ProjectTransaction) -> None:
         """Register an active transaction for a project."""
@@ -274,6 +426,14 @@ class ProjectStore:
         """List all dataset bindings."""
         return self._uri_bindings.list_bindings()
 
+    def set_project_data_root(self, project_id: str, data_root: str) -> None:
+        """Set a machine-local default data root for a project."""
+        self._project_data_roots.set(project_id, data_root)
+
+    def get_project_data_root(self, project_id: str) -> str:
+        """Get the machine-local default data root for a project."""
+        return self._project_data_roots.get(project_id)
+
     def _debounced_persist(self, project_id: str, reason: str = "metadata_updated") -> None:
         """Persist project with debounce to avoid excessive saves."""
         with self._lock:
@@ -298,7 +458,7 @@ class ProjectStore:
                 self._debounce_timers[project_id].cancel()
                 del self._debounce_timers[project_id]
 
-    def create(self, name: str, description: str = "") -> ProjectRead:
+    def create(self, name: str, description: str = "", *, data_root: str = "") -> ProjectRead:
         if not name or not name.strip():
             raise ValueError("Project name cannot be empty")
         if len(name) > 256:
@@ -320,6 +480,7 @@ class ProjectStore:
                 "pending_draft": None,
             }
             self._persist(project_id, reason="project_created")
+            self.set_project_data_root(project_id, data_root)
 
         created = self.get(project_id)
         if created is None:  # pragma: no cover - guarded by the insertion above
@@ -372,6 +533,7 @@ class ProjectStore:
             id=proj["id"],
             name=proj["name"],
             description=proj["description"],
+            data_root=self.get_project_data_root(project_id),
             flow_id=proj.get("flow", {}).get("flow_id", ""),
             package_path=str(bundle_path.resolve()),
             revision=int(manifest.get("revision", 0)),
@@ -419,6 +581,7 @@ class ProjectStore:
             if policy.get("allow_empty_edges") is True
             else remove_unconnected_auto_empty_markers(flow)
         )
+        _validate_import_atom_project_paths(normalized_flow)
         with self._lock:
             if project_id not in self._projects:
                 return False
@@ -859,6 +1022,7 @@ def discover_project_data(
     dataset_id: str,
     *,
     data_root: str | Path | None = None,
+    data_path: str | None = None,
     base_revision: int | None = None,
 ) -> DiscoverResult:
     """Discover a dataset for a project."""
@@ -868,7 +1032,18 @@ def discover_project_data(
         store, project_id, reason="discover_data", base_revision=base_revision
     ) as tx:
         outdir = tx.output_dir
-        manifest = discover_dataset(dataset_id, outdir, local_root=data_root)
+        if data_path is not None:
+            effective_data_root = resolve_project_data_path(
+                store,
+                project_id,
+                data_path,
+                label="Dataset folder",
+                must_be_dir=True,
+                allow_empty=True,
+            )[0]
+        else:
+            effective_data_root = data_root or store.get_project_data_root(project_id) or None
+        manifest = discover_dataset(dataset_id, outdir, local_root=effective_data_root)
         if manifest.runtime_local_root:
             store.bind_dataset(manifest.dataset_id, Path(manifest.runtime_local_root))
         result = DiscoverResult(
@@ -883,6 +1058,34 @@ def discover_project_data(
         tx.commit()
 
     return result
+
+
+def list_project_data_folders(store: ProjectStore, project_id: str, parent: str = "") -> dict[str, Any]:
+    """List immediate child folders under a project-relative data folder."""
+    if store.get(project_id) is None:
+        return {}
+    parent_path, parent_rel = resolve_project_data_path(
+        store,
+        project_id,
+        parent,
+        label="Parent folder",
+        must_be_dir=True,
+        allow_empty=True,
+    )
+    folders: list[dict[str, Any]] = []
+    for child in sorted(parent_path.iterdir(), key=lambda item: item.name.lower()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        relative = PurePosixPath(parent_rel, child.name).as_posix() if parent_rel else child.name
+        try:
+            has_children = any(
+                grandchild.is_dir() and not grandchild.name.startswith(".")
+                for grandchild in child.iterdir()
+            )
+        except OSError:
+            has_children = False
+        folders.append({"name": child.name, "path": relative, "has_children": has_children})
+    return {"parent": parent_rel, "folders": folders}
 
 
 def load_project_discover_result(store: ProjectStore, project_id: str) -> DiscoverResult | None:

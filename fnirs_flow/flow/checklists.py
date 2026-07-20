@@ -669,7 +669,10 @@ def _input_requirement_missing(flow: FlowGraph, atom: Any, step: FlowChecklistSt
                 if schema:
                     edge_schemas.add(_canonical_schema(schema))
             source_operation = str(getattr(source, "operation", "") or getattr(source, "atom_type", "") or "")
-            edge_schemas.update(_canonical_schema(schema) for schema in OPERATION_OUTPUT_SCHEMAS.get(source_operation, ()))
+            edge_schemas.update(
+                _canonical_schema(schema)
+                for schema in OPERATION_OUTPUT_SCHEMAS.get(source_operation, ())
+            )
         incoming_schemas.update(edge_schemas)
     return tuple(schema for schema in step.input_requirements if _canonical_schema(schema) not in incoming_schemas)
 

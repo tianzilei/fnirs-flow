@@ -71,7 +71,7 @@ class TestMneNirsStepsMocked:
     """Tests for adapter steps using mocked MNE functions."""
 
     def test_optical_density_calls_mne(self):
-        with patch("fnirs_flow.adapters.mne_nirs_steps.optical_density") as mock_od:
+        with patch("mne.preprocessing.nirs.optical_density") as mock_od:
             mock_raw = MagicMock()
             mock_od.return_value = mock_raw
 

@@ -28,6 +28,7 @@ export interface Project {
   id: string;
   name: string;
   description: string;
+  data_root?: string;
   flow_id: string;
   package_path: string;
   storage_format: 'fnirsflow_bundle';
@@ -87,6 +88,29 @@ export interface DiscoverResult {
   metadata_tables: number;
 }
 
+export interface ProjectDataFolder {
+  name: string;
+  path: string;
+  has_children: boolean;
+}
+
+export interface ProjectDataFolderList {
+  parent: string;
+  folders: ProjectDataFolder[];
+}
+
+export interface LocalFolder {
+  name: string;
+  path: string;
+  has_children: boolean;
+}
+
+export interface LocalFolderList {
+  current: string;
+  parent: string;
+  folders: LocalFolder[];
+}
+
 export interface DatasetEntry {
   dataset_id: string;
   name: string;
@@ -114,8 +138,15 @@ export async function getProject(projectId: string): Promise<Project> {
   return data;
 }
 
-export async function createProject(name: string, description = ''): Promise<Project> {
-  const { data } = await api.post('/projects', { name, description });
+export async function createProject(name: string, description = '', dataRoot = ''): Promise<Project> {
+  const { data } = await api.post('/projects', { name, description, data_root: dataRoot });
+  return data;
+}
+
+export async function listLocalFolders(path = ''): Promise<LocalFolderList> {
+  const { data } = await api.get('/local-folders', {
+    params: path ? { path } : {},
+  });
   return data;
 }
 
@@ -143,9 +174,16 @@ export async function getCompileResult(projectId: string): Promise<CompileResult
   return data;
 }
 
-export async function discoverData(projectId: string, datasetId: string, dataRoot?: string): Promise<DiscoverResult> {
+export async function listProjectDataFolders(projectId: string, parent = ''): Promise<ProjectDataFolderList> {
+  const { data } = await api.get(`/projects/${projectId}/data-folders`, {
+    params: parent ? { parent } : {},
+  });
+  return data;
+}
+
+export async function discoverData(projectId: string, datasetId: string, dataPath?: string): Promise<DiscoverResult> {
   const { data } = await api.post(`/projects/${projectId}/discover-data`, null, {
-    params: { dataset_id: datasetId, ...(dataRoot ? { data_root: dataRoot } : {}) },
+    params: { dataset_id: datasetId, ...(dataPath ? { data_path: dataPath } : {}) },
     timeout: 120000,
   });
   return data;
@@ -422,6 +460,11 @@ export interface AtomTemplate {
   category: string;
   operation: string;
   description: string;
+  default_config?: Record<string, unknown>;
+  parameter_options?: Record<string, unknown[]>;
+  parameter_specs?: Record<string, Record<string, unknown>>;
+  default_readiness_status?: string;
+  default_execution_scope?: string;
   input_ports: Array<{ name: string; schema: string; required: boolean }>;
   output_ports: Array<{ name: string; schema: string; required: boolean }>;
   ports?: Array<{ name: string; direction: 'in' | 'out'; schema: string; required: boolean }>;

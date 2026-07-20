@@ -179,9 +179,6 @@ def generate_draft_flow(
             preset = preset_lib.get(preset_id)
             if preset and atom_type in preset.applicable_atom_types:
                 params.update(preset.parameters)
-        if atom_type == "dataset_discovery":
-            source_kind = "local_bids_nirs" if data_format in {"bids", "bids_nirs"} else "mne_nirs_dataset"
-            params.setdefault("source_kind", source_kind)
         if atom_type == "study_design" and confirmed_conditions:
             params["conditions"] = confirmed_conditions
             params["contrasts"] = contrasts

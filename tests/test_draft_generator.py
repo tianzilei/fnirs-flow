@@ -30,6 +30,11 @@ class TestDraftGenerator:
         assert "bandpass_filter" in template_ids
         assert all(node["readiness_status"] != "not_configured" for node in flow["nodes"])
 
+    def test_dataset_discovery_draft_config_has_no_source_kind(self):
+        flow = generate_draft_flow("task", data_format="bids_nirs")
+        dataset_node = next(node for node in flow["nodes"] if node["template_id"] == "dataset_discovery")
+        assert dataset_node["config"] == {"dataset_id": ""}
+
     def test_required_atoms_connect_only_compatible_ports(self):
         flow = generate_draft_flow("task")
         nodes = {node["id"]: node for node in flow["nodes"]}

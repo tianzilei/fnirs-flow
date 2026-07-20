@@ -466,7 +466,7 @@ class ProjectBundleManager:
     def _extract_bundle(self, bundle: Path, project_id: str) -> Path:
         self.verify(bundle, expected_project_id=project_id)
         workspace = self.workspace_path(project_id)
-        staging = self.workspace_root / f".{project_id}.extracting"
+        staging = self.workspace_root / f".x{project_id}"
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True)

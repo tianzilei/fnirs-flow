@@ -230,7 +230,7 @@ Required confirmations:
       "category": "data",
       "origin": "builtin",
       "position": {"x": 0, "y": 0},
-      "config": {"dataset_id": "mne-fnirs-motor", "source_kind": "mne_nirs_dataset"},
+      "config": {"dataset_id": "mne-fnirs-motor"},
       "ports": [{"name": "data_manifest", "direction": "out", "schema": "DataManifest", "required": true}],
       "readiness_status": "needs_attention",
       "execution_status": "not_run",

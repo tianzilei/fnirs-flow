@@ -219,7 +219,6 @@ def _flow_prompt(
                 "Every edge must reference existing node ids and valid source_handle/target_handle names.",
                 "Every required input port must have one incoming edge from a matching output schema.",
                 "Use only builtin-managed nodes and no executable code.",
-                "Set dataset_discovery.config.source_kind from the requested data_format.",
                 "Set study_design.config.conditions exactly from requested conditions.",
                 "Set study_design.config.contrasts and contrast.config.contrasts with concrete names.",
                 "Set filtering, motion_correction, design_matrix, first_level_glm, and contrast configs explicitly.",

@@ -5,6 +5,113 @@ from __future__ import annotations
 from fnirs_flow.flow.atoms import AtomPort, BackendBinding, MethodAtomCategory
 from fnirs_flow.registry.node_library import MethodAtomTemplate
 
+COMMON_PARAMETER_OPTIONS = {
+    "aggregation": ["mean", "median", "sum", "min", "max"],
+    "baseline_correction": ["mean", "median", "linear", "none"],
+    "coding": ["dummy", "effect", "helmert"],
+    "covariance_structure": ["unstructured", "diagonal", "compound_symmetry", "autoregressive"],
+    "cv_strategy": ["leave_one_out", "k_fold", "stratified_k_fold", "group_k_fold", "nested"],
+    "data_type": ["continuous_wave", "frequency_domain", "time_domain"],
+    "design_type": ["block", "event", "mixed", "two_sample_t", "paired_t", "one_sample_t", "anova", "regression"],
+    "delimiter": ["auto", ",", "\\t", ";"],
+    "drift_model": ["polynomial", "cosine", "blank"],
+    "fdr_method": ["indep", "negcorr"],
+    "fir_design": ["firwin", "firwin2"],
+    "format": ["csv", "tsv", "json", "parquet"],
+    "hrf_model": ["canonical", "fir", "finite_impulse_response"],
+    "kernel": ["linear", "poly", "rbf", "sigmoid"],
+    "level": ["dyad", "subject", "channel", "roi", "group"],
+    "model_type": ["svm", "lda", "random_forest", "logistic_regression", "xgboost", "cnn", "lstm", "transformer"],
+    "mother_wavelet": ["morlet", "paul", "dog"],
+    "noise_model": ["ar1", "ols"],
+    "nonpositive_policy": ["nan", "clip", "raise"],
+    "solver": ["svd", "lsqr", "eigen"],
+    "spectrum": ["prahl", "wray", "matcher"],
+    "split_strategy": ["subject_wise", "run_wise", "trial_wise", "random", "leave_one_subject_out"],
+    "threshold_method": ["proportional", "absolute", "density", "mst"],
+    "threshold_type": ["soft", "hard"],
+}
+
+COMMON_PARAMETER_SPECS = {
+    "path": {"type": "text", "control": "path", "description": "Project-relative path inside the project data root."},
+    "bids_dir": {"type": "text", "control": "path", "description": "Project-relative BIDS dataset folder."},
+    "reference_dir": {"type": "text", "control": "path", "description": "Project-relative reference folder."},
+    "dataset_id": {"type": "text", "description": "Dataset identifier used in reports and manifests."},
+    "delimiter": {"type": "text", "control": "select"},
+    "encoding": {"type": "text"},
+}
+
+PROBABILITY_PARAMETER_NAMES = {
+    "alpha",
+    "dropout",
+    "forgetting_factor",
+    "icc_threshold",
+    "n_components",
+    "power",
+    "significance_level",
+}
+
+POSITIVE_INTEGER_NAME_PARTS = (
+    "basis",
+    "component",
+    "filter",
+    "fold",
+    "kernel",
+    "lag",
+    "layer",
+    "nhead",
+    "nperseg",
+    "order",
+    "round",
+    "seed",
+    "segment",
+    "trial",
+)
+
+
+def infer_common_parameter_spec(name: str, value: object) -> dict[str, object]:
+    if isinstance(value, bool):
+        return {"type": "boolean", "control": "checkbox"}
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        spec: dict[str, object] = {"type": "number", "control": "number"}
+        normalized_name = name.lower()
+        if normalized_name in PROBABILITY_PARAMETER_NAMES or normalized_name.endswith("_threshold"):
+            spec.update({"minimum": 0, "maximum": 1})
+        elif (
+            normalized_name.endswith(("freq", "frequency", "hz"))
+            or "_freq" in normalized_name
+            or "frequency_" in normalized_name
+        ):
+            spec["minimum"] = 0
+        elif any(part in normalized_name for part in POSITIVE_INTEGER_NAME_PARTS):
+            spec["minimum"] = 1
+        return spec
+    if (
+        isinstance(value, list)
+        and value
+        and all(isinstance(item, int | float) and not isinstance(item, bool) for item in value)
+    ):
+        return {"type": "number-list", "control": "text"}
+    return {"type": "text", "control": "text"}
+
+
+def attach_common_parameter_options(templates: list[MethodAtomTemplate]) -> None:
+    for template in templates:
+        options = dict(template.parameter_options)
+        specs = dict(template.parameter_specs)
+        for name in template.default_config:
+            if name in COMMON_PARAMETER_OPTIONS:
+                options.setdefault(name, COMMON_PARAMETER_OPTIONS[name])
+            spec = {
+                **infer_common_parameter_spec(name, template.default_config[name]),
+                **COMMON_PARAMETER_SPECS.get(name, {}),
+            }
+            if name in options:
+                spec["control"] = "select"
+            specs.setdefault(name, spec)
+        template.parameter_options = options
+        template.parameter_specs = specs
+
 # ============================================================================
 # DATA NODES
 # ============================================================================
@@ -16,7 +123,7 @@ DATASET_DISCOVERY = MethodAtomTemplate(
     atom_type="data_import",
     operation="dataset_discovery",
     description="Discover and enumerate fNIRS dataset files",
-    default_config={"dataset_id": "", "source_kind": "mne_nirs_dataset"},
+    default_config={"dataset_id": ""},
     ports=[
         AtomPort(name="data_manifest", direction="out", schema="DataManifest"),
     ],
@@ -30,7 +137,7 @@ BIDS_IMPORT = MethodAtomTemplate(
     atom_type="data_import",
     operation="bids_import",
     description="Import data from BIDS-formatted dataset",
-    default_config={"bids_dir": "", "datatype": "nirs"},
+    default_config={"bids_dir": ""},
     ports=[
         AtomPort(name="bids_path", direction="in", schema="FilePath"),
         AtomPort(name="raw_data", direction="out", schema="RawData"),
@@ -79,7 +186,7 @@ LOCALIZATION_PROJECTION_IMPORT = MethodAtomTemplate(
     description="Import a prepared localization/projection CSV as standardized MNI channel coordinates",
     default_config={
         "path": (
-            "Sample/privatedata/localization/usable_projection_csv/"
+            "Sample/privatedata/定位/usable_projection_csv/"
             "Protocol02_QYZ_optimized_10-20MNI_projection_coordinates.csv"
         ),
         "coordinate_set_id": "Protocol02_QYZ_optimized_10-20MNI",
@@ -108,7 +215,7 @@ NIRS_SPM_SURFACE_PROJECTION = MethodAtomTemplate(
     ),
     default_config={
         "path": (
-            "Sample/privatedata/localization/usable_projection_csv/"
+            "Sample/privatedata/定位/usable_projection_csv/"
             "G1_shouzhen_ch01_ch42_projection_coordinates.csv"
         ),
         "reference_dir": "References/NIRS_SPM_v4_r1",
@@ -1755,3 +1862,5 @@ ALL_NODE_TEMPLATES.extend([
     PARTICIPANT_SITE_PROJECTION,
     OBSERVATION_PAIRING_PROJECTION,
 ])
+
+attach_common_parameter_options(ALL_NODE_TEMPLATES)

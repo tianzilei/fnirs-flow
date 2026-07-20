@@ -14,8 +14,7 @@
         "y": 0
       },
       "config": {
-        "dataset_id": "mne-fnirs-motor",
-        "source_kind": "mne_nirs_dataset"
+        "dataset_id": "mne-fnirs-motor"
       },
       "ports": [
         {
@@ -909,8 +908,7 @@
         "y": 0
       },
       "config": {
-        "dataset_id": "mne-fnirs-motor",
-        "source_kind": "mne_nirs_dataset"
+        "dataset_id": "mne-fnirs-motor"
       },
       "ports": [
         {

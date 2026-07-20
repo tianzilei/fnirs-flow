@@ -95,6 +95,33 @@
         "capability_manifest": {
           "$ref": "#/$defs/CapabilityManifest"
         },
+        "dependency_profile_id": {
+          "type": ["string", "null"],
+          "description": "Optional dependency profile required by this atom"
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Backend capabilities required by this atom"
+        },
+        "dependency_optional": {
+          "type": "boolean",
+          "default": false
+        },
+        "execution_scope": {
+          "type": "string",
+          "enum": ["run", "subject", "group", "project"],
+          "default": "run"
+        },
+        "readiness_status": {
+          "$ref": "#/$defs/ReadinessStatus"
+        },
+        "execution_status": {
+          "$ref": "#/$defs/ExecutionStatus"
+        },
+        "security_status": {
+          "$ref": "#/$defs/SecurityStatus"
+        },
         "status": {
           "$ref": "#/$defs/MethodAtomStatus"
         },
@@ -175,6 +202,33 @@
         },
         "capability_manifest": {
           "$ref": "#/$defs/CapabilityManifest"
+        },
+        "dependency_profile_id": {
+          "type": ["string", "null"],
+          "description": "Optional dependency profile required by this atom"
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Backend capabilities required by this atom"
+        },
+        "dependency_optional": {
+          "type": "boolean",
+          "default": false
+        },
+        "execution_scope": {
+          "type": "string",
+          "enum": ["run", "subject", "group", "project"],
+          "default": "run"
+        },
+        "readiness_status": {
+          "$ref": "#/$defs/ReadinessStatus"
+        },
+        "execution_status": {
+          "$ref": "#/$defs/ExecutionStatus"
+        },
+        "security_status": {
+          "$ref": "#/$defs/SecurityStatus"
         },
         "status": {
           "$ref": "#/$defs/MethodAtomStatus"
@@ -269,7 +323,9 @@
         "backend_id": { "type": "string", "description": "Execution backend identifier" },
         "operation": { "type": "string", "description": "Specific operation to execute" },
         "version_spec": { "type": "string", "description": "Backend version constraint" },
-        "parameters": { "type": "object", "description": "Backend-specific parameters" }
+        "parameters": { "type": "object", "description": "Backend-specific parameters" },
+        "dependency_profile_id": { "type": ["string", "null"] },
+        "required_capabilities": { "type": "array", "items": { "type": "string" } }
       }
     },
     "NodeReference": {
@@ -379,12 +435,12 @@
       "properties": {
         "allowed_statuses": {
           "type": "array",
-          "items": { "$ref": "#/$defs/MethodAtomStatus" },
+          "items": { "$ref": "#/$defs/ReadinessStatus" },
           "description": "Atom statuses allowed at this boundary"
         },
         "blocked_statuses": {
           "type": "array",
-          "items": { "$ref": "#/$defs/MethodAtomStatus" },
+          "items": { "$ref": "#/$defs/ReadinessStatus" },
           "description": "Atom statuses explicitly blocked at this boundary"
         },
         "required_config_keys": {
@@ -404,6 +460,8 @@
       "properties": {
         "ingress": { "$ref": "#/$defs/BoundaryContract" },
         "egress": { "$ref": "#/$defs/BoundaryContract" },
+        "post_readiness_status": { "$ref": "#/$defs/ReadinessStatus" },
+        "post_execution_status": { "$ref": "#/$defs/ExecutionStatus" },
         "post_status": { "$ref": "#/$defs/MethodAtomStatus" }
       }
     },
@@ -412,6 +470,8 @@
       "properties": {
         "ingress": { "$ref": "#/$defs/BoundaryContract" },
         "egress": { "$ref": "#/$defs/BoundaryContract" },
+        "post_source_readiness": { "$ref": "#/$defs/ReadinessStatus" },
+        "post_target_readiness": { "$ref": "#/$defs/ReadinessStatus" },
         "post_source_status": { "$ref": "#/$defs/MethodAtomStatus" },
         "post_target_status": { "$ref": "#/$defs/MethodAtomStatus" }
       }
@@ -430,6 +490,21 @@
       "type": "string",
       "enum": ["not_configured", "configured", "warning", "quarantined", "blocked", "ready", "executed", "failed"],
       "description": "Current atom status"
+    },
+    "ReadinessStatus": {
+      "type": "string",
+      "enum": ["not_configured", "configured", "needs_attention", "ready", "blocked"],
+      "description": "Configuration and human-review readiness state"
+    },
+    "ExecutionStatus": {
+      "type": "string",
+      "enum": ["not_run", "queued", "running", "executed", "failed", "skipped"],
+      "description": "Runtime execution state"
+    },
+    "SecurityStatus": {
+      "type": "string",
+      "enum": ["trusted", "needs_review", "quarantined", "blocked"],
+      "description": "Security and trust state"
     }
   }
 }

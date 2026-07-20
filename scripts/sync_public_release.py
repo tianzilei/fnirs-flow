@@ -69,6 +69,7 @@ WEBUI_DIRS = [
 PUBLIC_DOC_FILES = [
     "docs/README.md",
     "docs/specs/fnirs_flow_public_api.md",
+    "docs/specs/method_atom_parameter_ui_contract.md",
     "docs/specs/package_profile_spec.md",
     "docs/specs/mvp_task_glm_acceptance_checklist.md",
 ]

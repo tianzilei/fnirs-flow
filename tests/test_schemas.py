@@ -108,6 +108,36 @@ class TestValidateFlowDict:
         errors = validate_flow_dict(flow)
         assert errors == []
 
+    def test_split_atom_status_fields_are_schema_valid(self) -> None:
+        """Test current MethodAtom status and contract fields are accepted."""
+        flow = {
+            "schema_version": "0.3.0",
+            "flow_id": "split-status-flow",
+            "flow_atoms": [
+                {
+                    "id": "atom-1",
+                    "atom_type": "participant_table_input",
+                    "type": "participant_table_input",
+                    "category": "data",
+                    "position": {"x": 0, "y": 0},
+                    "execution_scope": "group",
+                    "readiness_status": "needs_attention",
+                    "execution_status": "not_run",
+                    "security_status": "trusted",
+                    "state_contract": {
+                        "post_readiness_status": "ready",
+                        "post_execution_status": "executed",
+                    },
+                    "ports": [
+                        {"name": "participant_table", "direction": "out", "schema": "ParticipantTable"}
+                    ],
+                }
+            ],
+            "edges": [],
+        }
+        errors = validate_flow_dict(flow)
+        assert errors == []
+
 
 class TestLoadFlowFromDict:
     """Tests for load_flow_from_dict function."""

@@ -15,12 +15,14 @@ class ProjectCreate(BaseModel):
         pattern=r"^[a-zA-Z0-9_\- ]+$",
     )
     description: str = Field(default="", max_length=1024)
+    data_root: str = Field(default="", max_length=4096)
 
 
 class ProjectRead(BaseModel):
     id: str
     name: str
     description: str
+    data_root: str = ""
     flow_id: str = ""
     package_path: str = ""
     storage_format: str = "fnirsflow_bundle"

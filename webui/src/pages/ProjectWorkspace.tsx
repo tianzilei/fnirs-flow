@@ -1,10 +1,16 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Archive, Boxes, Copy, Database, Play, Download, ShieldCheck } from 'lucide-react';
+import { Archive, Boxes, ChevronLeft, Copy, Database, Download, FolderOpen, Play, ShieldCheck } from 'lucide-react';
 import { useStore } from '../store';
-import type { Project } from '../api/client';
+import { formatApiError, listLocalFolders, type LocalFolder, type Project } from '../api/client';
 import { VersionHistoryPanel } from '../components/VersionHistoryPanel';
 import { DesignHistoryPanel } from '../components/DesignHistoryPanel';
+
+type FolderSelectionStatus = {
+  tone: 'empty' | 'resolved' | 'unavailable';
+  label: string;
+  message: string;
+};
 
 export function ProjectWorkspace() {
   const navigate = useNavigate();
@@ -17,6 +23,14 @@ export function ProjectWorkspace() {
 
   const [newName, setNewName] = React.useState('');
   const [newDesc, setNewDesc] = React.useState('');
+  const [newDataRoot, setNewDataRoot] = React.useState('');
+  const [folderStatus, setFolderStatus] = React.useState<FolderSelectionStatus | null>(null);
+  const [folderPickerOpen, setFolderPickerOpen] = React.useState(false);
+  const [localFolderCurrent, setLocalFolderCurrent] = React.useState('');
+  const [localFolderParent, setLocalFolderParent] = React.useState('');
+  const [localFolders, setLocalFolders] = React.useState<LocalFolder[]>([]);
+  const [localFolderLoading, setLocalFolderLoading] = React.useState(false);
+  const [localFolderError, setLocalFolderError] = React.useState('');
   const [showCreate, setShowCreate] = React.useState(false);
   const [detailProject, setDetailProject] = React.useState<Project | null>(null);
 
@@ -27,9 +41,12 @@ export function ProjectWorkspace() {
   const handleCreate = async () => {
     if (newName.trim()) {
       try {
-        const proj = await createProject(newName.trim(), newDesc.trim());
+        const proj = await createProject(newName.trim(), newDesc.trim(), newDataRoot.trim());
         setNewName('');
         setNewDesc('');
+        setNewDataRoot('');
+        setFolderStatus(null);
+        setFolderPickerOpen(false);
         setShowCreate(false);
         navigate(`/projects/${proj.id}/flow`);
       } catch {
@@ -59,6 +76,55 @@ export function ProjectWorkspace() {
     await loadProjects();
   };
 
+  const folderReady = folderStatus?.tone === 'resolved' && !!newDataRoot.trim();
+  const folderBlocked = folderStatus?.tone === 'unavailable';
+  const nameReady = newName.trim().length > 0;
+
+  const browseLocalFolder = async (path = '') => {
+    setLocalFolderLoading(true);
+    setLocalFolderError('');
+    try {
+      const result = await listLocalFolders(path);
+      setLocalFolderCurrent(result.current);
+      setLocalFolderParent(result.parent);
+      setLocalFolders(result.folders);
+    } catch (err) {
+      setLocalFolderError(formatApiError(err));
+      setLocalFolders([]);
+    } finally {
+      setLocalFolderLoading(false);
+    }
+  };
+
+  const openFolderPicker = async () => {
+    setFolderPickerOpen(true);
+    await browseLocalFolder(newDataRoot || '');
+  };
+
+  const useSelectedFolder = () => {
+    if (!localFolderCurrent) return;
+    setNewDataRoot(localFolderCurrent);
+    setFolderStatus({
+      tone: 'resolved',
+      label: 'Data folder ready',
+      message: 'The selected local folder is available to the server.',
+    });
+    setFolderPickerOpen(false);
+  };
+
+  const handleTypedDataRoot = (value: string) => {
+    setNewDataRoot(value);
+    setFolderStatus(
+      value.trim()
+        ? {
+            tone: 'resolved',
+            label: 'Data folder ready',
+            message: 'The typed local path will be validated by the server when the project is created.',
+          }
+        : null
+    );
+  };
+
   return (
     <div className="page project-workspace work-page">
       <section className="page-header">
@@ -77,26 +143,135 @@ export function ProjectWorkspace() {
       {showCreate && (
         <div className="create-project">
           <div className="create-project-fields">
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Project name (required)"
-              autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && newName.trim() && handleCreate()}
-            />
-            <input
-              type="text"
-              value={newDesc}
-              onChange={(e) => setNewDesc(e.target.value)}
-              placeholder="Description (optional)"
-              onKeyDown={(e) => e.key === 'Enter' && newName.trim() && handleCreate()}
-            />
+            <section className={`create-step-card ${nameReady ? 'complete' : 'active'}`}>
+              <div className="create-step-index">1</div>
+              <div className="create-step-body">
+                <div className="create-step-heading">
+                  <h3>Project Name</h3>
+                  <span>{nameReady ? 'Ready' : 'Required'}</span>
+                </div>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Project name"
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && nameReady && folderReady && handleCreate()}
+                />
+              </div>
+            </section>
+
+            <section className={`create-step-card ${folderReady ? 'complete' : nameReady ? 'active' : 'disabled'}`}>
+              <div className="create-step-index">2</div>
+              <div className="create-step-body">
+                <div className="create-step-heading">
+                  <h3>Data Path</h3>
+                  <span>{folderReady ? 'Available' : folderBlocked ? 'Unavailable' : 'Required'}</span>
+                </div>
+                <div className={`folder-select-card ${folderStatus?.tone || 'empty'}`}>
+                  <div className="folder-select-main">
+                    <span className="folder-select-label">
+                      {folderStatus?.label || 'Project data folder'}
+                    </span>
+                    <code>{folderReady ? newDataRoot : 'No usable folder selected'}</code>
+                    <span className="folder-select-message">
+                      {folderStatus?.message || (nameReady ? 'Choose a local data folder for this project.' : 'Enter a project name first, then choose the data folder.')}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="ghost-button compact"
+                    onClick={openFolderPicker}
+                    disabled={!nameReady}
+                    title={nameReady ? 'Choose a local data folder' : 'Enter a project name first'}
+                  >
+                    <FolderOpen size={14} /> {folderReady ? 'Change' : 'Choose'}
+                  </button>
+                </div>
+                <label className="create-path-input">
+                  <span>Data folder path</span>
+                  <input
+                    type="text"
+                    value={newDataRoot}
+                    onChange={(e) => handleTypedDataRoot(e.target.value)}
+                    placeholder="E:/path/to/local/dataset"
+                    disabled={!nameReady}
+                    onKeyDown={(e) => e.key === 'Enter' && nameReady && folderReady && handleCreate()}
+                  />
+                </label>
+                <p className="folder-upload-note">
+                  You can browse server-visible folders or type a local path directly. No data is uploaded; processing runs on the server.
+                </p>
+                {folderPickerOpen && (
+                  <div className="local-folder-picker">
+                    <div className="folder-browser-header">
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => browseLocalFolder(localFolderParent)}
+                        disabled={!localFolderParent || localFolderLoading}
+                        title="Up one folder"
+                      >
+                        <ChevronLeft size={15} />
+                      </button>
+                      <code>{localFolderCurrent || 'Computer'}</code>
+                      <button type="button" className="ghost-button compact" onClick={() => setFolderPickerOpen(false)}>
+                        Close
+                      </button>
+                    </div>
+                    {localFolderError && <div className="error-message">{localFolderError}</div>}
+                    {localFolderLoading && <div className="panel-state">Loading folders...</div>}
+                    {!localFolderLoading && localFolders.length === 0 && <div className="panel-state">No child folders.</div>}
+                    <div className="folder-list local-folder-list">
+                      {localFolders.map((folder) => (
+                        <button
+                          type="button"
+                          key={folder.path}
+                          className="folder-list-item"
+                          onClick={() => browseLocalFolder(folder.path)}
+                        >
+                          <FolderOpen size={14} />
+                          <span>{folder.name}</span>
+                          <small>{folder.path}</small>
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="folder-use-button"
+                      onClick={useSelectedFolder}
+                      disabled={!localFolderCurrent}
+                    >
+                      Use this folder
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className={`create-step-card ${folderReady ? 'active' : 'disabled'}`}>
+              <div className="create-step-index">3</div>
+              <div className="create-step-body">
+                <div className="create-step-heading">
+                  <h3>Description</h3>
+                  <span>Optional</span>
+                </div>
+                <input
+                  type="text"
+                  value={newDesc}
+                  onChange={(e) => setNewDesc(e.target.value)}
+                  placeholder="Description"
+                  disabled={!folderReady}
+                  onKeyDown={(e) => e.key === 'Enter' && nameReady && folderReady && handleCreate()}
+                />
+              </div>
+            </section>
           </div>
           <button
             className="primary-button"
             onClick={handleCreate}
-            disabled={!newName.trim() || loading}
+            disabled={!nameReady || !folderReady || loading}
+            title={!nameReady ? 'Enter a project name first' : !folderReady ? 'Choose an available data folder before creating the project' : undefined}
           >
             {loading ? 'Creating...' : 'Create'}
           </button>
@@ -127,6 +302,7 @@ export function ProjectWorkspace() {
                 <span className="project-id-badge">{proj.id.slice(0, 8)}</span>
               </div>
               {proj.description && <p className="project-desc">{proj.description}</p>}
+                {proj.data_root && <p className="flow-id">Data: {proj.data_root}</p>}
                 {proj.flow_id && <p className="flow-id">Flow: {proj.flow_id}</p>}
                 <p className="project-storage-badge"><Archive size={13} /> Single-file project · r{proj.revision}</p>
             </div>
@@ -147,6 +323,12 @@ export function ProjectWorkspace() {
                   <div className="detail-row">
                     <span className="detail-label">Flow ID</span>
                     <span className="detail-value">{proj.flow_id}</span>
+                  </div>
+                )}
+                {proj.data_root && (
+                  <div className="detail-row">
+                    <span className="detail-label">Data folder</span>
+                    <span className="detail-value"><code>{proj.data_root}</code></span>
                   </div>
                 )}
                 <div className="detail-row">

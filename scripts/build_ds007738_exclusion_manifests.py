@@ -145,25 +145,23 @@ def build_manifests() -> dict[str, Any]:
 
 
 def write_report(summary: dict[str, Any]) -> None:
-    rows = ["| Reason code | Run count |", "|---|---:|"]
+    rows = ["| 原因代码 | run 数 |", "|---|---:|"]
     rows.extend(f"| {reason} | {count} |" for reason, count in summary["reason_counts"].items())
-    text = f"""# ds007738 Exclusion and Failure Manifest
+    text = f"""# ds007738 排除与失败清单
 
-Generated: {summary['created_at']}
+生成时间：{summary['created_at']}
 
-- Total runs: {summary['total_results']}
-- Included in GLM: {summary['included_runs']}
-- Excluded or not applicable: {summary['excluded_runs']}
-- True read/execution failure records: {summary['failure_records']}
+- 总 run：{summary['total_results']}
+- 纳入 GLM：{summary['included_runs']}
+- 排除或不适用：{summary['excluded_runs']}
+- 真正的读取/执行失败记录：{summary['failure_records']}
 
 {chr(10).join(rows)}
 
-`qc_failed` is recorded as a quality exclusion, not disguised as a software
-execution failure. Resting-state runs without task events are recorded as not
-applicable for the analysis. Missing events files and corrupted SNIRF metadata
-retain separate reason codes.
+`qc_failed` 被记录为质量排除，不伪装成软件执行失败；静息态无任务事件被记录为分析不适用；
+缺失 events 文件和损坏的 SNIRF 元数据分别保留独立原因代码。
 
-Machine-readable manifests are stored under `outputs/ds007738_full_analysis/logs/`.
+机器可读清单位于 `outputs/ds007738_full_analysis/logs/`。
 """
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(text, encoding="utf-8")

@@ -214,11 +214,11 @@ class TestDispatchPreprocessing:
             def compute_qc(self, raw):
                 return {"sci": 0.9}
 
-            def apply_motion_correction(self, raw, method="tddr"):
-                return {"corrected": True}
+            def apply_motion_correction(self, raw, method="tddr", **kwargs):
+                return {"corrected": True, "method": method, "kwargs": kwargs}
 
-            def apply_filter(self, raw, l_freq=0.01, h_freq=0.2):
-                return {"filtered": True}
+            def apply_filter(self, raw, l_freq=0.01, h_freq=0.2, method="bandpass", **kwargs):
+                return {"filtered": True, "method": method, "l_freq": l_freq, "h_freq": h_freq, "kwargs": kwargs}
 
             def to_haemoglobin(self, raw, ppf=6.0):
                 return {"hb": True}
@@ -231,29 +231,90 @@ class TestDispatchPreprocessing:
         result = service._dispatch_preprocessing(adapter, "raw", "optical_density", {})
         assert result == {"type": "od"}
 
+    def test_dispatch_template_optical_density_alias(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_preprocessing(adapter, "raw", "optical_density_conversion", {})
+        assert result == {"type": "od"}
+
     def test_dispatch_compute_qc(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
         result = service._dispatch_preprocessing(adapter, "raw", "compute_qc", {})
         assert result == {"sci": 0.9}
 
+    def test_dispatch_legacy_qc_alias(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_preprocessing(adapter, "raw", "qc_metrics", {})
+        assert result == {"sci": 0.9}
+
+    def test_dispatch_qc_converts_raw_intensity_when_needed(self):
+        class Adapter:
+            versions = {}
+
+            def __init__(self):
+                self.converted = False
+
+            def compute_qc(self, raw):
+                if raw == "raw":
+                    raise RuntimeError("Scalp coupling index must operate on optical density data, but none was found.")
+                return {"sci": 0.9, "raw": raw}
+
+            def to_optical_density(self, raw):
+                self.converted = True
+                return f"od({raw})"
+
+        service = ExecutionService()
+        adapter = Adapter()
+        result = service._dispatch_preprocessing(adapter, "raw", "compute_qc", {})
+        assert adapter.converted is True
+        assert result == {"sci": 0.9, "raw": "od(raw)"}
+
     def test_dispatch_motion_correction(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
         result = service._dispatch_preprocessing(adapter, "raw", "motion_correction", {"method": "wavelet"})
-        assert result == {"corrected": True}
+        assert result["method"] == "wavelet"
+
+    def test_dispatch_motion_template_alias_preserves_method(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_preprocessing(adapter, "raw", "spline", {"spline_segments": 4})
+        assert result["method"] == "spline"
+        assert result["kwargs"]["spline_segments"] == 4
 
     def test_dispatch_filtering(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
         result = service._dispatch_preprocessing(adapter, "raw", "filtering", {"l_freq": 0.01, "h_freq": 0.5})
-        assert result == {"filtered": True}
+        assert result["method"] == "bandpass"
+        assert result["h_freq"] == 0.5
+
+    def test_dispatch_filter_template_alias_preserves_method(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_preprocessing(adapter, "raw", "notch", {"freqs": [60.0]})
+        assert result["method"] == "notch"
+        assert result["kwargs"]["freqs"] == [60.0]
 
     def test_dispatch_beer_lambert(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
         result = service._dispatch_preprocessing(adapter, "raw", "beer_lambert_law", {"ppf": 6.0})
         assert result == {"hb": True}
+
+    def test_dispatch_template_beer_lambert_alias(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_preprocessing(adapter, "raw", "mbll", {"ppf": 6.0})
+        assert result == {"hb": True}
+
+    def test_dispatch_combat_alias_passes_input_through(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_preprocessing(adapter, "raw", "multi_site_harmonization", {})
+        assert result == "raw"
 
     def test_dispatch_unknown_raises(self):
         service = ExecutionService()
@@ -274,7 +335,7 @@ class TestDispatchAnalysis:
                 return {"n_trials": 10}
 
             def build_design_matrix(self, raw, events, event_id, hrf_model="glover", drift_order=1, high_pass=0.01):
-                return {"n_conditions": len(event_id)}
+                return {"n_conditions": len(event_id), "hrf_model": hrf_model}
 
             def fit_first_level_glm(self, raw, design_matrix, hrf_model="glover", noise_model="ar1"):
                 return {"n_channels": 10}
@@ -308,7 +369,48 @@ class TestDispatchAnalysis:
                 "event_id": {"condA": 1},
             },
         )
-        assert result == {"n_conditions": 1}
+        assert result == {"n_conditions": 1, "hrf_model": "glover"}
+
+    def test_dispatch_legacy_design_matrix_alias(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_analysis(
+            adapter,
+            "raw",
+            "design_matrix",
+            {
+                "events": np.array([[0, 0, 1]]),
+                "event_id": {"condA": 1},
+            },
+        )
+        assert result == {"n_conditions": 1, "hrf_model": "glover"}
+
+    def test_dispatch_template_advanced_glm_aliases(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        for operation in ("linear_mixed_effects_glm", "nuisance_glm", "site_covariate_glm"):
+            result = service._dispatch_analysis(
+                adapter,
+                "raw",
+                operation,
+                {"design_matrix": {"columns": ["condA"]}},
+            )
+            assert result == {"n_channels": 10}
+
+    def test_dispatch_legacy_canonical_hrf_maps_to_glover(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_analysis(
+            adapter,
+            "raw",
+            "build_design_matrix",
+            {
+                "events": np.array([[0, 0, 1]]),
+                "event_id": {"condA": 1},
+                "hrf_model": "canonical",
+            },
+        )
+        assert result == {"n_conditions": 1, "hrf_model": "glover"}
 
     def test_dispatch_build_design_matrix_no_events_raises(self):
         service = ExecutionService()
@@ -345,6 +447,20 @@ class TestDispatchAnalysis:
             {
                 "glm_result": {"betas": []},
                 "contrasts": [{"name": "A-B", "weights": [1, -1]}],
+            },
+        )
+        assert result == {"contrasts": []}
+
+    def test_dispatch_legacy_string_contrast_alias(self):
+        service = ExecutionService()
+        adapter = self._make_mock_adapter()
+        result = service._dispatch_analysis(
+            adapter,
+            "raw",
+            "contrast",
+            {
+                "glm_result": {"betas": [], "n_conditions": 2, "conditions": ["tapping", "rest"]},
+                "contrasts": ["tapping > rest"],
             },
         )
         assert result == {"contrasts": []}
@@ -401,12 +517,37 @@ class TestOperationRegistry:
         ops = registry.list_operations()
         # Preprocessing
         assert "optical_density" in ops
+        assert "optical_density_conversion" in ops
+        assert "compute_qc" in ops
+        assert "qc_metrics" in ops
+        assert "sci_check" in ops
+        assert "cv_check" in ops
+        assert "snr_check" in ops
+        assert "bad_channel_detection" in ops
+        assert "tddr" in ops
+        assert "wavelet" in ops
+        assert "spline" in ops
+        assert "ica" in ops
+        assert "pca" in ops
+        assert "cbsi" in ops
         assert "filtering" in ops
+        assert "bandpass" in ops
+        assert "notch" in ops
+        assert "lowpass" in ops
         assert "beer_lambert_law" in ops
+        assert "mbll" in ops
+        assert "combat_harmonization" in ops
+        assert "multi_site_harmonization" in ops
         # Analysis
         assert "build_design_matrix" in ops
+        assert "design_matrix" in ops
         assert "first_level_glm" in ops
+        assert "linear_mixed_effects_glm" in ops
+        assert "mixed_effects_glm" in ops
+        assert "nuisance_glm" in ops
+        assert "site_covariate_glm" in ops
         assert "estimate_contrast" in ops
+        assert "contrast" in ops
         assert "channel_output" in ops
         assert "roi_output" in ops
         # Participant metadata and group scope
@@ -436,6 +577,42 @@ class TestOperationRegistry:
         registry.register(OperationSpec(operation_id="op1", category="test"))
         with pytest.raises(ValueError, match="Duplicate"):
             registry.register(OperationSpec(operation_id="op1", category="test"))
+
+    def test_executable_node_template_operations_have_runtime_aliases(self):
+        from fnirs_flow.execution.operations import canonical_operation
+        from fnirs_flow.registry.node_templates import ALL_NODE_TEMPLATES
+
+        expected = {
+            "optical_density": "optical_density",
+            "tddr_motion_correction": "motion_correction",
+            "spline_motion_correction": "motion_correction",
+            "wavelet_motion_correction": "motion_correction",
+            "ica_motion_correction": "motion_correction",
+            "pca_motion_correction": "motion_correction",
+            "cbsi_motion_correction": "motion_correction",
+            "bandpass_filter": "filtering",
+            "notch_filter": "filtering",
+            "lowpass_filter": "filtering",
+            "beer_lambert_law": "beer_lambert_law",
+            "qc_metrics": "compute_qc",
+            "sci_check": "compute_qc",
+            "cv_check": "compute_qc",
+            "snr_check": "compute_qc",
+            "bad_channel_detection": "compute_qc",
+            "design_matrix": "build_design_matrix",
+            "first_level_glm": "first_level_glm",
+            "contrast": "estimate_contrast",
+            "nuisance_glm": "first_level_glm",
+            "linear_mixed_effects_glm": "first_level_glm",
+            "site_covariate_glm": "first_level_glm",
+            "channel_output": "channel_output",
+            "roi_output": "roi_output",
+        }
+        by_id = {template.template_id: template for template in ALL_NODE_TEMPLATES}
+
+        for template_id, canonical in expected.items():
+            template = by_id[template_id]
+            assert canonical_operation(template.operation or template.atom_type) == canonical
 
 
 # ============================================================================
@@ -565,6 +742,64 @@ class TestExecutionFailureAggregation:
 
         assert result.status == "failed"
         assert [(item.atom_id, item.status) for item in result.atom_results] == [("bad-atom", "failed")]
+
+
+class TestValidationQcExecution:
+    class _Artifacts:
+        def all(self):
+            return []
+
+    class _Adapter:
+        versions = {}
+
+        def __init__(self):
+            self.artifacts = TestValidationQcExecution._Artifacts()
+            self.qc_inputs = []
+
+        def read_run(self, path):
+            return {"raw_path": path}
+
+        def compute_qc(self, raw, **kwargs):
+            self.qc_inputs.append((raw, kwargs))
+            return {"sci": 0.9}
+
+    class _Registry:
+        def __init__(self):
+            self.adapter = TestValidationQcExecution._Adapter()
+
+        def create(self, backend_id, **kwargs):
+            return self.adapter
+
+    def test_validation_qc_template_executes_instead_of_skipping(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "sci",
+                    "operation": "sci_check",
+                    "category": "validation",
+                    "parameters": {"threshold": 0.75},
+                }
+            ],
+            "execution_layers": [["sci"]],
+            "edges": [],
+        }
+        registry = self._Registry()
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=registry):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)),
+                {},
+                dag,
+                tmp_path,
+            )
+
+        assert result.status == "completed"
+        assert [(item.atom_id, item.status) for item in result.atom_results] == [("sci", "completed")]
+        assert registry.adapter.qc_inputs[0][1]["sci_threshold"] == 0.75
 
 
 class TestEmptyMarkerExecution:

@@ -62,6 +62,38 @@ class OperationRegistry:
         return [s for s in spec.input_schemas if s not in available_schemas]
 
 
+OPERATION_ALIASES: dict[str, str] = {
+    "optical_density_conversion": "optical_density",
+    "qc_metrics": "compute_qc",
+    "sci_check": "compute_qc",
+    "cv_check": "compute_qc",
+    "snr_check": "compute_qc",
+    "bad_channel_detection": "compute_qc",
+    "tddr": "motion_correction",
+    "wavelet": "motion_correction",
+    "spline": "motion_correction",
+    "ica": "motion_correction",
+    "pca": "motion_correction",
+    "cbsi": "motion_correction",
+    "bandpass": "filtering",
+    "notch": "filtering",
+    "lowpass": "filtering",
+    "mbll": "beer_lambert_law",
+    "design_matrix": "build_design_matrix",
+    "contrast": "estimate_contrast",
+    "multi_site_harmonization": "combat_harmonization",
+    "linear_mixed_effects_glm": "first_level_glm",
+    "mixed_effects_glm": "first_level_glm",
+    "nuisance_glm": "first_level_glm",
+    "site_covariate_glm": "first_level_glm",
+}
+
+
+def canonical_operation(operation_id: str) -> str:
+    """Return the execution operation used by the current backend dispatch."""
+    return OPERATION_ALIASES.get(operation_id, operation_id)
+
+
 def create_default_registry() -> OperationRegistry:
     """Create and return the default operation registry with all known operations."""
     registry = OperationRegistry()
@@ -70,10 +102,28 @@ def create_default_registry() -> OperationRegistry:
     for op_id, desc in [
         ("read_run", "Read raw SNIRF/BIDS-NIRS data"),
         ("optical_density", "Convert raw intensity to optical density"),
+        ("optical_density_conversion", "Alias for optical_density used by node templates"),
         ("compute_qc", "Compute quality control metrics"),
+        ("qc_metrics", "Alias for compute_qc used by legacy demo flows"),
+        ("sci_check", "Alias for compute_qc used by QC templates"),
+        ("cv_check", "Alias for compute_qc used by QC templates"),
+        ("snr_check", "Alias for compute_qc used by QC templates"),
+        ("bad_channel_detection", "Alias for compute_qc used by QC templates"),
         ("motion_correction", "Apply motion artifact correction"),
+        ("tddr", "Alias for motion_correction with TDDR method"),
+        ("wavelet", "Alias for motion_correction with wavelet method"),
+        ("spline", "Alias for motion_correction with spline method"),
+        ("ica", "Alias for motion_correction with ICA method"),
+        ("pca", "Alias for motion_correction with PCA method"),
+        ("cbsi", "Alias for motion_correction with CBSI method"),
         ("filtering", "Apply bandpass/notch filtering"),
+        ("bandpass", "Alias for filtering with bandpass method"),
+        ("notch", "Alias for filtering with notch method"),
+        ("lowpass", "Alias for filtering with lowpass method"),
         ("beer_lambert_law", "Convert OD to haemoglobin concentration"),
+        ("mbll", "Alias for beer_lambert_law used by node templates"),
+        ("combat_harmonization", "Reviewed pass-through placeholder for ComBat harmonization"),
+        ("multi_site_harmonization", "Alias for combat_harmonization used by legacy demo flows"),
     ]:
         registry.register(
             OperationSpec(
@@ -86,8 +136,14 @@ def create_default_registry() -> OperationRegistry:
     # Analysis operations
     for op_id, desc in [
         ("build_design_matrix", "Construct GLM design matrix from events"),
+        ("design_matrix", "Alias for build_design_matrix used by legacy demo flows"),
         ("first_level_glm", "Fit first-level GLM (HbO/HbR)"),
+        ("linear_mixed_effects_glm", "Legacy/template advanced GLM alias executed with first-level GLM semantics"),
+        ("mixed_effects_glm", "Legacy advanced GLM alias executed with first-level GLM semantics"),
+        ("nuisance_glm", "Legacy/template nuisance GLM alias executed with first-level GLM semantics"),
+        ("site_covariate_glm", "Legacy site-covariate GLM alias executed with first-level GLM semantics"),
         ("estimate_contrast", "Estimate linear contrasts"),
+        ("contrast", "Alias for estimate_contrast used by legacy demo flows"),
         ("channel_output", "Export channel-level results"),
         ("roi_output", "Export ROI-level results"),
     ]:

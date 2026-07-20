@@ -22,6 +22,7 @@ Included content:
   configuration, `webui/src/`, and `webui/e2e/`
 - Public documentation: `docs/README.md`,
   `docs/specs/fnirs_flow_public_api.md`,
+  `docs/specs/method_atom_parameter_ui_contract.md`,
   `docs/specs/package_profile_spec.md`, and
   `docs/specs/mvp_task_glm_acceptance_checklist.md`
 - Public scripts listed in `PUBLIC_SCRIPT_FILES` inside

@@ -93,13 +93,13 @@ interface StoreState {
 
   // Actions
   loadProjects: () => Promise<void>;
-  createProject: (name: string, description: string) => Promise<Project>;
+  createProject: (name: string, description: string, dataRoot?: string) => Promise<Project>;
   selectProject: (project: Project) => Promise<void>;
   setFlow: (flow: Record<string, unknown>) => void;
   saveFlow: () => Promise<void>;
   validate: () => Promise<void>;
   compile: () => Promise<void>;
-  discover: (datasetId: string, dataRoot?: string) => Promise<DiscoverResult>;
+  discover: (datasetId: string, dataPath?: string) => Promise<DiscoverResult>;
   importParticipantTable: (
     path: string,
     idColumn?: string,
@@ -167,10 +167,10 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  createProject: async (name: string, description: string) => {
+  createProject: async (name: string, description: string, dataRoot = '') => {
     set({ loading: true, error: null });
     try {
-      const proj = await api.createProject(name, description);
+      const proj = await api.createProject(name, description, dataRoot);
       set((state) => ({
         projects: [...state.projects, proj],
         project: proj,
@@ -343,12 +343,12 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  discover: async (datasetId: string, dataRoot?: string) => {
+  discover: async (datasetId: string, dataPath?: string) => {
     const { project } = get();
     if (!project) throw new Error('No project selected');
     set({ error: null });
     try {
-      const result = await api.discoverData(project.id, datasetId, dataRoot);
+      const result = await api.discoverData(project.id, datasetId, dataPath);
       const readiness = await api.getProjectStatus(project.id);
       set({
         discoverResult: result,

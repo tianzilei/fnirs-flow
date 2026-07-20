@@ -281,7 +281,15 @@ def discover_dataset(
     registry = DatasetRegistry()
     entry = registry.get(dataset_id)
     if entry is None:
-        raise ValueError(f"Unknown dataset: {dataset_id}. Available: {registry.list_ids()}")
+        if local_root:
+            entry = DatasetEntry(
+                dataset_id=dataset_id or "project-local-data",
+                name="Project local data folder",
+                source_kind="local_bids_nirs",
+                description="Local data folder configured on the project.",
+            )
+        else:
+            raise ValueError(f"Unknown dataset: {dataset_id}. Available: {registry.list_ids()}")
 
     if entry.source_kind == "mne_nirs_dataset":
         manifest = _discover_mne_dataset(entry, compiled_dir)

@@ -1,6 +1,27 @@
 import type { Connection, Edge } from 'reactflow';
 import type { AtomTemplate, EmptyMarkerSpec, FlowChecklist, FlowChecklistStep } from '../api/client';
 
+export const INTERNAL_CONFIG_KEYS = new Set([
+  'source_kind',
+  'readiness_status',
+  'execution_scope',
+  'source_atom_id',
+  'source_study_id',
+  'target_flow_slot',
+  'scenario',
+  'execution_readiness',
+  'missing_for_execution',
+  'confidence',
+  'review_required',
+  'verification_status',
+  'method_note',
+  'accuracy_caveat',
+]);
+
+export function editableConfig(config: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(config).filter(([key]) => !INTERNAL_CONFIG_KEYS.has(key)));
+}
+
 export interface AtomPortRecord {
   name: string;
   direction: 'in' | 'out';
@@ -408,12 +429,17 @@ export function createFlowAtomFromTemplate(template: AtomTemplate, id: string, p
     input_ports: inputPorts,
     output_ports: outputPorts,
     evidence_refs: template.evidence_refs,
-    readiness_status: 'not_configured',
+    readiness_status: String(template.default_readiness_status || template.default_config?.readiness_status || 'not_configured'),
     execution_status: 'not_run',
     security_status: 'trusted',
     parameters: {},
-    config: {},
-    metadata: { template_id: template.id },
+    execution_scope: String(template.default_execution_scope || template.default_config?.execution_scope || 'run'),
+    config: editableConfig({ ...(template.default_config || {}) }),
+    metadata: {
+      template_id: template.id,
+      parameter_options: template.parameter_options || {},
+      parameter_specs: template.parameter_specs || {},
+    },
     position,
   };
 }

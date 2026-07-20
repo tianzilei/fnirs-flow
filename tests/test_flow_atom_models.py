@@ -57,6 +57,26 @@ class TestMethodAtomAliases:
         assert atom.id == "test-atom"
         assert atom.category == MethodAtomCategory.PREPROCESSING
 
+    def test_non_user_config_fields_are_normalized(self):
+        atom = FlowAtom.model_validate(
+            {
+                "id": "legacy-atom",
+                "type": "dataset_discovery",
+                "category": "data",
+                "config": {
+                    "dataset_id": "demo",
+                    "source_kind": "mne_nirs_dataset",
+                    "readiness_status": "ready",
+                    "execution_scope": "group",
+                    "source_atom_id": "ATOM_demo",
+                },
+            }
+        )
+        assert atom.config == {"dataset_id": "demo"}
+        assert atom.readiness_status == ReadinessStatus.READY
+        assert atom.execution_scope == "group"
+        assert atom.metadata["source_atom_id"] == "ATOM_demo"
+
     def test_create_atom_port_with_new_name(self):
         port = AtomPort(
             name="raw_data",

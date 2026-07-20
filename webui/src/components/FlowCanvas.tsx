@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
+  Handle,
   MiniMap,
   Node,
   Edge,
+  Position,
   ReactFlowInstance,
   addEdge,
   applyNodeChanges,
@@ -15,6 +17,7 @@ import ReactFlow, {
   NodeChange,
   EdgeChange,
   NodeMouseHandler,
+  NodeProps,
 } from 'reactflow';
 import {
   Activity,
@@ -31,7 +34,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import 'reactflow/dist/style.css';
-import { listEmptyMarkerSpecs, type AtomTemplate, type EmptyMarkerSpec } from '../api/client';
+import { listAtomTemplates, listEmptyMarkerSpecs, listProjectDataFolders, type AtomTemplate, type EmptyMarkerSpec } from '../api/client';
 import {
   addMissingEmptyMarkerAtoms,
   addTemplateAtomToFlow,
@@ -39,6 +42,7 @@ import {
   asRecords,
   clearChecklistChoiceForAtom,
   connectionProblem,
+  editableConfig,
   findPort,
   flowAtoms as getFlowAtoms,
   getAtomInputStatuses,
@@ -50,6 +54,7 @@ import {
   withOrderPolicy,
 } from '../flow/atomFactory';
 import { ParameterPanel } from './ParameterPanel';
+import { useStore } from '../store';
 
 interface FlowCanvasProps {
   flow: Record<string, unknown>;
@@ -80,15 +85,110 @@ const categoryIcons: Record<string, typeof Database> = {
   export: Braces,
 };
 
+function FlowAtomNode({ data }: NodeProps<{ label: ReactNode }>) {
+  return <>{data.label}</>;
+}
+
+const nodeTypes = {
+  flowAtom: FlowAtomNode,
+};
+
 interface NodeDetail {
   id: string;
+  template_id: string;
   atom_type: string;
   operation: string;
   category: string;
   readiness_status: string;
   config: Record<string, unknown>;
   parameters: Record<string, unknown>;
+  parameter_options: Record<string, unknown[]>;
+  parameter_specs: Record<string, Record<string, unknown>>;
   ports: Array<{ name: string; direction: string; schema: string }>;
+}
+
+interface PortNeighbor {
+  id: string;
+  atomType: string;
+  category: string;
+  color: string;
+}
+
+interface PortConnectionHints {
+  upstream: Record<string, PortNeighbor[]>;
+  downstream: Record<string, PortNeighbor[]>;
+}
+
+const fallbackPortColors = {
+  in: '#2563eb',
+  out: '#0f766e',
+};
+
+function edgeSourceHandle(edge: Record<string, unknown>): string {
+  return String(edge.source_handle || edge.sourceHandle || '');
+}
+
+function edgeTargetHandle(edge: Record<string, unknown>): string {
+  return String(edge.target_handle || edge.targetHandle || '');
+}
+
+function atomTypeLabel(atom: Record<string, unknown> | undefined, fallbackId: string): string {
+  if (!atom) return fallbackId;
+  return String(atom.atom_type || atom.type || atom.operation || atom.id || fallbackId);
+}
+
+function atomCategory(atom: Record<string, unknown> | undefined): string {
+  return String(atom?.category || 'default');
+}
+
+function neighborForAtom(atom: Record<string, unknown> | undefined, fallbackId: string): PortNeighbor {
+  const category = atomCategory(atom);
+  return {
+    id: String(atom?.id || fallbackId),
+    atomType: atomTypeLabel(atom, fallbackId),
+    category,
+    color: nodeColors[category] || '#525252',
+  };
+}
+
+function buildPortConnectionHints(atoms: Array<Record<string, unknown>>, edges: Array<Record<string, unknown>>) {
+  const atomById = new Map(atoms.map((atom) => [String(atom.id), atom]));
+  const hints = new Map<string, PortConnectionHints>();
+
+  atoms.forEach((atom) => {
+    hints.set(String(atom.id), { upstream: {}, downstream: {} });
+  });
+
+  edges.forEach((edge) => {
+    const sourceId = String(edge.source || '');
+    const targetId = String(edge.target || '');
+    if (!sourceId || !targetId) return;
+
+    const sourceAtom = atomById.get(sourceId);
+    const targetAtom = atomById.get(targetId);
+    const sourcePort = findPort(sourceAtom, edgeSourceHandle(edge), 'out');
+    const targetPort = findPort(targetAtom, edgeTargetHandle(edge), 'in');
+    const sourcePortName = String(edgeSourceHandle(edge) || sourcePort?.name || 'output');
+    const targetPortName = String(edgeTargetHandle(edge) || targetPort?.name || 'input');
+
+    const sourceHints = hints.get(sourceId);
+    if (sourceHints) {
+      sourceHints.downstream[sourcePortName] = [
+        ...(sourceHints.downstream[sourcePortName] || []),
+        neighborForAtom(targetAtom, targetId),
+      ];
+    }
+
+    const targetHints = hints.get(targetId);
+    if (targetHints) {
+      targetHints.upstream[targetPortName] = [
+        ...(targetHints.upstream[targetPortName] || []),
+        neighborForAtom(sourceAtom, sourceId),
+      ];
+    }
+  });
+
+  return hints;
 }
 
 function portCount(atom: Record<string, unknown>, key: string, fallback: string) {
@@ -97,24 +197,70 @@ function portCount(atom: Record<string, unknown>, key: string, fallback: string)
   ).length;
 }
 
+function portHandleColor(neighbors: PortNeighbor[], direction: 'in' | 'out'): string {
+  return neighbors[0]?.color || fallbackPortColors[direction];
+}
+
+function portHandleStyle(top: string, color: string, connected: boolean): CSSProperties {
+  return {
+    top,
+    backgroundColor: color,
+    boxShadow: connected ? `0 0 0 1px #fff, 0 0 0 3px ${color}` : `0 0 0 1px ${color}`,
+  };
+}
+
+function portHandleTitle(
+  port: { name: string; direction: 'in' | 'out'; schema: string },
+  neighbors: PortNeighbor[]
+): string {
+  const directionLabel = port.direction === 'in' ? 'in' : 'out';
+  const base = `${directionLabel} ${port.name}: ${port.schema}`;
+  if (neighbors.length === 0) return `${base} - not connected`;
+  const relation = port.direction === 'in' ? 'from' : 'to';
+  const neighborLabels = neighbors.map((neighbor) => `${neighbor.atomType} (${neighbor.category})`).join(', ');
+  return `${base} - ${relation} ${neighborLabels}`;
+}
+
 function NodeLabel({
   atom,
   missingInputs,
   emptyAtom,
   focused,
+  portConnectionHints,
 }: {
   atom: Record<string, unknown>;
   missingInputs: boolean;
   emptyAtom: boolean;
   focused: boolean;
+  portConnectionHints: PortConnectionHints;
 }) {
   const category = String(atom.category || 'node');
   const atomType = String(atom.atom_type || atom.type || atom.id || 'Atom');
   const operation = String(atom.operation || atomType);
   const Icon = categoryIcons[category] || CircleDot;
+  const inputPorts = getAtomPorts(atom).filter((port) => port.direction === 'in');
+  const outputPorts = getAtomPorts(atom).filter((port) => port.direction === 'out');
+  const handleTop = (index: number, total: number) => `${((index + 1) * 100) / (total + 1)}%`;
 
   return (
     <div className="flow-node-card">
+      {inputPorts.map((port, index) => (
+        (() => {
+          const neighbors = portConnectionHints.upstream[port.name] || [];
+          const color = portHandleColor(neighbors, 'in');
+          return (
+            <Handle
+              key={`in-${port.name}`}
+              type="target"
+              id={port.name}
+              position={Position.Left}
+              className={`flow-port-handle flow-port-handle-in ${neighbors.length > 0 ? 'connected' : ''}`}
+              style={portHandleStyle(handleTop(index, inputPorts.length), color, neighbors.length > 0)}
+              title={portHandleTitle(port, neighbors)}
+            />
+          );
+        })()
+      ))}
       <div className="flow-node-topline">
         <span className="flow-node-icon" style={{ color: nodeColors[category] || '#525252' }}>
           <Icon size={15} strokeWidth={2.2} />
@@ -134,12 +280,30 @@ function NodeLabel({
           {emptyAtom && <span>Empty</span>}
         </div>
       )}
+      {outputPorts.map((port, index) => (
+        (() => {
+          const neighbors = portConnectionHints.downstream[port.name] || [];
+          const color = portHandleColor(neighbors, 'out');
+          return (
+            <Handle
+              key={`out-${port.name}`}
+              type="source"
+              id={port.name}
+              position={Position.Right}
+              className={`flow-port-handle flow-port-handle-out ${neighbors.length > 0 ? 'connected' : ''}`}
+              style={portHandleStyle(handleTop(index, outputPorts.length), color, neighbors.length > 0)}
+              title={portHandleTitle(port, neighbors)}
+            />
+          );
+        })()
+      ))}
     </div>
   );
 }
 
 function toNodes(flow: Record<string, unknown>, focusedAtomId?: string | null): Node[] {
   const flowAtoms = asRecords(flow.flow_atoms).length > 0 ? asRecords(flow.flow_atoms) : asRecords(flow.nodes);
+  const connectionHints = buildPortConnectionHints(flowAtoms, asRecords(flow.edges));
   return flowAtoms.map((atom) => ({
     ...(() => {
       const metadata = (atom.metadata as Record<string, unknown>) || {};
@@ -148,8 +312,19 @@ function toNodes(flow: Record<string, unknown>, focusedAtomId?: string | null): 
       const focused = String(atom.id) === String(focusedAtomId || '');
       return {
         id: String(atom.id),
+        type: 'flowAtom',
         position: (atom.position as { x: number; y: number }) ?? { x: 0, y: 0 },
-        data: { label: <NodeLabel atom={atom} missingInputs={missingInputs} emptyAtom={emptyAtom} focused={focused} /> },
+        data: {
+          label: (
+            <NodeLabel
+              atom={atom}
+              missingInputs={missingInputs}
+              emptyAtom={emptyAtom}
+              focused={focused}
+              portConnectionHints={connectionHints.get(String(atom.id)) || { upstream: {}, downstream: {} }}
+            />
+          ),
+        },
         style: {
           background: 'transparent',
           border: 'none',
@@ -158,6 +333,8 @@ function toNodes(flow: Record<string, unknown>, focusedAtomId?: string | null): 
           cursor: 'pointer',
         },
         className: `flow-node flow-node-${String(atom.category || 'default')} ${missingInputs ? 'flow-node-missing-inputs' : ''} ${emptyAtom ? 'flow-node-empty' : ''} ${focused ? 'flow-node-focused' : ''}`,
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
       };
     })(),
   }));
@@ -225,16 +402,121 @@ function normalizePorts(atom: Record<string, unknown>): NodeDetail['ports'] {
 }
 
 function atomToDetail(atom: Record<string, unknown>): NodeDetail {
+  const metadata = (atom.metadata as Record<string, unknown>) || {};
   return {
     id: String(atom.id),
+    template_id: String(atom.template_id || metadata.template_id || ''),
     atom_type: String(atom.atom_type || atom.type || ''),
     operation: String(atom.operation || ''),
     category: String(atom.category || ''),
     readiness_status: String(atom.readiness_status || atom.status || ''),
     config: (atom.config as Record<string, unknown>) || {},
     parameters: (atom.parameters as Record<string, unknown>) || {},
+    parameter_options: {
+      ...(((metadata.parameter_options as Record<string, unknown[]> | undefined) || {}) as Record<string, unknown[]>),
+      ...(((atom.parameter_options as Record<string, unknown[]> | undefined) || {}) as Record<string, unknown[]>),
+    },
+    parameter_specs: {
+      ...(((metadata.parameter_specs as Record<string, Record<string, unknown>> | undefined) || {}) as Record<string, Record<string, unknown>>),
+      ...(((atom.parameter_specs as Record<string, Record<string, unknown>> | undefined) || {}) as Record<string, Record<string, unknown>>),
+    },
     ports: normalizePorts(atom),
   };
+}
+
+function primitiveOptionValue(value: unknown): value is string | number {
+  return typeof value === 'string' || typeof value === 'number';
+}
+
+function uniqueOptionValues(values: unknown[]): unknown[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    if (!primitiveOptionValue(value)) return false;
+    const key = `${typeof value}:${String(value)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function templateMatchesDetail(template: AtomTemplate, node: NodeDetail): boolean {
+  return (
+    Boolean(node.template_id && template.id === node.template_id) ||
+    Boolean(node.operation && template.operation === node.operation) ||
+    Boolean(node.atom_type && template.atom_type === node.atom_type)
+  );
+}
+
+function parameterOptionsForNode(name: string, value: unknown, node: NodeDetail, templates: AtomTemplate[]): unknown[] | undefined {
+  if (!primitiveOptionValue(value)) return undefined;
+  const templateOptions = templates.find((template) => templateMatchesDetail(template, node))?.parameter_options?.[name] || [];
+  const options = uniqueOptionValues([
+    ...(node.parameter_options[name] || []),
+    ...templateOptions,
+  ]);
+  if (options.length === 0) return undefined;
+  const hasCurrentValue = options.some((option) => String(option) === String(value));
+  const withCurrent = hasCurrentValue || String(value) === '' ? options : [value, ...options];
+  return withCurrent.length > 1 ? withCurrent : undefined;
+}
+
+function parameterSpecForNode(name: string, node: NodeDetail, templates: AtomTemplate[]): Record<string, unknown> {
+  const templateSpec = templates.find((template) => templateMatchesDetail(template, node))?.parameter_specs?.[name] || {};
+  return {
+    ...templateSpec,
+    ...(node.parameter_specs[name] || {}),
+  };
+}
+
+function defaultConfigForAtom(atom: Record<string, unknown>, templates: AtomTemplate[]): Record<string, unknown> {
+  const metadata = (atom.metadata as Record<string, unknown> | undefined) || {};
+  const preferredIds = [
+    String(atom.template_id || ''),
+    String(metadata.template_id || ''),
+  ].filter(Boolean);
+  const byId = templates.find((item) => preferredIds.includes(item.id));
+  if (byId) return byId.default_config || {};
+
+  const operation = String(atom.operation || '');
+  if (operation) {
+    const byOperation = templates.find((item) => item.operation === operation || item.id === operation);
+    if (byOperation) return byOperation.default_config || {};
+  }
+
+  const atomType = String(atom.atom_type || atom.type || '');
+  if (atomType) {
+    const matches = templates.filter((item) => item.atom_type === atomType || item.id === atomType);
+    if (matches.length === 1) return matches[0].default_config || {};
+  }
+
+  return {};
+}
+
+function atomToDetailWithDefaults(atom: Record<string, unknown>, templates: AtomTemplate[]): NodeDetail {
+  const detail = atomToDetail(atom);
+  const defaultConfig = defaultConfigForAtom(atom, templates);
+  return {
+    ...detail,
+    config: editableConfig({
+      ...defaultConfig,
+      ...detail.config,
+    }),
+  };
+}
+
+function visibleParameterEntries(node: NodeDetail): Array<[string, unknown]> {
+  const entries = Object.entries(editableConfig({ ...node.config, ...node.parameters }));
+  if (node.operation === 'bids_import') {
+    return entries.filter(([name]) => name !== 'datatype');
+  }
+  return entries;
+}
+
+function parameterTypeForValue(value: unknown): string {
+  if (typeof value === 'boolean') return 'boolean';
+  if (typeof value === 'number') return 'number';
+  if (Array.isArray(value) && value.every((item) => typeof item === 'number')) return 'number-list';
+  return 'text';
 }
 
 export function FlowCanvas({
@@ -245,6 +527,7 @@ export function FlowCanvas({
   activeChecklistStep,
   onInspectingChange,
 }: FlowCanvasProps) {
+  const project = useStore((s) => s.project);
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<NodeDetail | null>(null);
@@ -252,12 +535,18 @@ export function FlowCanvas({
   const [connectionError, setConnectionError] = useState('');
   const [canvasNotice, setCanvasNotice] = useState('');
   const [emptyMarkerSpecs, setEmptyMarkerSpecs] = useState<EmptyMarkerSpec[]>([]);
+  const [atomTemplates, setAtomTemplates] = useState<AtomTemplate[]>([]);
   const [emptyRemovalPreview, setEmptyRemovalPreview] = useState<ReturnType<typeof previewEmptyRiskRemoval> | null>(null);
   const [searchParams] = useSearchParams();
   const nodesRef = useRef<Node[]>([]);
   const edgesRef = useRef<Edge[]>([]);
   const nodeCount = nodes.length;
   const edgeCount = edges.length;
+  const loadProjectFolders = useCallback(async (parent: string) => {
+    if (!project?.id) return [];
+    const result = await listProjectDataFolders(project.id, parent);
+    return result.folders;
+  }, [project?.id]);
 
   useEffect(() => {
     const nextNodes = toNodes(flow, focusedAtomId);
@@ -272,6 +561,12 @@ export function FlowCanvas({
     listEmptyMarkerSpecs()
       .then(setEmptyMarkerSpecs)
       .catch(() => setEmptyMarkerSpecs([]));
+  }, []);
+
+  useEffect(() => {
+    listAtomTemplates()
+      .then(setAtomTemplates)
+      .catch(() => setAtomTemplates([]));
   }, []);
 
   useEffect(() => {
@@ -293,22 +588,34 @@ export function FlowCanvas({
     if (!nodeId) return;
     const atom = flowAtoms.find((item) => String(item.id) === nodeId);
     if (atom) {
-      setSelectedNode(atomToDetail(atom));
+      setSelectedNode(atomToDetailWithDefaults(atom, atomTemplates));
       onInspectingChange?.(true);
     }
-  }, [flowAtoms, onInspectingChange, searchParams]);
+  }, [atomTemplates, flowAtoms, onInspectingChange, searchParams]);
 
   useEffect(() => {
     if (!focusedAtomId) return;
     const atom = flowAtoms.find((item) => String(item.id) === focusedAtomId);
     if (!atom) return;
-    setSelectedNode(atomToDetail(atom));
+    setSelectedNode(atomToDetailWithDefaults(atom, atomTemplates));
     onInspectingChange?.(true);
     const position = (atom.position as { x: number; y: number }) || undefined;
     if (position && reactFlowInstance) {
       reactFlowInstance.setCenter(position.x + 90, position.y + 40, { zoom: 1, duration: 300 });
     }
-  }, [flowAtoms, focusedAtomId, onInspectingChange, reactFlowInstance]);
+  }, [atomTemplates, flowAtoms, focusedAtomId, onInspectingChange, reactFlowInstance]);
+
+  useEffect(() => {
+    if (!selectedNode || atomTemplates.length === 0) return;
+    const atom = flowAtoms.find((item) => String(item.id) === selectedNode.id);
+    if (!atom) return;
+    const nextDetail = atomToDetailWithDefaults(atom, atomTemplates);
+    const currentKeys = Object.keys(selectedNode.config);
+    const nextKeys = Object.keys(nextDetail.config);
+    if (currentKeys.length === 0 && nextKeys.length > 0) {
+      setSelectedNode(nextDetail);
+    }
+  }, [atomTemplates, flowAtoms, selectedNode]);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -409,11 +716,11 @@ export function FlowCanvas({
     (_, node) => {
       const atom = flowAtoms.find((item) => String(item.id) === node.id);
       if (atom) {
-        setSelectedNode(atomToDetail(atom));
+        setSelectedNode(atomToDetailWithDefaults(atom, atomTemplates));
         onInspectingChange?.(true);
       }
     },
-    [flowAtoms, onInspectingChange]
+    [atomTemplates, flowAtoms, onInspectingChange]
   );
 
   const onPaneClick = useCallback(() => {
@@ -513,6 +820,7 @@ export function FlowCanvas({
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          nodeTypes={nodeTypes}
           onNodesChange={handleNodesChange}
           onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
@@ -609,10 +917,11 @@ export function FlowCanvas({
           </dl>
           {selectedNode.ports.length > 0 && (
             <section className="inspection-section">
-              <h4>Ports</h4>
+              <h4>Ports: in / out</h4>
               {selectedNode.ports.map((port) => (
-                <div key={`${port.direction}-${port.name}`} className="port-row">
+                <div key={`${port.direction}-${port.name}`} className={`port-row port-row-${port.direction}`}>
                   <span className={`port-dot ${port.direction}`} />
+                  <span className={`port-direction-badge ${port.direction}`}>{port.direction}</span>
                   <span>{port.name}</span>
                   <code>{port.schema}</code>
                 </div>
@@ -621,14 +930,50 @@ export function FlowCanvas({
           )}
           <ParameterPanel
             title="Parameters"
-            parameters={Object.entries({ ...selectedNode.config, ...selectedNode.parameters }).map(([name, value]) => ({
-              name,
-              type: typeof value === 'boolean' ? 'boolean' : typeof value === 'number' ? 'number' : 'text',
-              value,
-            }))}
+            parameters={visibleParameterEntries(selectedNode).map(([name, value]) => {
+              const spec = parameterSpecForNode(name, selectedNode, atomTemplates);
+              return {
+                name,
+                type: String(spec.type || parameterTypeForValue(value)),
+                value,
+                control: typeof spec.control === 'string' ? spec.control : undefined,
+                description: typeof spec.description === 'string' ? spec.description : undefined,
+                placeholder: typeof spec.placeholder === 'string' ? spec.placeholder : undefined,
+                advanced: spec.advanced === true,
+                source: typeof spec.source === 'string' ? spec.source : undefined,
+                options: parameterOptionsForNode(name, value, selectedNode, atomTemplates),
+                enum: Array.isArray(spec.enum) ? spec.enum : undefined,
+                minimum: typeof spec.minimum === 'number' ? spec.minimum : undefined,
+                maximum: typeof spec.maximum === 'number' ? spec.maximum : undefined,
+                min: typeof spec.min === 'number' ? spec.min : undefined,
+                max: typeof spec.max === 'number' ? spec.max : undefined,
+                range: Array.isArray(spec.range) || (spec.range && typeof spec.range === 'object')
+                  ? spec.range as [number, number] | { min?: number; max?: number; minimum?: number; maximum?: number }
+                  : undefined,
+              };
+            })}
             onChange={(name, value) => {
               if (readOnly) return;
               const updatedConfig = { ...selectedNode.config, [name]: value };
+              const nextReadiness = selectedNode.readiness_status === 'not_configured'
+                ? 'configured'
+                : selectedNode.readiness_status;
+              setSelectedNode({ ...selectedNode, config: updatedConfig, readiness_status: nextReadiness });
+              const atomKey = Array.isArray(flow.flow_atoms) ? 'flow_atoms' : 'nodes';
+              const nextAtoms = asRecords(flow[atomKey]).map((atom) =>
+                String(atom.id) === selectedNode.id
+                  ? { ...atom, config: updatedConfig, readiness_status: nextReadiness }
+                  : atom
+              );
+              onChange({
+                ...flow,
+                [atomKey]: nextAtoms,
+                ...(atomKey === 'flow_atoms' && Array.isArray(flow.nodes) ? { nodes: nextAtoms } : {}),
+              });
+            }}
+            onBulkChange={(values) => {
+              if (readOnly) return;
+              const updatedConfig = { ...selectedNode.config, ...values };
               const nextReadiness = selectedNode.readiness_status === 'not_configured'
                 ? 'configured'
                 : selectedNode.readiness_status;
@@ -651,6 +996,7 @@ export function FlowCanvas({
               operation: selectedNode.operation,
               readiness_status: selectedNode.readiness_status,
             }}
+            loadProjectFolders={project?.data_root ? loadProjectFolders : undefined}
           />
         </aside>
       )}

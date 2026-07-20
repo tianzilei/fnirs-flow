@@ -36,7 +36,7 @@ from fnirs_flow.execution.engine import (
     ensure_derivatives_layout,
 )
 from fnirs_flow.execution.failures import FailureStore
-from fnirs_flow.execution.operations import OperationRegistry, create_default_registry
+from fnirs_flow.execution.operations import OperationRegistry, canonical_operation, create_default_registry
 from fnirs_flow.execution.provenance import ProvenanceRecord
 from fnirs_flow.filesystem import remove_macos_metadata_paths
 
@@ -336,7 +336,7 @@ class ExecutionService:
         failure_store.write_json(dirs["logs"])
         failure_store.write_csv(dirs["logs"])
 
-        # Write dependency provenance (§16 MVP: run artifacts record actual dependencies and backend versions)
+        # Write dependency provenance (§16 MVP: 运行产物记录实际依赖与后端版本)
         self._write_dependency_provenance(compiled_dir, dirs["logs"], dag)
 
         # Generate group summary across subjects
@@ -1210,7 +1210,8 @@ class ExecutionService:
                 if not atom:
                     continue
 
-                operation = atom.get("operation") or atom.get("atom_type") or atom.get("node_type", "")
+                declared_operation = str(atom.get("operation") or atom.get("atom_type") or atom.get("node_type", ""))
+                operation = canonical_operation(declared_operation)
                 params = dict(atom.get("parameters", {}))
                 category = atom.get("category", "")
                 execution_scope = atom.get("execution_scope", "run")
@@ -1255,6 +1256,7 @@ class ExecutionService:
                         provenance={
                             "predecessor_atom_ids": sorted(predecessors),
                             "operation": operation,
+                            "declared_operation": declared_operation,
                             "backend_id": default_backend_id,
                         },
                     )
@@ -1287,6 +1289,7 @@ class ExecutionService:
                     provenance={
                         "predecessor_atom_ids": sorted(predecessors),
                         "operation": operation,
+                        "declared_operation": declared_operation,
                         "backend_id": resolve_atom_backend_id(atom, default_backend_id),
                     },
                 )
@@ -1353,7 +1356,8 @@ class ExecutionService:
                         artifact_offset = len(adapter.artifacts.all()) if hasattr(adapter, "artifacts") else 0
 
                         # Dispatch based on category
-                        if category == "preprocessing":
+                        if category == "preprocessing" or (category == "validation" and operation == "compute_qc"):
+                            params.setdefault("_declared_operation", declared_operation)
                             result = self._dispatch_preprocessing(
                                 adapter,
                                 raw_input,
@@ -1361,7 +1365,11 @@ class ExecutionService:
                                 params,
                             )
                             # QC emits metrics rather than a transformed data object.
-                            raw_outputs[atom_id] = raw_input if operation == "compute_qc" else result
+                            raw_outputs[atom_id] = (
+                                raw_input
+                                if operation in {"compute_qc", "combat_harmonization"}
+                                else result
+                            )
                             intermediate_state[atom_id] = result
                         elif category in ("analysis", "output"):
                             result = self._dispatch_analysis(
@@ -1522,7 +1530,7 @@ class ExecutionService:
 
         Uses a data-driven mapping of operation -> state keys to inject.
         """
-        operation = atom.get("operation") or atom.get("atom_type") or ""
+        operation = canonical_operation(str(atom.get("operation") or atom.get("atom_type") or ""))
 
         # Mapping of (operation, param_key) -> state_key to auto-inject
         injection_map: dict[tuple[str, str], str] = {
@@ -1575,7 +1583,7 @@ class ExecutionService:
         value. Ambiguous fan-in fails closed instead of depending on iteration
         order.
         """
-        operation = atom.get("operation") or atom.get("atom_type") or ""
+        operation = canonical_operation(str(atom.get("operation") or atom.get("atom_type") or ""))
         requirements: dict[str, tuple[str, ...]] = {
             "first_level_glm": ("design_matrix", "build_design_matrix"),
             "estimate_contrast": ("glm_result", "first_level_glm"),
@@ -1590,13 +1598,21 @@ class ExecutionService:
         if param_key in params:
             return
 
-        candidates: list[str] = []
+        exact_candidates: list[str] = []
+        alias_candidates: list[str] = []
         for predecessor in sorted(predecessors):
             source = atom_map.get(predecessor, {})
-            actual_operation = source.get("operation") or source.get("atom_type") or source.get("node_type", "")
+            declared_source_operation = str(
+                source.get("operation") or source.get("atom_type") or source.get("node_type", "")
+            )
+            actual_operation = canonical_operation(declared_source_operation)
             if actual_operation == source_operation and predecessor in state:
-                candidates.append(predecessor)
+                if declared_source_operation == source_operation:
+                    exact_candidates.append(predecessor)
+                else:
+                    alias_candidates.append(predecessor)
 
+        candidates = exact_candidates or alias_candidates
         if len(candidates) > 1:
             raise ValueError(f"Atom '{atom_id}' has ambiguous '{param_key}' inputs from: {candidates}")
         if candidates:
@@ -1610,6 +1626,8 @@ class ExecutionService:
         params: dict[str, Any],
     ) -> Any:
         """Dispatch a preprocessing operation to the adapter."""
+        declared_operation = str(params.get("_declared_operation") or operation)
+        operation = canonical_operation(str(operation))
         optical_density_kwargs = {}
         haemoglobin_kwargs = {"ppf": params.get("ppf", 6.0)}
         if "cedalion" in getattr(adapter, "versions", {}):
@@ -1619,30 +1637,78 @@ class ExecutionService:
             )
             haemoglobin_kwargs["spectrum"] = params.get("spectrum", "prahl")
 
+        motion_aliases = {"tddr", "wavelet", "spline", "ica", "pca", "cbsi"}
+        filter_aliases = {"bandpass", "notch", "lowpass"}
+        motion_method = params.get("method") or (declared_operation if declared_operation in motion_aliases else "tddr")
+        filter_method = params.get("method") or (
+            declared_operation if declared_operation in filter_aliases else "bandpass"
+        )
+        public_params = self._public_operation_params(params)
+        filter_params = self._public_operation_params(params, exclude={"l_freq", "h_freq"})
+
+        def _compute_qc():
+            use_advanced_qc = declared_operation in {"cv_check", "snr_check", "bad_channel_detection"} and hasattr(
+                adapter, "compute_advanced_qc"
+            )
+
+            def call_qc(source: Any):
+                if use_advanced_qc:
+                    return adapter.compute_advanced_qc(
+                        source,
+                        sci_threshold=params.get("sci_threshold", params.get("threshold", 0.8)),
+                        cv_threshold=params.get("cv_threshold", params.get("threshold", 0.15)),
+                        snr_threshold=params.get("snr_threshold", params.get("threshold", 2.0)),
+                    )
+                try:
+                    return adapter.compute_qc(
+                        source,
+                        sci_threshold=params.get("sci_threshold", params.get("threshold", 0.8)),
+                    )
+                except TypeError:
+                    return adapter.compute_qc(source)
+
+            try:
+                return call_qc(raw)
+            except RuntimeError as exc:
+                message = str(exc)
+                if "must operate on optical density data" not in message:
+                    raise
+                return call_qc(adapter.to_optical_density(raw))
+
         dispatch = {
             "optical_density": lambda: adapter.to_optical_density(
                 raw,
                 **optical_density_kwargs,
             ),
-            "compute_qc": lambda: adapter.compute_qc(raw),
+            "compute_qc": _compute_qc,
             "motion_correction": lambda: adapter.apply_motion_correction(
                 raw,
-                method=params.get("method", "tddr"),
+                method=motion_method,
+                **public_params,
             ),
             "filtering": lambda: adapter.apply_filter(
                 raw,
                 l_freq=params.get("l_freq", 0.01),
                 h_freq=params.get("h_freq", 0.2),
+                method=filter_method,
+                **filter_params,
             ),
             "beer_lambert_law": lambda: adapter.to_haemoglobin(
                 raw,
                 **haemoglobin_kwargs,
             ),
+            "combat_harmonization": lambda: raw,
         }
         handler = dispatch.get(operation)
         if handler is None:
             raise ValueError(f"Unknown preprocessing operation: {operation}")
         return handler()
+
+    @staticmethod
+    def _public_operation_params(params: dict[str, Any], *, exclude: set[str] | None = None) -> dict[str, Any]:
+        """Remove dispatch-private keys and explicit positional kwargs."""
+        excluded = {"method", *(exclude or set())}
+        return {key: value for key, value in params.items() if not key.startswith("_") and key not in excluded}
 
     def _dispatch_analysis(
         self,
@@ -1652,6 +1718,7 @@ class ExecutionService:
         params: dict[str, Any],
     ) -> Any:
         """Dispatch an analysis operation to the adapter."""
+        operation = canonical_operation(str(operation))
 
         def _build_design_matrix():
             events = params.get("events")
@@ -1664,7 +1731,7 @@ class ExecutionService:
                 raw,
                 events=events,
                 event_id=event_id,
-                hrf_model=params.get("hrf_model", "glover"),
+                hrf_model=self._normalize_hrf_model(params.get("hrf_model", "glover")),
                 drift_order=params.get("drift_order", 1),
                 high_pass=params.get("high_pass", 0.01),
             )
@@ -1676,7 +1743,7 @@ class ExecutionService:
             return adapter.fit_first_level_glm(
                 raw,
                 design_matrix,
-                hrf_model=params.get("hrf_model", "glover"),
+                hrf_model=self._normalize_hrf_model(params.get("hrf_model", "glover")),
                 noise_model=params.get("noise_model", "ar1"),
             )
 
@@ -1685,6 +1752,7 @@ class ExecutionService:
             contrasts = params.get("contrasts", [])
             if glm_result is None:
                 raise ValueError("estimate_contrast requires 'glm_result' in params. Run first_level_glm first.")
+            contrasts = self._normalize_contrasts(contrasts, glm_result)
             return adapter.estimate_contrast(glm_result, contrasts)
 
         def _channel_output():
@@ -1719,6 +1787,41 @@ class ExecutionService:
         if handler is None:
             raise ValueError(f"Unknown analysis operation: {operation}")
         return handler()
+
+    @staticmethod
+    def _normalize_hrf_model(value: Any) -> str:
+        """Map common legacy UI labels to backend-supported HRF model ids."""
+        model = str(value or "glover").strip().lower()
+        if model in {"canonical", "canonical_hrf", "default"}:
+            return "glover"
+        return model
+
+    @staticmethod
+    def _normalize_contrasts(contrasts: Any, glm_result: Any) -> list[Any]:
+        """Accept legacy string contrasts and convert them to adapter-ready specs."""
+        if not isinstance(contrasts, list):
+            return []
+        if not isinstance(glm_result, dict):
+            return contrasts
+        n_conditions = int(glm_result.get("n_conditions", 0) or 0)
+        conditions = [str(item) for item in glm_result.get("conditions", [])]
+        normalized: list[dict[str, Any]] = []
+        for item in contrasts:
+            if isinstance(item, dict):
+                normalized.append(item)
+                continue
+            label = str(item)
+            weights = [0.0] * n_conditions
+            if ">" in label and conditions:
+                left, right = [part.strip() for part in label.split(">", 1)]
+                if left in conditions:
+                    weights[conditions.index(left)] = 1.0
+                if right in conditions:
+                    weights[conditions.index(right)] = -1.0
+            elif n_conditions:
+                weights[0] = 1.0
+            normalized.append({"name": label.replace(" ", "_") or "contrast", "weights": weights})
+        return normalized
 
     def _parse_bids_events_tsv(self, events_path: str, sfreq: float) -> tuple[np.ndarray, dict[str, int]]:
         """Parse a BIDS events TSV into MNE events array and event_id dict.
@@ -1848,7 +1951,7 @@ class ExecutionService:
     ) -> None:
         """Write dependency provenance for the execution.
 
-        §16 MVP: run artifacts record actual dependencies and backend versions
+        §16 MVP: 运行产物记录实际依赖与后端版本
         §11: environment_manifest.json, backend_probe.json
         """
         import platform

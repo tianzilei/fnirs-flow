@@ -112,7 +112,7 @@ class BackendRegistry:
         """Describe a backend without loading it.
 
         Returns metadata only - no imports, no instantiation.
-        Implements §7.1: registry.describe(backend_id) = metadata only, no backend loading
+        Implements §7.1: registry.describe(backend_id) = 纯元数据，不加载后端
         """
         entry = self._entries.get(backend_id)
         if entry is None:
@@ -133,7 +133,7 @@ class BackendRegistry:
 
         Uses the lightweight detector if provided, otherwise checks
         if the module exists using find_spec.
-        Implements §7.1: registry.is_available(backend_id) = read-only lightweight check
+        Implements §7.1: registry.is_available(backend_id) = 只读轻量检查
         """
         entry = self._entries.get(backend_id)
         if entry is None:
@@ -163,7 +163,7 @@ class BackendRegistry:
     def load(self, backend_id: str) -> type[BackendProtocol] | None:
         """Load and cache a backend class.
 
-        Implements §7.1: registry.load(backend_id) = explicit backend code loading
+        Implements §7.1: registry.load(backend_id) = 显式加载后端代码
         """
         if backend_id in self._loaded_classes:
             return self._loaded_classes[backend_id]
@@ -192,7 +192,7 @@ class BackendRegistry:
     def create(self, backend_id: str, **kwargs: Any) -> BackendProtocol:
         """Load and instantiate a backend.
 
-        Implements §7.1: registry.create(backend_id, **kw) = load and instantiate
+        Implements §7.1: registry.create(backend_id, **kw) = 加载并实例化
         """
         if not self.is_available(backend_id):
             raise BackendNotAvailableError(backend_id)
@@ -207,7 +207,7 @@ class BackendRegistry:
     def unload(self, backend_id: str) -> None:
         """Unload a backend from the cache.
 
-        Implements §7.1: registry.unload(backend_id) = clear registry cache only; no Python module unload guarantee
+        Implements §7.1: registry.unload(backend_id) = 仅清理注册表缓存，不承诺卸载 Python 模块
         """
         self._loaded_classes.pop(backend_id, None)
 
@@ -285,7 +285,7 @@ def _register_known_backends() -> None:
     """Register known backends with lazy loading.
 
     Uses string entry points instead of importing adapter classes.
-    Implements §7.1: do not call import_module() during registration
+    Implements §7.1: 不在注册时执行 import_module()
     """
     _registry.register(
         backend_id="mne_nirs",

@@ -13,6 +13,7 @@ are intentionally excluded.
 |---|---|
 | `docs/README.md` | Public documentation index |
 | `docs/specs/fnirs_flow_public_api.md` | Public Python/API surface and package concepts |
+| `docs/specs/method_atom_parameter_ui_contract.md` | MethodAtom-owned parameter UI metadata contract |
 | `docs/specs/package_profile_spec.md` | Submission, reviewer, and reproducibility package profiles |
 | `docs/specs/mvp_task_glm_acceptance_checklist.md` | Task-GLM MVP acceptance checklist |
 | `PUBLIC_RELEASE.md` | Release-tree scope and exclusion policy |
@@ -41,6 +42,7 @@ are intentionally excluded.
 ### WebUI
 
 - Project workspace, Flow builder, MethodAtom library, data import, validation, compile summary, run monitor, results browser, import/export package views, and diagnostics
+- MethodAtom-owned parameter controls through `parameter_options` and `parameter_specs`
 - Checklist guidance for Task GLM, resting-state connectivity, group analysis, and ML classification workflows
 - Checklist-to-Atom Library recommendations with priority actions, focus routing, and missing-input previews
 - Results Workspace tabs for artifacts, QC, channel, ROI, and group-level SVG/CSV/JSON outputs

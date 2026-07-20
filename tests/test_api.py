@@ -73,7 +73,15 @@ def test_example_flow_api_loads_official_demo():
     client = TestClient(app)
     listing = client.get("/api/example-flows")
     assert listing.status_code == 200
+    assert listing.json()[0] == {"id": "blank_template", "label": "Blank Template"}
     assert any(item["id"] == "demo_task_glm_real" for item in listing.json())
+
+    blank = client.get("/api/example-flows/blank_template")
+    assert blank.status_code == 200
+    assert blank.json()["flow_id"] == "blank-template"
+    assert blank.json()["nodes"] == []
+    assert blank.json()["flow_atoms"] == []
+    assert blank.json()["edges"] == []
 
     response = client.get("/api/example-flows/demo_task_glm_real")
     assert response.status_code == 200
@@ -221,10 +229,11 @@ def test_create_project():
     from fastapi.testclient import TestClient
 
     client = TestClient(app)
-    resp = client.post("/api/projects", json={"name": "Test", "description": "desc"})
+    resp = client.post("/api/projects", json={"name": "Test", "description": "desc", "data_root": "E:/data/study"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "Test"
+    assert data["data_root"] == "E:/data/study"
     assert "id" in data
 
 
@@ -237,6 +246,99 @@ def test_list_projects():
     resp = client.get("/api/projects")
     assert resp.status_code == 200
     assert len(resp.json()) == 2
+
+
+def test_discover_project_local_data_root(tmp_path):
+    from fastapi.testclient import TestClient
+
+    dataset_root = tmp_path / "local-study"
+    nirs_dir = dataset_root / "sub-01" / "nirs"
+    nirs_dir.mkdir(parents=True)
+    (dataset_root / "participants.tsv").write_text("participant_id\tinclude\nsub-01\t1\n", encoding="utf-8")
+    (nirs_dir / "sub-01_task-rest_nirs.snirf").write_bytes(b"snirf")
+    (nirs_dir / "sub-01_task-rest_events.tsv").write_text("onset\tduration\n0\t1\n", encoding="utf-8")
+
+    client = TestClient(app)
+    project = client.post(
+        "/api/projects",
+        json={"name": "Local Data", "data_root": str(dataset_root)},
+    ).json()
+    response = client.post(
+        f"/api/projects/{project['id']}/discover-data",
+        params={"dataset_id": "project-local-data"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["dataset_id"] == "project-local-data"
+    assert body["runs"] == 1
+    assert body["local_root"] == str(dataset_root.resolve())
+
+
+def test_discover_project_local_data_subdir(tmp_path):
+    from fastapi.testclient import TestClient
+
+    project_root = tmp_path / "project-data"
+    dataset_root = project_root / "raw" / "study-a"
+    nirs_dir = dataset_root / "sub-01" / "nirs"
+    nirs_dir.mkdir(parents=True)
+    (dataset_root / "participants.tsv").write_text("participant_id\tinclude\nsub-01\t1\n", encoding="utf-8")
+    (nirs_dir / "sub-01_task-rest_nirs.snirf").write_bytes(b"snirf")
+    (nirs_dir / "sub-01_task-rest_events.tsv").write_text("onset\tduration\n0\t1\n", encoding="utf-8")
+
+    client = TestClient(app)
+    project = client.post(
+        "/api/projects",
+        json={"name": "Local Data Subdir", "data_root": str(project_root)},
+    ).json()
+    response = client.post(
+        f"/api/projects/{project['id']}/discover-data",
+        params={"dataset_id": "project-local-data", "data_path": "raw/study-a"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["runs"] == 1
+    assert body["local_root"] == str(dataset_root.resolve())
+
+
+def test_list_project_data_folders_returns_relative_paths(tmp_path):
+    from fastapi.testclient import TestClient
+
+    project_root = tmp_path / "project-data"
+    (project_root / "raw" / "study-a").mkdir(parents=True)
+    (project_root / "derivatives").mkdir()
+
+    client = TestClient(app)
+    project = client.post(
+        "/api/projects",
+        json={"name": "Folder List", "data_root": str(project_root)},
+    ).json()
+
+    response = client.get(f"/api/projects/{project['id']}/data-folders")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["parent"] == ""
+    assert {folder["path"] for folder in body["folders"]} == {"derivatives", "raw"}
+
+    child_response = client.get(f"/api/projects/{project['id']}/data-folders", params={"parent": "raw"})
+    assert child_response.status_code == 200
+    assert child_response.json()["folders"][0]["path"] == "raw/study-a"
+
+
+def test_list_local_folders_returns_server_paths(tmp_path):
+    from fastapi.testclient import TestClient
+
+    child = tmp_path / "BIDS-NIRS-Tapping-master"
+    child.mkdir()
+
+    client = TestClient(app)
+    response = client.get("/api/local-folders", params={"path": str(tmp_path)})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["current"] == str(tmp_path.resolve())
+    assert any(folder["path"] == str(child.resolve()) for folder in body["folders"])
 
 
 def test_update_and_get_flow():
@@ -683,7 +785,48 @@ def test_atom_templates():
     client = TestClient(app)
     resp = client.get("/api/atom-templates")
     assert resp.status_code == 200
-    assert isinstance(resp.json(), (dict, list))
+    templates = resp.json()
+    assert isinstance(templates, (dict, list))
+    assert isinstance(templates, list)
+    assert all(template["input_ports"] or template["output_ports"] for template in templates)
+    non_user_keys = {
+        "source_kind",
+        "readiness_status",
+        "execution_scope",
+        "source_atom_id",
+        "source_study_id",
+        "target_flow_slot",
+        "scenario",
+        "execution_readiness",
+        "missing_for_execution",
+        "confidence",
+        "review_required",
+        "verification_status",
+        "method_note",
+        "accuracy_caveat",
+    }
+    assert all(not (set(template["default_config"]) & non_user_keys) for template in templates)
+    assert all(template["default_readiness_status"] for template in templates)
+    assert all(template["default_execution_scope"] for template in templates)
+    study_design = next(template for template in templates if template["id"] == "study_design")
+    assert study_design["default_config"]["design_type"] == "block"
+    assert set(study_design["default_config"]) >= {"design_type", "conditions", "contrasts"}
+    assert study_design["output_ports"] == [{"name": "design_spec", "schema": "DesignSpec", "required": True}]
+    assert study_design["parameter_options"]["design_type"] == [
+        "block",
+        "event",
+        "mixed",
+        "two_sample_t",
+        "paired_t",
+        "one_sample_t",
+        "anova",
+        "regression",
+    ]
+    assert study_design["parameter_specs"]["design_type"]["control"] == "select"
+    bandpass = next(template for template in templates if template["id"] == "bandpass_filter")
+    assert bandpass["parameter_specs"]["l_freq"] == {"type": "number", "control": "number", "minimum": 0}
+    bids_import = next(template for template in templates if template["id"] == "bids_import")
+    assert bids_import["parameter_specs"]["bids_dir"]["control"] == "path"
 
 
 def test_empty_marker_specs():
@@ -771,7 +914,12 @@ def test_participant_table_api_rejects_path_outside_allowed_roots(tmp_path):
     from fastapi.testclient import TestClient
 
     client = TestClient(app)
-    pid = client.post("/api/projects", json={"name": "Path Guard"}).json()["id"]
+    project_root = tmp_path / "project-data"
+    project_root.mkdir()
+    pid = client.post(
+        "/api/projects",
+        json={"name": "Path Guard", "data_root": str(project_root)},
+    ).json()["id"]
     outside_root = tmp_path.parent / f"{tmp_path.name}_outside_allowed_roots"
     table = outside_root / "participants.tsv"
     table.parent.mkdir()
@@ -780,8 +928,56 @@ def test_participant_table_api_rejects_path_outside_allowed_roots(tmp_path):
         f"/api/projects/{pid}/participant-table",
         json={"path": str(table), "id_column": "participant_id"},
     )
-    assert resp.status_code == 403
-    assert "allowed local roots" in resp.json()["detail"]
+    assert resp.status_code == 422
+    assert "project-relative" in resp.json()["detail"]["message"]
+
+
+def test_participant_table_api_accepts_project_relative_path(tmp_path):
+    from fastapi.testclient import TestClient
+
+    project_root = tmp_path / "project-data"
+    project_root.mkdir()
+    (project_root / "participants.tsv").write_text(
+        "participant_id\tinclude\tgroup\nsub-01\t1\tcontrol\n",
+        encoding="utf-8",
+    )
+
+    client = TestClient(app)
+    pid = client.post(
+        "/api/projects",
+        json={"name": "Relative Participant Table", "data_root": str(project_root)},
+    ).json()["id"]
+    resp = client.post(
+        f"/api/projects/{pid}/participant-table",
+        json={"path": "participants.tsv", "id_column": "participant_id"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["rows"] == 1
+
+
+def test_flow_api_rejects_absolute_import_atom_path():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    pid = client.post("/api/projects", json={"name": "Flow Path Guard"}).json()["id"]
+    flow = {
+        "flow_id": "guard",
+        "nodes": [
+            {
+                "id": "n1",
+                "atom_type": "data_import",
+                "operation": "snirf_reader",
+                "config": {"file_path": "C:/data/run.snirf"},
+            }
+        ],
+        "edges": [],
+    }
+
+    resp = client.put(f"/api/projects/{pid}/flow", json={"flow": flow})
+
+    assert resp.status_code == 422
+    assert "project-relative" in resp.json()["detail"]["message"]
 
 
 def test_sequential_project_creation():

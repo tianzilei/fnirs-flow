@@ -9,7 +9,6 @@ before measuring list, open, save, and revision-storage costs.
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import os
 import platform
@@ -69,7 +68,7 @@ def _write_random_file(path: Path, size: int) -> None:
     with path.open("wb") as stream:
         while remaining:
             chunk_size = min(MIB, remaining)
-            encoded = base64.b64encode(os.urandom((chunk_size * 3 // 4) + 3))[:chunk_size]
+            encoded = os.urandom((chunk_size // 2) + 1).hex().encode("ascii")[:chunk_size]
             stream.write(encoded)
             remaining -= len(encoded)
 

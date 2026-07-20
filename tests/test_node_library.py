@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fnirs_flow.flow.models import NodeCategory
-from fnirs_flow.registry.node_library import NodeLibrary, NodeTemplate, create_builtin_library
+from fnirs_flow.registry.node_library import NON_USER_CONFIG_KEYS, NodeLibrary, NodeTemplate, create_builtin_library
 from fnirs_flow.registry.node_templates import ALL_NODE_TEMPLATES
 
 
@@ -164,6 +164,22 @@ class TestBuiltinLibrary:
         data_nodes = lib.by_category(NodeCategory.DATA)
         assert len(data_nodes) >= 3
         assert any(t.template_id == "dataset_discovery" for t in data_nodes)
+
+    def test_dataset_discovery_has_no_user_source_kind_parameter(self):
+        lib = create_builtin_library()
+        template = lib.get("dataset_discovery")
+        assert template is not None
+        assert "dataset_id" in template.default_config
+        assert "source_kind" not in template.default_config
+
+    def test_builtin_template_default_configs_exclude_non_user_fields(self):
+        lib = create_builtin_library()
+        leaked = {
+            template.template_id: sorted(set(template.default_config) & NON_USER_CONFIG_KEYS)
+            for template in lib.all()
+            if set(template.default_config) & NON_USER_CONFIG_KEYS
+        }
+        assert leaked == {}
 
     def test_preprocessing_nodes(self):
         lib = create_builtin_library()

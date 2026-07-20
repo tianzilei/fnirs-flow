@@ -11,7 +11,7 @@
   "nodes": [
     {
       "id": "dataset_discovery", "type": "dataset_discovery", "category": "data", "position": {"x": 0, "y": 0},
-      "config": {"dataset_id": "ds007738", "source_kind": "local_bids_nirs"},
+      "config": {"dataset_id": "ds007738"},
       "ports": [{"name": "data_manifest", "direction": "out", "schema": "DataManifest", "required": true}],
       "status": "configured"
     },

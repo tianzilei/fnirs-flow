@@ -12,9 +12,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from fnirs_flow.flow.atoms import (
+    NON_USER_CONFIG_KEYS,
+    PROVENANCE_CONFIG_KEYS,
     AtomPort,
     BackendBinding,
     ExecutableTrustLevel,
@@ -24,6 +26,26 @@ from fnirs_flow.flow.atoms import (
     Position,
     ReadinessStatus,
 )
+
+
+def _split_non_user_config(
+    config: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], str | None, str | None]:
+    editable_config = dict(config)
+    metadata: dict[str, Any] = {}
+    readiness_status = editable_config.pop("readiness_status", None)
+    execution_scope = editable_config.pop("execution_scope", None)
+    for key in NON_USER_CONFIG_KEYS - PROVENANCE_CONFIG_KEYS - {"readiness_status", "execution_scope"}:
+        editable_config.pop(key, None)
+    for key in PROVENANCE_CONFIG_KEYS:
+        if key in editable_config:
+            metadata[key] = editable_config.pop(key)
+    return (
+        editable_config,
+        metadata,
+        str(readiness_status) if readiness_status not in (None, "") else None,
+        str(execution_scope) if execution_scope not in (None, "") else None,
+    )
 
 
 class MethodAtomTemplate(BaseModel):
@@ -36,6 +58,11 @@ class MethodAtomTemplate(BaseModel):
     operation: str | None = None
     description: str = ""
     default_config: dict[str, Any] = Field(default_factory=dict)
+    parameter_options: dict[str, list[Any]] = Field(default_factory=dict)
+    parameter_specs: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    default_readiness_status: ReadinessStatus | None = None
+    default_execution_scope: str | None = Field(default=None, pattern="^(run|subject|group|project)$")
+    metadata: dict[str, Any] = Field(default_factory=dict)
     ports: list[AtomPort] = Field(default_factory=list)
     origin: MethodAtomOrigin = MethodAtomOrigin.BUILTIN
     evidence_refs: list[str] = Field(default_factory=list)
@@ -46,6 +73,20 @@ class MethodAtomTemplate(BaseModel):
     dependency_profile_id: str | None = None
     required_capabilities: list[str] = Field(default_factory=list)
     dependency_optional: bool = False
+
+    @model_validator(mode="after")
+    def _move_non_user_defaults_out_of_config(self) -> MethodAtomTemplate:
+        config, metadata, readiness_status, execution_scope = _split_non_user_config(self.default_config)
+        self.default_config = config
+        self.metadata = {**metadata, **self.metadata}
+        if self.default_readiness_status is None and readiness_status:
+            try:
+                self.default_readiness_status = ReadinessStatus(readiness_status)
+            except ValueError:
+                self.metadata.setdefault("invalid_readiness_status", readiness_status)
+        if self.default_execution_scope is None and execution_scope:
+            self.default_execution_scope = execution_scope
+        return self
 
     @property
     def node_id(self) -> str:
@@ -132,8 +173,26 @@ class MethodAtomLibrary:
 
         # Merge config
         config = dict(template.default_config)
+        metadata = dict(template.metadata)
+        readiness_value = (
+            template.default_readiness_status.value
+            if template.default_readiness_status is not None
+            else ReadinessStatus.NOT_CONFIGURED.value
+        )
+        execution_scope = template.default_execution_scope or "run"
         if config_override:
-            config.update(config_override)
+            (
+                override_config,
+                override_metadata,
+                override_readiness,
+                override_scope,
+            ) = _split_non_user_config(config_override)
+            config.update(override_config)
+            metadata.update(override_metadata)
+            if override_readiness:
+                readiness_value = override_readiness
+            if override_scope:
+                execution_scope = override_scope
 
         # Generate atom ID
         import uuid
@@ -141,7 +200,6 @@ class MethodAtomLibrary:
         if atom_id is None:
             atom_id = f"{template.atom_type}-{uuid.uuid4().hex[:8]}"
 
-        readiness_value = config.get("readiness_status", ReadinessStatus.NOT_CONFIGURED.value)
         try:
             readiness_status = ReadinessStatus(readiness_value)
         except ValueError:
@@ -163,8 +221,10 @@ class MethodAtomLibrary:
             dependency_profile_id=template.dependency_profile_id,
             required_capabilities=set(template.required_capabilities),
             dependency_optional=template.dependency_optional,
+            execution_scope=execution_scope,
             execution_trust_level=ExecutableTrustLevel.BUILTIN_MANAGED,
             readiness_status=readiness_status,
+            metadata=metadata,
         )
 
     def load_from_file(self, filepath: str | Path) -> int:

@@ -92,7 +92,8 @@ class TestLiteratureDerivedMethodAtoms:
         atom = library.create_atom("atom_descriptive_statistics", atom_id="desc")
         assert atom is not None
         assert atom.origin == NodeOrigin.EVIDENCE_DERIVED
-        assert atom.config["source_atom_id"] == "ATOM_descriptive_statistics"
+        assert "source_atom_id" not in atom.config
+        assert atom.metadata["source_atom_id"] == "ATOM_descriptive_statistics"
 
     def test_nirs_spm_spatial_registration_projection_atom(self):
         library = create_builtin_library()
@@ -108,15 +109,15 @@ class TestLiteratureDerivedMethodAtoms:
             "hypothetical_head_surface",
             "cortical_surface",
         ]
-        assert template.default_config["execution_readiness"] == "needs_attention"
+        assert template.metadata["execution_readiness"] == "needs_attention"
 
     def test_localization_projection_import_atom_is_executable(self):
         library = create_builtin_library()
         template = library.get("localization_projection_import")
         assert template is not None
         assert template.operation == "localization_projection_import"
-        assert template.default_config["execution_scope"] == "group"
-        assert template.default_config["readiness_status"] == "ready"
+        assert template.default_execution_scope == "group"
+        assert template.default_readiness_status == ReadinessStatus.READY
         assert template.output_ports[0].port_schema == "ProjectedMNIChannels"
         atom = library.create_atom("localization_projection_import", atom_id="loc")
         assert atom is not None
@@ -128,8 +129,8 @@ class TestLiteratureDerivedMethodAtoms:
         template = library.get("nirs_spm_surface_projection")
         assert template is not None
         assert template.operation == "nirs_spm_surface_projection"
-        assert template.default_config["execution_scope"] == "group"
-        assert template.default_config["readiness_status"] == "needs_attention"
+        assert template.default_execution_scope == "group"
+        assert template.default_readiness_status == ReadinessStatus.NEEDS_ATTENTION
         assert template.output_ports[0].port_schema == "ProjectedMNIChannels"
         atom = library.create_atom("nirs_spm_surface_projection", atom_id="nirsspm-projection")
         assert atom is not None
@@ -156,7 +157,7 @@ class TestLiteratureDerivedMethodAtoms:
         assert template.backend_binding.backend_id == "cedalion"
         assert template.backend_binding.operation == "reconstruct_image"
         assert "experimental" in template.tags
-        assert template.default_config["verification_status"] == "contract_test_required"
+        assert template.metadata["verification_status"] == "contract_test_required"
 
     def test_cedalion_binding_is_preserved_when_atom_is_created(self):
         library = create_builtin_library()

@@ -20,6 +20,28 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+CONTROL_CONFIG_KEYS = {
+    "source_kind",
+    "readiness_status",
+    "execution_scope",
+}
+
+PROVENANCE_CONFIG_KEYS = {
+    "source_atom_id",
+    "source_study_id",
+    "target_flow_slot",
+    "scenario",
+    "execution_readiness",
+    "missing_for_execution",
+    "confidence",
+    "review_required",
+    "verification_status",
+    "method_note",
+    "accuracy_caveat",
+}
+
+NON_USER_CONFIG_KEYS = CONTROL_CONFIG_KEYS | PROVENANCE_CONFIG_KEYS
+
 # ============================================================================
 # Enums
 # ============================================================================
@@ -264,6 +286,25 @@ class FlowAtom(BaseModel):
         if "status" in result and "readiness_status" not in result:
             old_status = result.pop("status")
             result["readiness_status"] = old_status
+        config = result.get("config")
+        if isinstance(config, dict):
+            clean_config = dict(config)
+            metadata = dict(result.get("metadata") or {})
+            if "readiness_status" in clean_config and "readiness_status" not in result:
+                result["readiness_status"] = clean_config.pop("readiness_status")
+            else:
+                clean_config.pop("readiness_status", None)
+            if "execution_scope" in clean_config and "execution_scope" not in result:
+                result["execution_scope"] = clean_config.pop("execution_scope")
+            else:
+                clean_config.pop("execution_scope", None)
+            clean_config.pop("source_kind", None)
+            for key in PROVENANCE_CONFIG_KEYS:
+                if key in clean_config:
+                    metadata.setdefault(key, clean_config.pop(key))
+            result["config"] = clean_config
+            if metadata:
+                result["metadata"] = metadata
         return result
 
     @model_validator(mode="after")
@@ -276,8 +317,6 @@ class FlowAtom(BaseModel):
             self.metadata.setdefault("template_id", self.template_id)
         if self.operation is None:
             self.operation = self.config.get("operation")
-        if "execution_scope" in self.config:
-            self.execution_scope = str(self.config["execution_scope"])
         if not self.evidence_refs and "evidence_refs" in self.metadata:
             self.evidence_refs = list(self.metadata.get("evidence_refs", []))
         elif self.evidence_refs:

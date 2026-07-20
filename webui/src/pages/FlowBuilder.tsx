@@ -13,6 +13,7 @@ export function FlowBuilder() {
   const [focusedAtomId, setFocusedAtomId] = useState<string | null>(null);
   const [examples, setExamples] = useState<ExampleFlowSummary[]>([]);
   const [loadingExample, setLoadingExample] = useState('');
+  const [canvasResetVersion, setCanvasResetVersion] = useState(0);
   const [focusedChecklistSlotId, setFocusedChecklistSlotId] = useState<string | null>(null);
   const [activeChecklistStep, setActiveChecklistStep] = useState<{
     scenarioId: string;
@@ -46,7 +47,12 @@ export function FlowBuilder() {
     setLoadingExample(exampleId);
     try {
       const nextFlow = await getExampleFlow(exampleId);
-      setFlow(nextFlow);
+      setConfiguringNode(false);
+      setFocusedAtomId(null);
+      setFocusedChecklistSlotId(null);
+      setActiveChecklistStep(null);
+      setCanvasResetVersion((version) => version + 1);
+      setFlow(structuredClone(nextFlow));
       useStore.setState({
         error: {
           message: 'Example flow loaded',
@@ -77,6 +83,7 @@ export function FlowBuilder() {
       />
       <div className="canvas-container">
         <FlowCanvas
+          key={canvasResetVersion}
           flow={flow}
           onChange={setFlow}
           readOnly={readOnly}

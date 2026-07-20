@@ -305,7 +305,7 @@ class TestDependencyResolver:
     def test_resolve_cedalion_flow_without_cedalion(self):
         """Verify Cedalion Flow returns approval_required when Cedalion missing.
 
-        §15.2: Resolving a Cedalion Flow without a Cedalion environment returns approval_required
+        §15.2: 无 Cedalion 环境解析 Cedalion Flow，返回 approval_required
         """
         from fnirs_flow.dependencies.resolver import resolve_dependencies
 
@@ -333,7 +333,7 @@ class TestDependencyResolver:
     def test_resolver_never_imports_cedalion(self):
         """Verify resolver never imports cedalion.
 
-        §6: resolving must not access the network or import large scientific backends
+        §6: resolving 不得联网，也不得导入大型科学后端
         §15.3: assert "cedalion" not in sys.modules
         """
         # Remove cedalion from sys.modules if present
@@ -475,14 +475,14 @@ class TestProvenance:
 class TestNoBackendImportOnModuleLoad:
     """Verify that importing fnirs_flow modules does not import backends.
 
-    §15.3: Core tests do not require Cedalion
+    §15.3: Core 测试不需要 Cedalion
     §15.3: assert "cedalion" not in sys.modules
     """
 
     def test_backend_registry_no_eager_import(self):
         """Verify backend registry doesn't eagerly import adapter classes.
 
-        §7.1: The registry stores string entry points and does not call import_module() during registration
+        §7.1: 注册表保存字符串入口点，不在注册时执行 import_module()
         """
         # Remove cedalion from sys.modules if present
         cedalion_keys = [k for k in sys.modules if k.startswith("cedalion")]
@@ -516,7 +516,7 @@ class TestNoBackendImportOnModuleLoad:
     def test_compiler_no_cedalion_import(self, tmp_path):
         """Verify compiler doesn't import cedalion.
 
-        §15.3: Compiling a non-Cedalion Flow must not slow down meaningfully because a Cedalion profile exists
+        §15.3: 非 Cedalion Flow 的编译不因 Cedalion profile 增加而明显上升
         """
         # Remove cedalion from sys.modules if present
         cedalion_keys = [k for k in sys.modules if k.startswith("cedalion")]
