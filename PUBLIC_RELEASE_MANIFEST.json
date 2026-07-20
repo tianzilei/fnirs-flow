@@ -1,5 +1,5 @@
 {
-  "copied_file_count": 280,
+  "copied_file_count": 281,
   "files": [
     {
       "bytes": 898,
@@ -18,6 +18,12 @@
       "path": "LICENSE",
       "sha256": "96a3b41445d1ac3e943b8780193a8f34454359ff8c54a547d9ae93e486c16965",
       "source": "LICENSE"
+    },
+    {
+      "bytes": 5754,
+      "path": "PUBLIC_SYNC_SPEC.md",
+      "sha256": "b9abfbe495e3c1da50a3d07152fbe954f08202af1d02f8c65ad067435a70ab59",
+      "source": "PUBLIC_SYNC_SPEC.md"
     },
     {
       "bytes": 18013,
@@ -116,9 +122,9 @@
       "source": "configs/example_task_study.json"
     },
     {
-      "bytes": 3974,
+      "bytes": 4074,
       "path": "docs/README.md",
-      "sha256": "03eb83bc7a167224d90f5b2231d3a19526d76b7ada66f016d3ca035cedb705ce",
+      "sha256": "5f84a5dd175e67d231ccc78824e2af458c3ba5cdc126b47da3a4f796c1d9d2e7",
       "source": "docs/README.md"
     },
     {
@@ -968,9 +974,9 @@
       "source": "scripts/run_ds007738_full_analysis.py"
     },
     {
-      "bytes": 13200,
+      "bytes": 13227,
       "path": "scripts/sync_public_release.py",
-      "sha256": "246d8cc3e058ef121104eaf5c23e699f1b9e993d4a920c1d10f3e72f342b02a7",
+      "sha256": "b77cb0707fbd8811d2a02622b18a70d161bf3f57aa55990735914bfa39c26e55",
       "source": "scripts/sync_public_release.py"
     },
     {

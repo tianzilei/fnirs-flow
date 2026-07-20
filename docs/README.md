@@ -1,6 +1,6 @@
 # Documentation Index
 
-> Last updated: 2026-07-18
+> Last updated: 2026-07-20
 
 This public repository contains the code-oriented release tree for fnirs-flow.
 Private manuscript drafts, literature extraction worktables, sample datasets,
@@ -17,6 +17,7 @@ are intentionally excluded.
 | `docs/specs/mvp_task_glm_acceptance_checklist.md` | Task-GLM MVP acceptance checklist |
 | `PUBLIC_RELEASE.md` | Release-tree scope and exclusion policy |
 | `PUBLIC_RELEASE_MANIFEST.json` | Generated manifest with copied paths, byte counts, and SHA-256 hashes |
+| `PUBLIC_SYNC_SPEC.md` | Public sync process, audit gate, and required Markdown update checklist |
 | `ai_flow_generation_guide.md` | Prompt/context contract for AI-generated candidate FlowGraph JSON |
 | `CHANGELOG.md` | Release notes and verification history |
 

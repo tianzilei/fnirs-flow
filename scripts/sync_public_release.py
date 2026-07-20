@@ -25,6 +25,7 @@ from pathlib import Path
 ROOT_FILES = [
     ".gitignore",
     "CHANGELOG.md",
+    "PUBLIC_SYNC_SPEC.md",
     "README.md",
     "ai_flow_generation_guide.md",
     "cli.py",
