@@ -42,6 +42,14 @@ Excluded content must never be present in the public repository:
 The public repository owns `.git/`, `.github/`, and `.gitattributes`; a clean
 sync preserves these paths.
 
+## Language Policy
+
+The public repository uses English for all documentation and code comments.
+Public Markdown, reStructuredText, inline comments, block comments, and
+docstrings must not introduce Chinese text. If upstream private notes contain
+Chinese descriptions, translate them to clear English before syncing or
+committing the public repository.
+
 ## Sync Command
 
 Run from the development repository root.
@@ -71,6 +79,8 @@ public verification surface.
   `THIRD_PARTY_NOTICES.md`.
 - Any claim about test counts, backend support, datasets, or limitations is
   current and supported by the latest validation run.
+- Documentation, comments, and docstrings in public files have been reviewed for
+  English-only wording.
 
 ## Post-Sync Audit
 
@@ -137,6 +147,7 @@ Commit or push the public repository only when:
 
 - The post-sync audit is complete.
 - Required public Markdown has been reviewed and updated.
+- Public documentation and code comments use English only.
 - `git status --short` contains only intentional release changes.
 - The public repository can be understood without access to the private
   development repository.

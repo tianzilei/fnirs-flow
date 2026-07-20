@@ -336,7 +336,8 @@ class ExecutionService:
         failure_store.write_json(dirs["logs"])
         failure_store.write_csv(dirs["logs"])
 
-        # Write dependency provenance (§16 MVP: 运行产物记录实际依赖与后端版本)
+        # Write dependency provenance.
+        # §16 MVP: runtime artifacts record actual dependency and backend versions.
         self._write_dependency_provenance(compiled_dir, dirs["logs"], dag)
 
         # Generate group summary across subjects
@@ -1951,7 +1952,7 @@ class ExecutionService:
     ) -> None:
         """Write dependency provenance for the execution.
 
-        §16 MVP: 运行产物记录实际依赖与后端版本
+        §16 MVP: runtime artifacts record actual dependency and backend versions.
         §11: environment_manifest.json, backend_probe.json
         """
         import platform

@@ -216,7 +216,8 @@ def write_outputs(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def write_report(summary: dict[str, Any]) -> None:
     matrix_rows = [
-        "| SCI 阈值 | 最低通道通过率 | 通过 run | 失败 run | 通过比例 |",
+        "| SCI threshold | Minimum channel pass rate | Passing runs | "
+        "Failing runs | Pass fraction |",
         "|---:|---:|---:|---:|---:|",
     ]
     for row in summary["gate_matrix"]:
@@ -224,39 +225,44 @@ def write_report(summary: dict[str, Any]) -> None:
             f"| {row['sci_threshold']:.1f} | {row['min_pass_rate']:.1f} | "
             f"{row['passed_runs']} | {row['failed_runs']} | {row['pass_fraction']:.1%} |"
         )
-    task_rows = ["| 任务 | 通过 | 失败 | 数据无效 |", "|---|---:|---:|---:|"]
+    task_rows = ["| Task | Passed | Failed | Invalid data |", "|---|---:|---:|---:|"]
     for task, counts in summary["baseline_task_counts"].items():
         task_rows.append(
             f"| {task} | {counts.get('passed', 0)} | {counts.get('failed', 0)} | "
             f"{counts.get('data_invalid', 0)} |"
         )
-    text = f"""# ds007738 QC 敏感性分析
+    text = f"""# ds007738 QC Sensitivity Analysis
 
-生成时间：{summary['created_at']}
+Generated: {summary['created_at']}
 
-## 结论
+## Findings
 
-- 共检查 {summary['total_runs']} 个 run，其中 {summary['readable_runs']} 个可读取。
-- 预设主分析门槛（SCI ≥ 0.8，至少 50% 通道通过）保留
-  {summary['baseline']['passed_runs']} 个 run，排除 {summary['baseline']['failed_runs']} 个 run。
-- 重新计算结果与完整分析的门控结果一致：{summary['baseline_matches_full_analysis']}。
-- 不建议仅为增加样本量而降低阈值；替代门槛只能作为敏感性分析，并需在解释中披露。
+- Checked {summary['total_runs']} runs; {summary['readable_runs']} were readable.
+- The preset main-analysis gate (SCI >= 0.8 and at least 50% passing channels)
+  retained {summary['baseline']['passed_runs']} runs and excluded
+  {summary['baseline']['failed_runs']} runs.
+- The recalculated results match the full-analysis gating results:
+  {summary['baseline_matches_full_analysis']}.
+- Lowering thresholds only to increase sample size is not recommended.
+  Alternative gates should be treated as sensitivity analyses and disclosed in
+  interpretation.
 
-## 门槛敏感性矩阵
+## Gate Sensitivity Matrix
 
 {chr(10).join(matrix_rows)}
 
-## 主分析门槛的任务分布
+## Task Distribution Under the Main-Analysis Gate
 
 {chr(10).join(task_rows)}
 
-## 运行环境
+## Runtime Environment
 
 ```json
 {json.dumps(summary['versions'], indent=2)}
 ```
 
-机器可读结果位于 `outputs/ds007738_full_analysis/qc_sensitivity/`。
+Machine-readable results are in
+`outputs/ds007738_full_analysis/qc_sensitivity/`.
 """
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(text, encoding="utf-8")

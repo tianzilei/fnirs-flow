@@ -186,7 +186,7 @@ LOCALIZATION_PROJECTION_IMPORT = MethodAtomTemplate(
     description="Import a prepared localization/projection CSV as standardized MNI channel coordinates",
     default_config={
         "path": (
-            "Sample/privatedata/定位/usable_projection_csv/"
+            "Sample/privatedata/positioning/usable_projection_csv/"
             "Protocol02_QYZ_optimized_10-20MNI_projection_coordinates.csv"
         ),
         "coordinate_set_id": "Protocol02_QYZ_optimized_10-20MNI",
@@ -215,7 +215,7 @@ NIRS_SPM_SURFACE_PROJECTION = MethodAtomTemplate(
     ),
     default_config={
         "path": (
-            "Sample/privatedata/定位/usable_projection_csv/"
+            "Sample/privatedata/positioning/usable_projection_csv/"
             "G1_shouzhen_ch01_ch42_projection_coordinates.csv"
         ),
         "reference_dir": "References/NIRS_SPM_v4_r1",

@@ -1826,7 +1826,7 @@ async def list_backends():
 async def resolve_dependencies_endpoint(project_id: str):
     """Resolve dependencies for a project's compiled flow.
 
-    §9.1: resolve 永远是只读操作
+    §9.1: resolve is always a read-only operation.
     """
     from fnirs_flow.api.transaction import ProjectTransaction
 

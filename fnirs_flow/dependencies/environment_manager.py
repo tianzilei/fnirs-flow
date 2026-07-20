@@ -207,7 +207,7 @@ class EnvironmentManager:
         This creates the staging directory. The environment is not published
         until publish_environment() is called.
 
-        §8.1: 环境创建和安装在独立进程中完成
+        §8.1: Environment creation and installation run in a separate process.
         """
         env_id = self._compute_environment_id(profile_id, lock_fingerprint)
         env_path = self.get_environment_path(profile_id, lock_fingerprint)
@@ -237,7 +237,7 @@ class EnvironmentManager:
     def publish_environment(self, profile_id: str, lock_fingerprint: str) -> bool:
         """Publish an environment by atomic rename.
 
-        §8.1: 安装成功后通过原子重命名发布
+        §8.1: Successful installations are published by atomic rename.
         """
         env_id = self._compute_environment_id(profile_id, lock_fingerprint)
         env_path = self.get_environment_path(profile_id, lock_fingerprint)
@@ -270,7 +270,7 @@ class EnvironmentManager:
     def quarantine_environment(self, profile_id: str, lock_fingerprint: str, error: str = "") -> bool:
         """Move a failed environment to quarantine.
 
-        §8.1: 失败环境进入 quarantine 或清理队列
+        §8.1: Failed environments enter quarantine or the cleanup queue.
         """
         env_id = self._compute_environment_id(profile_id, lock_fingerprint)
         env_path = self.get_environment_path(profile_id, lock_fingerprint)
@@ -303,7 +303,7 @@ class EnvironmentManager:
     def remove_environment(self, profile_id: str, lock_fingerprint: str) -> bool:
         """Remove an environment.
 
-        §8.2: 可取消性和删除环境的方法
+        §8.2: Cancellability and environment removal.
         """
         env_id = self._compute_environment_id(profile_id, lock_fingerprint)
         env_path = self.get_environment_path(profile_id, lock_fingerprint)
@@ -374,7 +374,7 @@ class EnvironmentManager:
     ) -> str:
         """Compute a stable fingerprint for lock file.
 
-        §8.4: 以 (profile_id, lock_fingerprint) 为键
+        §8.4: Keyed by (profile_id, lock_fingerprint).
         """
         data = {
             "profile_id": profile_id,

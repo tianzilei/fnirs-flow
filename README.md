@@ -1,110 +1,116 @@
 # fnirs-flow
 
-GUI-enabled fNIRS analysis toolbox + reproducibility framework。用 Flow 编排预处理、验证、执行和复现，基于 MNE-NIRS 执行后端。
+GUI-enabled fNIRS analysis toolbox and reproducibility framework. fnirs-flow
+uses Flow graphs to orchestrate preprocessing, validation, execution, and
+reproducibility workflows with an MNE-NIRS execution backend.
 
 **v1.2.0** | 1068 source-tree tests passing | Python 3.10+
 
 ---
 
-## 快速开始
+## Quick Start
 
-### 安装
+### Installation
 
 ```bash
-# 基础安装（仅核心模型和验证）
+# Basic installation for core models and validation
 pip install -e .
 
-# 完整安装（含 MNE-NIRS 执行、API、ML）
+# Full installation with MNE-NIRS execution, API, and ML support
 pip install -e ".[full]"
 
-# 含 Cedalion 26.5.1 后端（需要 Python 3.11+ 和 Git）
+# Cedalion 26.5.1 backend support; requires Python 3.11+ and Git
 pip install -e ".[full,cedalion]"
 
-# 或用 conda
+# Or use conda
 conda env create -f environment.yml
 ```
 
-### 后端懒加载
+### Backend Lazy Loading
 
-fnirs-flow 采用**懒加载（lazy loading）**架构，后端按需加载：
+fnirs-flow uses a lazy-loading architecture. Backends load only when needed:
 
-| 场景 | 行为 |
-|------|------|
-| 导入库/浏览 MethodAtom | **不加载**任何后端（MNE/Cedalion） |
-| 编译 Flow | **不加载**后端，仅读取元数据 |
-| 执行 MNE MethodAtom | 按需加载 MNE-NIRS |
-| 执行 Cedalion MethodAtom | 按需加载 Cedalion |
-| Cedalion 未安装 | 返回结构化错误，**不回退**到 MNE，**不自动安装** |
+| Scenario | Behavior |
+|---|---|
+| Import library or browse MethodAtoms | Does not load any backend (MNE/Cedalion) |
+| Compile a Flow | Does not load backends; reads metadata only |
+| Execute an MNE MethodAtom | Loads MNE-NIRS on demand |
+| Execute a Cedalion MethodAtom | Loads Cedalion on demand |
+| Cedalion is not installed | Returns a structured error; does not fall back to MNE and does not auto-install |
 
-**性能基准**：
-- 启动时间（导入核心模块）：< 0.5s
-- `describe()` / `is_available()` 调用：< 0.1ms（100 次 < 4ms）
-- 内存开销：仅导入后端时增加
+**Performance baseline**:
 
-**检查后端状态**：
+- Startup time for importing core modules: < 0.5s
+- `describe()` / `is_available()` calls: < 0.1ms; 100 calls < 4ms
+- Memory overhead increases only when a backend is imported
+
+**Check backend status**:
+
 ```bash
 python cli.py backends
 ```
 
-### 三步上手
+### Three-Step Workflow
 
 ```bash
-# 1. 验证一个 flow 配置
+# 1. Validate a flow configuration
 python cli.py validate configs/demo_task_glm_real.json
 
-# 2. 编译为可执行计划
+# 2. Compile it into an executable plan
 python cli.py compile configs/demo_task_glm_real.json --outdir outputs/demo
 
-# 3. 执行分析（需要 MNE-NIRS）
+# 3. Run the analysis; requires MNE-NIRS
 python cli.py run outputs/demo --outdir outputs/demo
 ```
 
-### 启动 WebUI
+### Start the WebUI
 
 ```bash
-# 方式一：生产模式（推荐）
+# Option 1: production mode (recommended)
 python cli.py webui
-# 首次运行会自动构建前端，之后直接从 FastAPI 提供静态文件
-# 访问 http://127.0.0.1:8000
+# The first run builds the frontend; later runs serve static files from FastAPI
+# Visit http://127.0.0.1:8000
 
-# 方式二：开发模式（前端热更新）
+# Option 2: development mode with frontend hot reload
 python cli.py webui --dev
-# 同时启动 Vite 开发服务器 + 后端
-# 前端: http://localhost:3000
-# 后端: http://127.0.0.1:8000
+# Starts both the Vite dev server and backend
+# Frontend: http://localhost:3000
+# Backend: http://127.0.0.1:8000
 
-# 方式三：分别启动前后端
-python -m uvicorn fnirs_flow.api.app:app --reload   # 后端 :8000
-cd webui && npm install && npm run dev               # 前端 :5173
+# Option 3: start frontend and backend separately
+python -m uvicorn fnirs_flow.api.app:app --reload   # Backend :8000
+cd webui && npm install && npm run dev               # Frontend :5173
 ```
 
-**CLI 参数**:
-- `--port PORT`：指定端口（默认 8000）
-- `--host HOST`：指定绑定地址（默认 127.0.0.1）
-- `--dev`：开发模式，启用前端热更新
+**CLI parameters**:
+
+- `--port PORT`: set the port; default is 8000
+- `--host HOST`: set the bind address; default is 127.0.0.1
+- `--dev`: enable development mode with frontend hot reload
 
 ---
 
-## CLI 参考
+## CLI Reference
 
-| 命令 | 用途 | 示例 |
+| Command | Purpose | Example |
 |---|---|---|
-| `validate` | 验证 flow JSON 是否合法 | `python cli.py validate configs/demo_task_glm_real.json` |
-| `compile` | 编译 flow → plan/dag/manifests | `python cli.py compile configs/demo_task_glm_real.json --outdir outputs/demo` |
-| `discover` | 发现并注册公开数据集 | `python cli.py discover bids-nirs-tapping --outdir outputs/demo` |
-| `dry-run` | 枚举所有 subject/session/run，不执行 | `python cli.py dry-run outputs/demo --outdir outputs/demo` |
-| `run` | 真实执行分析（MNE-NIRS） | `python cli.py run outputs/demo --outdir outputs/demo` |
-| `export` | 导出 reproducibility package | `python cli.py export outputs/demo --outdir outputs/demo` |
-| `rerun` | 重新执行已导入的 package | `python cli.py rerun outputs/imported_package` |
-| `import-homer3` | 导入 Homer3 配置 → fnirs-flow atoms | `python cli.py import-homer3 pipeline.cfg --outdir outputs/imported` |
-| `import-analyzir` | 导入 AnalyzIR R 脚本 → fnirs-flow atoms | `python cli.py import-analyzir pipeline.R --outdir outputs/imported` |
-| `export-homer3` | 导出 atoms → Homer3 配置 | `python cli.py export-homer3 atoms.json --outdir outputs/homer3` |
-| `export-analyzir` | 导出 atoms → AnalyzIR R 脚本 | `python cli.py export-analyzir atoms.json --outdir outputs/analyzir` |
-| `webui` | 启动 WebUI 服务器 | `python cli.py webui` 或 `python cli.py webui --dev` |
-| `backends` | 显示后端状态和能力 | `python cli.py backends` |
-| `verify-package` | 验证 .fnirsflow.zip 包完整性 | `python cli.py verify-package package.fnirsflow.zip` |
+| `validate` | Validate a flow JSON file | `python cli.py validate configs/demo_task_glm_real.json` |
+| `compile` | Compile a flow into plan, DAG, and manifests | `python cli.py compile configs/demo_task_glm_real.json --outdir outputs/demo` |
+| `discover` | Discover and register public datasets | `python cli.py discover bids-nirs-tapping --outdir outputs/demo` |
+| `dry-run` | Enumerate all subject/session/run combinations without execution | `python cli.py dry-run outputs/demo --outdir outputs/demo` |
+| `run` | Execute analysis with MNE-NIRS | `python cli.py run outputs/demo --outdir outputs/demo` |
+| `export` | Export a reproducibility package | `python cli.py export outputs/demo --outdir outputs/demo` |
+| `rerun` | Rerun an imported package | `python cli.py rerun outputs/imported_package` |
+| `import-homer3` | Import Homer3 configuration into fnirs-flow atoms | `python cli.py import-homer3 pipeline.cfg --outdir outputs/imported` |
+| `import-analyzir` | Import an AnalyzIR R script into fnirs-flow atoms | `python cli.py import-analyzir pipeline.R --outdir outputs/imported` |
+| `export-homer3` | Export atoms to Homer3 configuration | `python cli.py export-homer3 atoms.json --outdir outputs/homer3` |
+| `export-analyzir` | Export atoms to an AnalyzIR R script | `python cli.py export-analyzir atoms.json --outdir outputs/analyzir` |
+| `webui` | Start the WebUI server | `python cli.py webui` or `python cli.py webui --dev` |
+| `backends` | Show backend status and capabilities | `python cli.py backends` |
+| `verify-package` | Verify `.fnirsflow.zip` package integrity | `python cli.py verify-package package.fnirsflow.zip` |
 
-`run` 命令支持筛选：
+`run` supports filters:
+
 ```bash
 python cli.py run outputs/demo --outdir outputs/demo \
   --participant-label sub-01 sub-02 \
@@ -112,7 +118,8 @@ python cli.py run outputs/demo --outdir outputs/demo \
   --run-label run-01
 ```
 
-`export` 支持三种 profile：
+`export` supports three profiles:
+
 ```bash
 python cli.py export outputs/demo --outdir outputs/demo --profile reproducibility_package
 python cli.py export outputs/demo --outdir outputs/demo --profile submission_package
@@ -121,132 +128,141 @@ python cli.py export outputs/demo --outdir outputs/demo --profile reviewer_packa
 
 ---
 
-## 生成式 AI 接入
+## Generative AI Integration
 
-根目录的 `ai_flow_generation_guide.md` 是给 AI 系统的 prompt 上下文规范。把这份文档作为 model context 喂给 AI，它就能生成候选 `flow.json` 分析方案。
+The root-level `ai_flow_generation_guide.md` defines prompt context for AI
+systems. Provide that document as model context with a research description, and
+the AI can generate a candidate `flow.json` analysis plan.
 
-- AI 只输出候选 FlowGraph JSON，不生成可执行代码
-- 定义了输入字段（研究目标、数据格式、条件、对比等）和输出 schema
-- 包含 10 条硬性规则：不绕过验证、不编造文献、不包含 PHI/私有路径等
-- 生成的 flow 仍需通过 `validate_flow()` 才能执行
+- AI outputs candidate FlowGraph JSON only, not executable code.
+- The guide defines input fields such as research objective, data format,
+  conditions, contrasts, and output schema.
+- It includes 10 hard rules, including no validation bypass, no fabricated
+  citations, and no PHI or private paths.
+- Generated flows must still pass `validate_flow()` before execution.
 
-**用法**：将本文档内容作为 system prompt 或 context 提供给 AI，附上你的研究描述，AI 输出 `flow.json`。
+**Usage**: provide the guide as a system prompt or context, attach your research
+description, and ask the AI to output `flow.json`.
 
-示例 AI draft：`configs/ai_draft_task_glm.json`（task GLM 分析方案，含 `ai_generation` 元数据和 `requires_user_confirmation` 待确认项）。
+Example AI draft: `configs/ai_draft_task_glm.json`, a task GLM analysis plan
+with `ai_generation` metadata and `requires_user_confirmation` items.
 
-配套文档：
-- Generation guide：`ai_flow_generation_guide.md`
-- Example Flow：`configs/ai_draft_task_glm.json`
-- Public API spec：`docs/specs/fnirs_flow_public_api.md`
+Related documents:
+
+- Generation guide: `ai_flow_generation_guide.md`
+- Example Flow: `configs/ai_draft_task_glm.json`
+- Public API spec: `docs/specs/fnirs_flow_public_api.md`
 
 ---
 
-## 项目结构索引
+## Project Structure
 
-### 核心代码 — `fnirs_flow/`
+### Core Code: `fnirs_flow/`
 
-| 子包 | 文件 | 用途 |
+| Package | Files | Purpose |
 |---|---|---|
-| **flow/** | `atoms.py` `models.py` `schemas.py` `snapshots.py` `migration.py` `migrations/` | Flow 核心数据模型：`FlowAtom`、`AtomPort`、`FlowEdge`、`FlowGraph`、`ExecutionPlan`、`AIGenerationMetadata`；schema 定义与版本迁移 |
-| **compiler/** | `compiler.py` `execution_dag.py` `manifests.py` `hashing.py` | FlowGraph → `plan.json` + `execution_dag.json` + 各类 manifest 编译 |
-| **execution/** | `engine.py` `service.py` `batch.py` `operations.py` `batch_adapter.py` `provenance.py` `artifacts.py` `failures.py` | 执行引擎：dry-run 枚举、MNE-NIRS 真实执行、批处理、provenance/artifact/failure 追踪 |
-| **adapters/** | `mne_nirs_adapter.py` `mne_nirs_steps.py` `mne_nirs_io.py` `qc_metrics.py` `roi_mapping.py` `homer3_export.py` `homer3_import.py` `analyzir_export.py` `analyzir_import.py` `cedalion_adapter.py` `cedalion_steps.py` `cedalion_capabilities.py` `cedalion_io.py` | MNE-NIRS 完整链路 adapter；Cedalion 可选后端 adapter（26 个方法）；QC 指标；ROI 映射；Homer3/AnalyzIR 双向导入导出 |
-| **validation/** | `api.py` `graph.py` `adapters.py` `models.py` `state.py` `error_codes.py` | 图验证、adapter 兼容性、状态验证、结构化 error codes |
-| **registry/** | `atom_templates.py` `node_templates.py` `node_library.py` `scenarios.py` `evidence_store.py` `evidence_config.py` `risk_rules.py` `presets.py` `methods.py` `combat_diagnostics.py` | MethodAtom 模板库（113 个模板）、场景路由器、Evidence Store、风险规则、预设配置 |
-| **security/** | `models.py` `validation.py` | 执行信任分级、capability manifest、import quarantine、readiness check |
-| **exporters/** | `package_exporter.py` `package_importer.py` `outputs.py` `reports.py` `methods_report.py` `inclusion_audit.py` `reproducibility.py` `reportlets.py` | Reproducibility package 导出/导入、报告生成、纳入性审计 |
-| **api/** | `app.py` `models.py` `projects.py` `__init__.py` | FastAPI 后端：项目 CRUD、验证/编译/发现/执行/导出 REST API、SSE 进度推送 |
-| **data/** | `discovery.py` `manifest.py` `registry.py` | 公开数据集发现、data manifest、数据注册 |
+| **flow/** | `atoms.py` `models.py` `schemas.py` `snapshots.py` `migration.py` `migrations/` | Core Flow data models: `FlowAtom`, `AtomPort`, `FlowEdge`, `FlowGraph`, `ExecutionPlan`, `AIGenerationMetadata`; schema definitions and version migration |
+| **compiler/** | `compiler.py` `execution_dag.py` `manifests.py` `hashing.py` | Compile FlowGraph into `plan.json`, `execution_dag.json`, and manifest files |
+| **execution/** | `engine.py` `service.py` `batch.py` `operations.py` `batch_adapter.py` `provenance.py` `artifacts.py` `failures.py` | Execution engine for dry-run enumeration, real MNE-NIRS execution, batch processing, provenance, artifacts, and failure tracking |
+| **adapters/** | `mne_nirs_adapter.py` `mne_nirs_steps.py` `mne_nirs_io.py` `qc_metrics.py` `roi_mapping.py` `homer3_export.py` `homer3_import.py` `analyzir_export.py` `analyzir_import.py` `cedalion_adapter.py` `cedalion_steps.py` `cedalion_capabilities.py` `cedalion_io.py` | MNE-NIRS adapter path, optional Cedalion backend adapter with 26 methods, QC metrics, ROI mapping, and Homer3/AnalyzIR import/export |
+| **validation/** | `api.py` `graph.py` `adapters.py` `models.py` `state.py` `error_codes.py` | Graph validation, adapter compatibility, state validation, and structured error codes |
+| **registry/** | `atom_templates.py` `node_templates.py` `node_library.py` `scenarios.py` `evidence_store.py` `evidence_config.py` `risk_rules.py` `presets.py` `methods.py` `combat_diagnostics.py` | MethodAtom template library with 113 templates, scenario router, Evidence Store, risk rules, and preset configuration |
+| **security/** | `models.py` `validation.py` | Execution trust levels, capability manifests, import quarantine, and readiness checks |
+| **exporters/** | `package_exporter.py` `package_importer.py` `outputs.py` `reports.py` `methods_report.py` `inclusion_audit.py` `reproducibility.py` `reportlets.py` | Reproducibility package import/export, report generation, and inclusion audit |
+| **api/** | `app.py` `models.py` `projects.py` `__init__.py` | FastAPI backend for project CRUD, validation, compilation, discovery, execution, export REST APIs, and SSE progress updates |
+| **data/** | `discovery.py` `manifest.py` `registry.py` | Public dataset discovery, data manifest handling, and data registration |
 
-### 前端 — `webui/`
+### Frontend: `webui/`
 
-React + Vite，通过 `src/api/client.ts` 调用后端 API。
+React + Vite frontend that calls the backend API through `src/api/client.ts`.
 
-| 路径 | 用途 |
+| Path | Purpose |
 |---|---|
-| `src/components/AppShell.tsx` | 应用外壳：导航栏、工具栏、状态条 |
-| `src/components/FlowCanvas.tsx` | Flow 画布主组件（React Flow） |
-| `src/components/Sidebar.tsx` | 侧边栏：MethodAtom 库、配置面板 |
-| `src/components/ParameterPanel.tsx` | 参数编辑面板 |
-| `src/components/ValidationPanel.tsx` | 验证结果展示 |
-| `src/components/DagLayerPreview.tsx` | DAG 层级预览 |
-| `src/pages/ProjectWorkspace.tsx` | 项目工作区 |
-| `src/pages/FlowBuilder.tsx` | Flow 构建器 |
-| `src/pages/AtomLibrary.tsx` | MethodAtom 库浏览 |
-| `src/pages/DataWorkspace.tsx` | 数据工作区 |
-| `src/pages/ValidationDashboard.tsx` | 验证仪表板 |
-| `src/pages/CompileSummary.tsx` | 编译摘要 |
-| `src/pages/RunMonitor.tsx` | 执行监控（SSE 实时进度） |
-| `src/pages/ResultsWorkspace.tsx` | 结果浏览（artifacts/QC/channel/ROI/group） |
-| `src/pages/ExportPackage.tsx` | 导出 package（含 profile 选择） |
-| `src/pages/ImportPackage.tsx` | 导入 package（含 quarantine 管理） |
-| `src/pages/SystemDiagnostics.tsx` | 系统诊断 |
+| `src/components/AppShell.tsx` | Application shell with navigation, toolbar, and status bar |
+| `src/components/FlowCanvas.tsx` | Main Flow canvas component using React Flow |
+| `src/components/Sidebar.tsx` | Sidebar for the MethodAtom library and configuration panels |
+| `src/components/ParameterPanel.tsx` | Parameter editing panel |
+| `src/components/ValidationPanel.tsx` | Validation results panel |
+| `src/components/DagLayerPreview.tsx` | DAG layer preview |
+| `src/pages/ProjectWorkspace.tsx` | Project workspace |
+| `src/pages/FlowBuilder.tsx` | Flow builder |
+| `src/pages/AtomLibrary.tsx` | MethodAtom library browser |
+| `src/pages/DataWorkspace.tsx` | Data workspace |
+| `src/pages/ValidationDashboard.tsx` | Validation dashboard |
+| `src/pages/CompileSummary.tsx` | Compile summary |
+| `src/pages/RunMonitor.tsx` | Execution monitor with SSE progress |
+| `src/pages/ResultsWorkspace.tsx` | Results browser for artifacts, QC, channel, ROI, and group outputs |
+| `src/pages/ExportPackage.tsx` | Package export with profile selection |
+| `src/pages/ImportPackage.tsx` | Package import with quarantine management |
+| `src/pages/SystemDiagnostics.tsx` | System diagnostics |
 
-### 测试 — `tests/`
+### Tests: `tests/`
 
-61 个测试模块；公开发布树当前为 958 passed、5 skipped。私有工作树包含本地
-样例数据时，额外执行 1 项数据发现测试。测试覆盖核心链路：
+The public release tree currently has 61 test modules with 958 passed and 5
+skipped tests. The private development tree runs one additional dataset
+discovery test when local sample data is available. Tests cover the core path:
 
-| 测试文件 | 覆盖范围 |
+| Test Files | Coverage |
 |---|---|
-| `test_flow_models.py` `test_flow_atom_models.py` | Flow 数据模型 |
-| `test_graph_validation.py` `test_adapter_validation.py` `test_validation_api.py` | 图验证、adapter 兼容性 |
-| `test_compiler.py` `test_compile_gate.py` | Flow 编译 |
+| `test_flow_models.py` `test_flow_atom_models.py` | Flow data models |
+| `test_graph_validation.py` `test_adapter_validation.py` `test_validation_api.py` | Graph validation and adapter compatibility |
+| `test_compiler.py` `test_compile_gate.py` | Flow compilation |
 | `test_mne_adapter.py` `test_sprint_c_adapter.py` | MNE-NIRS adapter |
-| `test_homer3_bidirectional.py` | Homer3 双向导入/导出 |
-| `test_analyzir_bidirectional.py` | AnalyzIR 双向导入/导出 |
-| `test_cross_backend_integration.py` | Homer3↔AnalyzIR 跨 backend 全链路集成 |
-| `test_cli_adapters.py` | adapter CLI 命令端到端 |
-| `test_batch_runner.py` `test_execution_service.py` `test_sprint_b_execution.py` | 批处理、执行引擎 |
-| `test_api.py` `test_api_export.py` | REST API、导出 |
-| `test_dataset_discovery.py` | 数据集发现 |
-| `test_security_models.py` `test_security_validation.py` | 安全模型、quarantine |
-| `test_state_validation.py` | 状态验证 |
-| `test_golden_outputs.py` `test_enhanced_reports.py` `test_reports_package.py` | 输出产物、报告 |
-| `test_project_persistence.py` `test_snapshots.py` | 项目持久化、快照 |
-| `test_schema_migration.py` `test_migration_roundtrip.py` `test_migration_roundtrip_v2.py` | Schema 迁移 |
-| `test_sprint_e_interop.py` `test_sprint_e_interop.py` | 互操作性 |
-| `test_dryrun_report.py` `test_qc_roi_outputs.py` | Dry-run 报告、QC/ROI |
-| `test_node_library.py` `test_atom_library.py` `test_registry.py` | 模板库、注册表 |
-| `test_scenarios.py` | 场景路由 |
-| `test_cli.py` | CLI 命令 |
-| `test_smoke.py` | 冒烟测试 |
+| `test_homer3_bidirectional.py` | Homer3 bidirectional import/export |
+| `test_analyzir_bidirectional.py` | AnalyzIR bidirectional import/export |
+| `test_cross_backend_integration.py` | Homer3 to AnalyzIR cross-backend integration |
+| `test_cli_adapters.py` | Adapter CLI end-to-end commands |
+| `test_batch_runner.py` `test_execution_service.py` `test_sprint_b_execution.py` | Batch processing and execution engine |
+| `test_api.py` `test_api_export.py` | REST API and export |
+| `test_dataset_discovery.py` | Dataset discovery |
+| `test_security_models.py` `test_security_validation.py` | Security models and quarantine |
+| `test_state_validation.py` | State validation |
+| `test_golden_outputs.py` `test_enhanced_reports.py` `test_reports_package.py` | Output artifacts and reports |
+| `test_project_persistence.py` `test_snapshots.py` | Project persistence and snapshots |
+| `test_schema_migration.py` `test_migration_roundtrip.py` `test_migration_roundtrip_v2.py` | Schema migration |
+| `test_sprint_e_interop.py` | Interoperability |
+| `test_dryrun_report.py` `test_qc_roi_outputs.py` | Dry-run reports and QC/ROI outputs |
+| `test_node_library.py` `test_atom_library.py` `test_registry.py` | Template library and registry |
+| `test_scenarios.py` | Scenario routing |
+| `test_cli.py` | CLI commands |
+| `test_smoke.py` | Smoke tests |
 
-运行测试：
+Run tests:
+
 ```bash
-pytest                    # 全部
-pytest tests/test_api.py  # 单个模块
-pytest -k "mne"           # 按关键词
+pytest                    # All tests
+pytest tests/test_api.py  # One module
+pytest -k "mne"           # Keyword filter
 ```
 
-### 配置 — `configs/`
+### Configuration: `configs/`
 
-| 文件 | 用途 |
+| File | Purpose |
 |---|---|
-| `demo_task_glm_real.json` | 主 demo：任务态 GLM 完整 flow（推荐入门） |
-| `ai_draft_task_glm.json` | AI 生成的 task GLM 候选 flow（含 ai_generation 元数据） |
-| `demo_resting_state_flow.json` | 静息态 flow 示例 |
-| `demo_ml_validation_flow.json` | 机器学习验证 flow 示例 |
-| `demo_task_flow.json` | 基础任务态 flow |
-| `demo_task_flow_v0_2_method_atoms.json` | MethodAtom 版任务态 flow |
-| `evidence_backed_presets.json` | 基于文献证据的预设参数 |
-| `example_task_study.json` | 简单任务态研究配置 |
+| `demo_task_glm_real.json` | Main demo: complete task GLM flow, recommended starting point |
+| `ai_draft_task_glm.json` | AI-generated task GLM candidate flow with `ai_generation` metadata |
+| `demo_resting_state_flow.json` | Resting-state flow example |
+| `demo_ml_validation_flow.json` | Machine-learning validation flow example |
+| `demo_task_flow.json` | Basic task-state flow |
+| `demo_task_flow_v0_2_method_atoms.json` | MethodAtom-based task-state flow |
+| `evidence_backed_presets.json` | Preset parameters backed by literature evidence |
+| `example_task_study.json` | Simple task-state study configuration |
 
-### Schema — `schemas/`
+### Schemas: `schemas/`
 
-| 文件 | 定义 |
+| File | Definition |
 |---|---|
-| `fnirs_flow.schema.json` | Flow JSON 主 schema |
-| `capability_manifest.schema.json` | 原子能力声明 schema |
-| `risk_item.schema.json` | 风险项 schema |
-| `action_attempt.schema.json` | 执行尝试记录 schema |
-| `project_snapshot.schema.json` | 项目快照 schema |
-| `readiness_result.schema.json` | 就绪检查结果 schema |
-| `literature_flow_evidence.schema.json` | 文献→Flow 证据映射 schema |
+| `fnirs_flow.schema.json` | Main Flow JSON schema |
+| `capability_manifest.schema.json` | Atom capability declaration schema |
+| `risk_item.schema.json` | Risk item schema |
+| `action_attempt.schema.json` | Action attempt record schema |
+| `project_snapshot.schema.json` | Project snapshot schema |
+| `readiness_result.schema.json` | Readiness check result schema |
+| `literature_flow_evidence.schema.json` | Literature-to-Flow evidence mapping schema |
 
-### 脚本 — `scripts/`
+### Scripts: `scripts/`
 
-| 文件 | 用途 |
+| File | Purpose |
 |---|---|
 | `analyze_ds007738_qc_sensitivity.py` | ds007738 QC sensitivity analysis |
 | `audit_ds007738_outputs.py` | ds007738 output audit |
@@ -254,11 +270,11 @@ pytest -k "mne"           # 按关键词
 | `build_ds007738_exclusion_manifests.py` | ds007738 exclusion manifest builder |
 | `compare_ds007738_golden_rerun.py` | ds007738 golden rerun comparison |
 | `run_ds007738_full_analysis.py` | ds007738 full-pipeline analysis entry point |
-| `sync_public_release.py` | 公开版本同步 |
+| `sync_public_release.py` | Public release sync script |
 
-### 文档 — `docs/`
+### Documentation: `docs/`
 
-| 文件 | 用途 |
+| File | Purpose |
 |---|---|
 | `README.md` | Public documentation index |
 | `specs/fnirs_flow_public_api.md` | Public API and package concepts |
@@ -266,58 +282,63 @@ pytest -k "mne"           # 按关键词
 | `specs/package_profile_spec.md` | Submission, reviewer, and reproducibility profiles |
 | `specs/mvp_task_glm_acceptance_checklist.md` | Task-GLM MVP acceptance checklist |
 
-### 根目录文件
+### Root Files
 
-| 文件 | 用途 |
+| File | Purpose |
 |---|---|
-| `cli.py` | CLI 入口点（`fnirs-flow` 命令） |
-| `pyproject.toml` | Python 项目配置（依赖、ruff、mypy、pytest） |
-| `environment.yml` | Conda 环境定义 |
-| `ai_flow_generation_guide.md` | 生成式 AI flow 生成规范（prompt 上下文） |
-| `CHANGELOG.md` | 版本变更记录 |
-| `README.md` | 本文件 |
+| `cli.py` | CLI entry point for the `fnirs-flow` command |
+| `pyproject.toml` | Python project configuration for dependencies, ruff, mypy, and pytest |
+| `environment.yml` | Conda environment definition |
+| `ai_flow_generation_guide.md` | Generative AI flow-generation prompt context specification |
+| `CHANGELOG.md` | Version change log |
+| `README.md` | This file |
 | `PUBLIC_RELEASE.md` | Public release tree scope and exclusion strategy |
 | `PUBLIC_RELEASE_MANIFEST.json` | Generated file list, sizes, and SHA-256 hashes |
 
 ---
 
-## 执行链路
+## Execution Path
 
 ```text
 flow.json
-  → validate（图验证 + adapter 兼容性 + 后端能力检查）
-  → compile（plan.json + execution_dag.json + manifests + backend bindings）
-  → discover（数据集发现 + data_manifest.json）
-  → dry-run（枚举 subject/session/run）
-  → run（MNE-NIRS 或 Cedalion 执行）
-      read_run → optical_density → QC → motion_correction → filtering
-      → MBLL → design_matrix → GLM → contrast → channel_output → roi_output
-  → export（reproducibility package）
+  -> validate (graph validation + adapter compatibility + backend capability checks)
+  -> compile (plan.json + execution_dag.json + manifests + backend bindings)
+  -> discover (dataset discovery + data_manifest.json)
+  -> dry-run (enumerate subject/session/run)
+  -> run (MNE-NIRS or Cedalion execution)
+      read_run -> optical_density -> QC -> motion_correction -> filtering
+      -> MBLL -> design_matrix -> GLM -> contrast -> channel_output -> roi_output
+  -> export (reproducibility package)
 ```
 
-**后端选择**：
-- **MNE-NIRS**（默认）：通道空间处理、GLM、连接分析
-- **Cedalion**（可选）：DOT、头模型、信号分解、合成数据、ML 工具、摄影测量
+**Backend selection**:
 
-**混合后端 Flow**：支持在同一个 Flow 中混合使用 MNE 和 Cedalion MethodAtom，系统会按 MethodAtom 级别自动切换后端，每个后端实例在运行期间复用。
+- **MNE-NIRS** (default): channel-space processing, GLM, and connectivity
+  analysis
+- **Cedalion** (optional): DOT, head models, signal decomposition, synthetic
+  data, ML tools, and photogrammetry
+
+**Mixed-backend Flow**: one Flow can mix MNE and Cedalion MethodAtoms. The system
+switches backends automatically at MethodAtom granularity, and each backend
+instance is reused during runtime.
 
 ---
 
-## 核心概念
+## Core Concepts
 
-| 术语 | 含义 |
+| Term | Meaning |
 |---|---|
-| `MethodAtom` | 最小可组合方法单元（文献/方法学粒度）。当前库包含 113 个模板 |
-| `MethodAtomTemplate` | 可复用的 MethodAtom 蓝图 |
-| `FlowAtom` | Flow 中的 MethodAtom 实例 |
-| `AtomPort` | MethodAtom 的输入/输出端口 |
-| `FlowGraph` | 由 FlowAtom + edge 组成的分析流程图 |
-| `ExecutionPlan` | FlowGraph 编译后的可执行计划 |
-| `Evidence Store` | 文献提取证据的结构化存储 |
-| `Scenario` | 研究场景路由器（task/resting_state/real_world/hyperscanning/machine_learning） |
-| `Adapter` | 连接前后 MethodAtom 的输入输出转换器 |
-| `Cedalion Adapter` | Cedalion 可选后端 adapter，支持 DOT、信号分解、合成数据等独有功能 |
-| `Reproducibility Package` | 可传递、可复现的分析包（不含原始数据） |
+| `MethodAtom` | Smallest composable method unit at literature or methodology granularity. The current library contains 113 templates. |
+| `MethodAtomTemplate` | Reusable MethodAtom blueprint |
+| `FlowAtom` | MethodAtom instance inside a Flow |
+| `AtomPort` | MethodAtom input/output port |
+| `FlowGraph` | Analysis workflow graph built from FlowAtoms and edges |
+| `ExecutionPlan` | Executable plan compiled from a FlowGraph |
+| `Evidence Store` | Structured storage for extracted literature evidence |
+| `Scenario` | Research scenario router for `task`, `resting_state`, `real_world`, `hyperscanning`, and `machine_learning` |
+| `Adapter` | Converter between upstream and downstream MethodAtom inputs and outputs |
+| `Cedalion Adapter` | Optional Cedalion backend adapter with DOT, signal decomposition, synthetic data, and related backend-specific capabilities |
+| `Reproducibility Package` | Transferable, reproducible analysis package that excludes raw data |
 
 ---
 
@@ -334,7 +355,7 @@ published file list.
 
 ---
 
-## 参考规范
+## Reference Specifications
 
 - [NIRS-BIDS specification](https://bids-specification.readthedocs.io/en/stable/modality-specific-files/near-infrared-spectroscopy.html)
 - [BIDS Extended to fNIRS (Nature 2024)](https://www.nature.com/articles/s41597-024-04136-9)
