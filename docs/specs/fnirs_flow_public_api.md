@@ -17,21 +17,21 @@ Top-level flow container. Schema version `0.2.0`.
 | `flow_id` | `string` | yes | Unique flow identifier |
 | `name` | `string` | yes | Human-readable name |
 | `description` | `string` | no | Free-text description |
-| `nodes` | `list[FlowAtom]` | yes | Legacy field (backward-compatible) |
-| `flow_atoms` | `list[FlowAtom] \| null` | no | MethodAtom-first field (dual-write with `nodes`) |
+| `nodes` | `list[FlowAtom]` | yes | Compatibility field for older flows |
+| `flow_atoms` | `list[FlowAtom] \| null` | no | MethodAtom-first field; new writers should prefer this over `nodes` |
 | `edges` | `list[FlowEdge]` | yes | Directed edges between atoms |
 | `adapter_registry` | `list[AdapterDefinition]` | no | Registered adapters |
 | `metadata` | `FlowMetadata` | no | Author, tags, timestamps |
 
 ### FlowAtom
 
-Business-level flow atom instance (legacy alias: `FlowNode`).
+Business-level flow atom instance. `FlowNode` is a compatibility alias kept for older flows and migration code.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | `string` | yes | Unique atom instance ID |
-| `type` | `string` | yes | Atom type (legacy) |
-| `atom_type` | `string \| null` | no | MethodAtom-first type (synced with `type`) |
+| `type` | `string` | yes | Legacy atom type field; kept for compatibility |
+| `atom_type` | `string \| null` | no | MethodAtom-first type; new writers should emit this |
 | `template_id` | `string \| null` | no | Reference to atom library template |
 | `operation` | `string \| null` | no | Operation name |
 | `evidence_refs` | `list[string]` | no | Literature evidence references |

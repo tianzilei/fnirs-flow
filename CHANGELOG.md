@@ -2,6 +2,18 @@
 
 ## [1.2.0] - 2026-07-15
 
+### Verified — 2026-08-15 Public Sync
+
+- Clean public tree `pytest -q`: 1149 passed, 11 skipped
+- Development tree `pytest -q`: 1158 passed, 2 skipped; nine additional passes use excluded local real-data fixtures
+- `ruff check cli.py fnirs_flow tests scripts`: passed
+- `npm run test:unit`: 22 passed
+- `npm run build`: passed with the existing Vite chunk-size warning
+- Public release English-only gate: passed across all 287 whitelisted source files
+- Public release manifest self-check: all copied and generated file hashes matched
+- CI covers Python 3.10–3.13; Python 3.10 resolves MNE below 1.13
+- `npm audit --audit-level=moderate`: 0 vulnerabilities after compatible lockfile updates
+
 ### Added — 2026-07-18 Release Convergence
 
 - Flow Checklist guidance panel for Task GLM, resting-state connectivity, group analysis, and ML classification workflows

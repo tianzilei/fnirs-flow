@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [main, master]
   pull_request:
+    branches: [main, master]
 
 permissions:
   contents: read
@@ -10,21 +12,59 @@ permissions:
 jobs:
   python:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
-      - name: Install test dependencies
-        run: python -m pip install -e ".[dev]"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,mne,ml-motion,api]"
+
+      - name: Lint with Ruff
+        if: matrix.python-version == '3.12'
+        run: python -m ruff check cli.py fnirs_flow tests scripts
+
+      - name: Type check core profile
+        if: matrix.python-version == '3.12'
+        run: python -m mypy --config-file config/mypy/core.ini
+
+      - name: Type check MNE profile
+        if: matrix.python-version == '3.12'
+        run: python -m mypy --config-file config/mypy/mne.ini
+
+      - name: Type check Cedalion profile
+        if: matrix.python-version == '3.12'
+        run: python -m mypy --config-file config/mypy/cedalion.ini
+
       - name: Run tests
-        run: pytest -q
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+          MNE_HOME: ${{ runner.temp }}
+        run: python -m pytest --tb=short -q --cov=fnirs_flow --cov-report=term --cov-fail-under=75
+
+      - name: Audit Python dependencies
+        if: matrix.python-version == '3.12'
+        run: python -m pip_audit --skip-editable
+
       - name: Build distributions
+        if: matrix.python-version == '3.12'
         run: |
           python -m pip install build
           python -m build
+
       - name: Verify installed wheel CLI
+        if: matrix.python-version == '3.12'
         run: |
           python -m venv /tmp/fnirs-flow-wheel
           /tmp/fnirs-flow-wheel/bin/pip install dist/*.whl
@@ -33,17 +73,28 @@ jobs:
 
   webui:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: webui
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: webui/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: Build frontend
-        run: npm run build
+
+      - name: Install and build WebUI
+        working-directory: webui
+        run: |
+          npm ci
+          npm audit --audit-level=moderate
+          npm run test:unit
+          npm run build
+
+      - name: Install Playwright browser
+        working-directory: webui
+        run: npx playwright install --with-deps chromium
+
+      - name: Run WebUI browser tests
+        working-directory: webui
+        run: npm run test:e2e

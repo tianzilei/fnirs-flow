@@ -37,6 +37,7 @@ env/
 outputs/*
 !outputs/methodatom_library/
 *.html
+!webui/index.html
 *.htm
 *.xml
 *.pdf

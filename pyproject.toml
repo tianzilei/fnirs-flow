@@ -15,6 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 dependencies = [
@@ -30,7 +31,10 @@ webui = [
     "fnirs-flow[api]",
 ]
 mne = [
-    "mne>=1.6,<2.0",
+    # MNE 1.12 is the last release line supporting Python 3.10; the
+    # development branch after v1.12.0 requires Python 3.11 or newer.
+    "mne>=1.6,<1.13; python_version < '3.11'",
+    "mne>=1.6,<2.0; python_version >= '3.11'",
     "mne-nirs>=0.7,<1.0",
     "mne-bids>=0.15,<1.0",
     "numpy>=1.24,<2.0",

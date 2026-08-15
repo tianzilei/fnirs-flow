@@ -15,6 +15,9 @@ This document defines how MethodAtom templates control parameter editing in the 
 
 The `/api/atom-templates` endpoint returns both fields for each template. When a template is dropped onto the canvas, the WebUI stores these fields in the atom metadata so the created atom carries its own parameter UI contract.
 
+Older template records may still expose `NodeTemplate`-era names through the
+compatibility layer, but new templates and docs should use `MethodAtomTemplate`.
+
 ## Parameter Options
 
 Use `parameter_options` when a parameter should be selected from a fixed set.
@@ -102,4 +105,3 @@ When adding a MethodAtom, keep the UI contract beside the atom definition:
 2. Put fixed choices in `parameter_options`.
 3. Put control/range/grouping/help text in `parameter_specs`.
 4. Add or update tests if the parameter UI contract is important for that atom.
-

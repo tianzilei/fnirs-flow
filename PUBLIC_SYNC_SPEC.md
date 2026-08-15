@@ -19,7 +19,7 @@ Included content:
 - Public source directories: `config/`, `configs/`, `fnirs_flow/`, `schemas/`,
   and `tests/`
 - WebUI release source: selected `webui/` package metadata, Vite/TypeScript
-  configuration, `webui/src/`, and `webui/e2e/`
+  configuration, `webui/src/`, `webui/tests/`, and `webui/e2e/`
 - Public documentation: `docs/README.md`,
   `docs/specs/fnirs_flow_public_api.md`,
   `docs/specs/method_atom_parameter_ui_contract.md`,

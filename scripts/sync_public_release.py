@@ -64,6 +64,7 @@ WEBUI_FILES = [
 WEBUI_DIRS = [
     "webui/e2e",
     "webui/src",
+    "webui/tests",
 ]
 
 PUBLIC_DOC_FILES = [
@@ -285,6 +286,43 @@ def validate_plan(plan: list[CopyItem], target: Path) -> None:
         raise SystemExit(f"Refusing to copy duplicate target path(s): {sample}")
 
 
+def _contains_han(text: str) -> bool:
+    """Return whether text contains a CJK unified ideograph."""
+    return any(
+        "\u3400" <= char <= "\u4dbf"
+        or "\u4e00" <= char <= "\u9fff"
+        or "\uf900" <= char <= "\ufaff"
+        for char in text
+    )
+
+
+def validate_english_public_text(plan: list[CopyItem]) -> None:
+    """Reject public source files that contain Chinese text.
+
+    The public repository has an English-only policy for documentation,
+    comments, docstrings, configuration labels, and user-facing strings. The
+    release whitelist contains text source files only, so every selected file
+    is checked before the target tree is cleaned or written.
+    """
+    violations: list[str] = []
+    for item in plan:
+        try:
+            lines = item.source.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError as exc:
+            raise SystemExit(f"Public release source is not UTF-8 text: {item.source}") from exc
+        for line_number, line in enumerate(lines, start=1):
+            if _contains_han(line):
+                violations.append(f"{item.source}:{line_number}")
+
+    if violations:
+        sample = ", ".join(violations[:20])
+        suffix = "" if len(violations) <= 20 else f" (+{len(violations) - 20} more)"
+        raise SystemExit(
+            "English-only public release policy violation; Chinese text found at: "
+            f"{sample}{suffix}"
+        )
+
+
 def audit_target(target: Path, dry_run: bool) -> None:
     if dry_run or not target.exists():
         return
@@ -347,7 +385,8 @@ def write_release_readme(target: Path, dry_run: bool) -> None:
     if dry_run:
         print(f"would write {path}")
         return
-    path.write_text(PUBLIC_RELEASE_README, encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(PUBLIC_RELEASE_README)
 
 
 def build_manifest(root: Path, target: Path, plan: list[CopyItem]) -> dict[str, object]:
@@ -387,7 +426,8 @@ def write_manifest(root: Path, target: Path, plan: list[CopyItem], dry_run: bool
         return
 
     manifest = build_manifest(root, target, plan)
-    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
 
 
 def parse_args() -> argparse.Namespace:
@@ -441,6 +481,7 @@ def main() -> int:
     validate_required_sources(root, args.dry_run)
     plan = build_copy_plan(root, target)
     validate_plan(plan, target)
+    validate_english_public_text(plan)
     print(f"Source: {root}")
     print(f"Target: {target}")
     print(f"Files selected: {len(plan)}")

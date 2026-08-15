@@ -1,63 +1,49 @@
 # Documentation Index
 
-> Last updated: 2026-07-20
+> Last updated: 2026-08-15
 
-This public repository contains the code-oriented release tree for fnirs-flow.
-Private manuscript drafts, literature extraction worktables, sample datasets,
-generated outputs, reference repositories, local caches, and platform metadata
-are intentionally excluded.
+This page indexes the public documentation shipped with the release tree.
+Private research notes, literature worktables, generated outputs, caches, and
+platform metadata are excluded from the public release.
 
-## Public Docs
+## Start Here
 
-| Path | Purpose |
+| Path | Use |
 |---|---|
-| `docs/README.md` | Public documentation index |
-| `docs/specs/fnirs_flow_public_api.md` | Public Python/API surface and package concepts |
-| `docs/specs/method_atom_parameter_ui_contract.md` | MethodAtom-owned parameter UI metadata contract |
-| `docs/specs/package_profile_spec.md` | Submission, reviewer, and reproducibility package profiles |
-| `docs/specs/mvp_task_glm_acceptance_checklist.md` | Task-GLM MVP acceptance checklist |
-| `PUBLIC_RELEASE.md` | Release-tree scope and exclusion policy |
-| `PUBLIC_RELEASE_MANIFEST.json` | Generated manifest with copied paths, byte counts, and SHA-256 hashes |
-| `PUBLIC_SYNC_SPEC.md` | Public sync process, audit gate, and required Markdown update checklist |
-| `ai_flow_generation_guide.md` | Prompt/context contract for AI-generated candidate FlowGraph JSON |
-| `CHANGELOG.md` | Release notes and verification history |
+| `README.md` | Project entry point and quick start |
+| `CHANGELOG.md` | Release history and verification evidence |
+| `PUBLIC_SYNC_SPEC.md` | Public-tree sync policy and audit checklist |
+| `PUBLIC_RELEASE.md` | Public release scope and exclusions |
+| `PUBLIC_RELEASE_MANIFEST.json` | Generated release manifest |
+| `ai_flow_generation_guide.md` | Prompt contract for AI-generated candidate flows |
+| `docs/specs/fnirs_flow_public_api.md` | Public API and package concepts |
+| `docs/specs/method_atom_parameter_ui_contract.md` | Parameter UI metadata contract |
+| `docs/specs/package_profile_spec.md` | Package profile definitions |
+| `docs/specs/mvp_task_glm_acceptance_checklist.md` | Task-GLM acceptance checklist |
 
-## Current Capabilities
+## Public Surface
 
-### Core
-
-- Flow/MethodAtom models, graph validation, compiler, risk register, and reporting checklist
-- Backend abstraction through BackendProtocol, BackendRegistry, and BackendBinding
-- MNE-NIRS execution path and optional Cedalion adapter capabilities
+- Flow/MethodAtom models, graph validation, compiler, execution, exporters, registry, security, and data helpers
+- MNE-NIRS execution path with optional Cedalion-backed adapters
 - Homer3 and AnalyzIR import/export adapters
-- Security model for trust levels, capability manifests, quarantine, and readiness checks
-
-### Execution
-
-- Task-GLM fNIRS execution chain: read_run -> optical_density -> QC -> motion_correction -> filtering -> MBLL -> design_matrix -> GLM -> contrast -> channel_output -> roi_output
-- BIDS events TSV parsing for design matrix construction
-- Structured artifact, provenance, failure, QC, channel, ROI, and group-level outputs
 - Package export/import/rerun with portable URI relinking
 
-### WebUI
-
-- Project workspace, Flow builder, MethodAtom library, data import, validation, compile summary, run monitor, results browser, import/export package views, and diagnostics
-- MethodAtom-owned parameter controls through `parameter_options` and `parameter_specs`
-- Checklist guidance for Task GLM, resting-state connectivity, group analysis, and ML classification workflows
-- Checklist-to-Atom Library recommendations with priority actions, focus routing, and missing-input previews
-- Results Workspace tabs for artifacts, QC, channel, ROI, and group-level SVG/CSV/JSON outputs
-- Import quarantine handling and export profile selection for reproducibility, submission, and reviewer packages
+Compatibility aliases such as `FlowNode`, `NodeTemplate`, and `NodeLibrary`
+remain available only for older flows and migration code.
 
 ## Validation Baseline
 
-The latest release convergence recorded in `CHANGELOG.md` reports:
+The clean public release tree baseline is:
 
 ```text
-pytest -q                                  # 1126 passed, 1 skipped
-npm run test:unit                          # 9 passed
-npm run build -- --mode development        # passed with existing Vite chunk-size warning
-npx playwright test e2e/workflows.spec.ts  # 6 passed
+pytest -q                                  # 1149 passed, 11 skipped
+npm run test:unit                          # 22 passed
+npm run build                              # passed with existing Vite chunk-size warning
 ```
+
+The development tree baseline is 1158 passed and 2 skipped. Its nine additional
+passes use local real-data and sample-data fixtures that are intentionally
+excluded from the public release tree.
 
 For a public-tree lint pass, run:
 
@@ -73,9 +59,10 @@ ruff check cli.py fnirs_flow tests scripts
 | `webui/` | React + Vite WebUI source, package metadata, and Playwright specs |
 | `configs/` | Demo and evidence-backed FlowGraph configurations |
 | `schemas/` | Public JSON schemas |
-| `scripts/` | Public runtime, benchmark, audit, ds007738, and release-sync scripts |
+| `scripts/` | Public runtime, benchmark, audit, and release-sync scripts |
 | `tests/` | Public test suite |
 | `config/` | Tooling configuration |
+| `LICENSE` / `THIRD_PARTY_NOTICES.md` / `PUBLIC_RELEASE.md` / `PUBLIC_RELEASE_MANIFEST.json` | Release metadata and notices |
 
 ## Commands
 

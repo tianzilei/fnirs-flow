@@ -4,7 +4,7 @@ GUI-enabled fNIRS analysis toolbox and reproducibility framework. fnirs-flow
 uses Flow graphs to orchestrate preprocessing, validation, execution, and
 reproducibility workflows with an MNE-NIRS execution backend.
 
-**v1.2.0** | 1068 source-tree tests passing | Python 3.10+
+**v1.2.0** | Public release baseline: `pytest -q` 1149 passed, 11 skipped | Python 3.10+
 
 ---
 
@@ -155,145 +155,13 @@ Related documents:
 
 ---
 
-## Project Structure
+## Documentation
 
-### Core Code: `fnirs_flow/`
-
-| Package | Files | Purpose |
-|---|---|---|
-| **flow/** | `atoms.py` `models.py` `schemas.py` `snapshots.py` `migration.py` `migrations/` | Core Flow data models: `FlowAtom`, `AtomPort`, `FlowEdge`, `FlowGraph`, `ExecutionPlan`, `AIGenerationMetadata`; schema definitions and version migration |
-| **compiler/** | `compiler.py` `execution_dag.py` `manifests.py` `hashing.py` | Compile FlowGraph into `plan.json`, `execution_dag.json`, and manifest files |
-| **execution/** | `engine.py` `service.py` `batch.py` `operations.py` `batch_adapter.py` `provenance.py` `artifacts.py` `failures.py` | Execution engine for dry-run enumeration, real MNE-NIRS execution, batch processing, provenance, artifacts, and failure tracking |
-| **adapters/** | `mne_nirs_adapter.py` `mne_nirs_steps.py` `mne_nirs_io.py` `qc_metrics.py` `roi_mapping.py` `homer3_export.py` `homer3_import.py` `analyzir_export.py` `analyzir_import.py` `cedalion_adapter.py` `cedalion_steps.py` `cedalion_capabilities.py` `cedalion_io.py` | MNE-NIRS adapter path, optional Cedalion backend adapter with 26 methods, QC metrics, ROI mapping, and Homer3/AnalyzIR import/export |
-| **validation/** | `api.py` `graph.py` `adapters.py` `models.py` `state.py` `error_codes.py` | Graph validation, adapter compatibility, state validation, and structured error codes |
-| **registry/** | `atom_templates.py` `node_templates.py` `node_library.py` `scenarios.py` `evidence_store.py` `evidence_config.py` `risk_rules.py` `presets.py` `methods.py` `combat_diagnostics.py` | MethodAtom template library with 113 templates, scenario router, Evidence Store, risk rules, and preset configuration |
-| **security/** | `models.py` `validation.py` | Execution trust levels, capability manifests, import quarantine, and readiness checks |
-| **exporters/** | `package_exporter.py` `package_importer.py` `outputs.py` `reports.py` `methods_report.py` `inclusion_audit.py` `reproducibility.py` `reportlets.py` | Reproducibility package import/export, report generation, and inclusion audit |
-| **api/** | `app.py` `models.py` `projects.py` `__init__.py` | FastAPI backend for project CRUD, validation, compilation, discovery, execution, export REST APIs, and SSE progress updates |
-| **data/** | `discovery.py` `manifest.py` `registry.py` | Public dataset discovery, data manifest handling, and data registration |
-
-### Frontend: `webui/`
-
-React + Vite frontend that calls the backend API through `src/api/client.ts`.
-
-| Path | Purpose |
-|---|---|
-| `src/components/AppShell.tsx` | Application shell with navigation, toolbar, and status bar |
-| `src/components/FlowCanvas.tsx` | Main Flow canvas component using React Flow |
-| `src/components/Sidebar.tsx` | Sidebar for the MethodAtom library and configuration panels |
-| `src/components/ParameterPanel.tsx` | Parameter editing panel |
-| `src/components/ValidationPanel.tsx` | Validation results panel |
-| `src/components/DagLayerPreview.tsx` | DAG layer preview |
-| `src/pages/ProjectWorkspace.tsx` | Project workspace |
-| `src/pages/FlowBuilder.tsx` | Flow builder |
-| `src/pages/AtomLibrary.tsx` | MethodAtom library browser |
-| `src/pages/DataWorkspace.tsx` | Data workspace |
-| `src/pages/ValidationDashboard.tsx` | Validation dashboard |
-| `src/pages/CompileSummary.tsx` | Compile summary |
-| `src/pages/RunMonitor.tsx` | Execution monitor with SSE progress |
-| `src/pages/ResultsWorkspace.tsx` | Results browser for artifacts, QC, channel, ROI, and group outputs |
-| `src/pages/ExportPackage.tsx` | Package export with profile selection |
-| `src/pages/ImportPackage.tsx` | Package import with quarantine management |
-| `src/pages/SystemDiagnostics.tsx` | System diagnostics |
-
-### Tests: `tests/`
-
-The public release tree currently has 61 test modules with 958 passed and 5
-skipped tests. The private development tree runs one additional dataset
-discovery test when local sample data is available. Tests cover the core path:
-
-| Test Files | Coverage |
-|---|---|
-| `test_flow_models.py` `test_flow_atom_models.py` | Flow data models |
-| `test_graph_validation.py` `test_adapter_validation.py` `test_validation_api.py` | Graph validation and adapter compatibility |
-| `test_compiler.py` `test_compile_gate.py` | Flow compilation |
-| `test_mne_adapter.py` `test_sprint_c_adapter.py` | MNE-NIRS adapter |
-| `test_homer3_bidirectional.py` | Homer3 bidirectional import/export |
-| `test_analyzir_bidirectional.py` | AnalyzIR bidirectional import/export |
-| `test_cross_backend_integration.py` | Homer3 to AnalyzIR cross-backend integration |
-| `test_cli_adapters.py` | Adapter CLI end-to-end commands |
-| `test_batch_runner.py` `test_execution_service.py` `test_sprint_b_execution.py` | Batch processing and execution engine |
-| `test_api.py` `test_api_export.py` | REST API and export |
-| `test_dataset_discovery.py` | Dataset discovery |
-| `test_security_models.py` `test_security_validation.py` | Security models and quarantine |
-| `test_state_validation.py` | State validation |
-| `test_golden_outputs.py` `test_enhanced_reports.py` `test_reports_package.py` | Output artifacts and reports |
-| `test_project_persistence.py` `test_snapshots.py` | Project persistence and snapshots |
-| `test_schema_migration.py` `test_migration_roundtrip.py` `test_migration_roundtrip_v2.py` | Schema migration |
-| `test_sprint_e_interop.py` | Interoperability |
-| `test_dryrun_report.py` `test_qc_roi_outputs.py` | Dry-run reports and QC/ROI outputs |
-| `test_node_library.py` `test_atom_library.py` `test_registry.py` | Template library and registry |
-| `test_scenarios.py` | Scenario routing |
-| `test_cli.py` | CLI commands |
-| `test_smoke.py` | Smoke tests |
-
-Run tests:
-
-```bash
-pytest                    # All tests
-pytest tests/test_api.py  # One module
-pytest -k "mne"           # Keyword filter
-```
-
-### Configuration: `configs/`
-
-| File | Purpose |
-|---|---|
-| `demo_task_glm_real.json` | Main demo: complete task GLM flow, recommended starting point |
-| `ai_draft_task_glm.json` | AI-generated task GLM candidate flow with `ai_generation` metadata |
-| `demo_resting_state_flow.json` | Resting-state flow example |
-| `demo_ml_validation_flow.json` | Machine-learning validation flow example |
-| `demo_task_flow.json` | Basic task-state flow |
-| `demo_task_flow_v0_2_method_atoms.json` | MethodAtom-based task-state flow |
-| `evidence_backed_presets.json` | Preset parameters backed by literature evidence |
-| `example_task_study.json` | Simple task-state study configuration |
-
-### Schemas: `schemas/`
-
-| File | Definition |
-|---|---|
-| `fnirs_flow.schema.json` | Main Flow JSON schema |
-| `capability_manifest.schema.json` | Atom capability declaration schema |
-| `risk_item.schema.json` | Risk item schema |
-| `action_attempt.schema.json` | Action attempt record schema |
-| `project_snapshot.schema.json` | Project snapshot schema |
-| `readiness_result.schema.json` | Readiness check result schema |
-| `literature_flow_evidence.schema.json` | Literature-to-Flow evidence mapping schema |
-
-### Scripts: `scripts/`
-
-| File | Purpose |
-|---|---|
-| `analyze_ds007738_qc_sensitivity.py` | ds007738 QC sensitivity analysis |
-| `audit_ds007738_outputs.py` | ds007738 output audit |
-| `benchmark_performance.py` | Performance benchmark script |
-| `build_ds007738_exclusion_manifests.py` | ds007738 exclusion manifest builder |
-| `compare_ds007738_golden_rerun.py` | ds007738 golden rerun comparison |
-| `run_ds007738_full_analysis.py` | ds007738 full-pipeline analysis entry point |
-| `sync_public_release.py` | Public release sync script |
-
-### Documentation: `docs/`
-
-| File | Purpose |
-|---|---|
-| `README.md` | Public documentation index |
-| `specs/fnirs_flow_public_api.md` | Public API and package concepts |
-| `specs/method_atom_parameter_ui_contract.md` | MethodAtom parameter UI metadata contract |
-| `specs/package_profile_spec.md` | Submission, reviewer, and reproducibility profiles |
-| `specs/mvp_task_glm_acceptance_checklist.md` | Task-GLM MVP acceptance checklist |
-
-### Root Files
-
-| File | Purpose |
-|---|---|
-| `cli.py` | CLI entry point for the `fnirs-flow` command |
-| `pyproject.toml` | Python project configuration for dependencies, ruff, mypy, and pytest |
-| `environment.yml` | Conda environment definition |
-| `ai_flow_generation_guide.md` | Generative AI flow-generation prompt context specification |
-| `CHANGELOG.md` | Version change log |
-| `README.md` | This file |
-| `PUBLIC_RELEASE.md` | Public release tree scope and exclusion strategy |
-| `PUBLIC_RELEASE_MANIFEST.json` | Generated file list, sizes, and SHA-256 hashes |
+- `docs/README.md` is the public documentation index.
+- `docs/architecture/CURRENT_DOCUMENTATION_MAP.md` records the current document priorities and historical notes.
+- `docs/specs/` contains the stable public contracts.
+- `docs/audit/` contains audit outputs and validation artifacts.
+- Compatibility aliases such as `FlowNode`, `NodeTemplate`, and `NodeLibrary` are kept only for older flows and migration paths.
 
 ---
 
