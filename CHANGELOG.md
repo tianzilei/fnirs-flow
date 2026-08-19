@@ -8,6 +8,9 @@ This release records the current synchronized development and public trees.
 
 - Project version is `1.2.1` across Python, WebUI, API metadata, and public documentation.
 - Public release synchronization and English-only documentation checks passed.
+- Public CI now enforces architecture, runtime, generated-contract, packaging,
+  security, license, WebUI, browser, and release-version gates; version tags
+  publish verified distributions to GitHub Releases.
 
 ## Unreleased
 

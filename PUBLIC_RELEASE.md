@@ -10,7 +10,9 @@ submission/public repository:
 - JSON schemas and demo configs
 - tests
 - WebUI source and package metadata
+- prebuilt WebUI runtime assets used by the Python package
 - selected public docs/specs
+- CI and release validation tools
 - license and third-party notice files
 
 It intentionally excludes manuscript drafts, literature extraction materials,

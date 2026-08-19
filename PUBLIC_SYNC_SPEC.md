@@ -20,6 +20,8 @@ Included content:
   and `tests/`
 - WebUI release source: selected `webui/` package metadata, Vite/TypeScript
   configuration, `webui/src/`, `webui/tests/`, and `webui/e2e/`
+- Prebuilt WebUI runtime assets under `fnirs_flow/resources/webui/dist/`, which
+  are required for wheel packaging and API static serving
 - Public documentation: `docs/README.md`,
   `docs/specs/fnirs_flow_public_api.md`,
   `docs/specs/method_atom_parameter_ui_contract.md`,
@@ -27,6 +29,10 @@ Included content:
   `docs/specs/mvp_task_glm_acceptance_checklist.md`
 - Public scripts listed in `PUBLIC_SCRIPT_FILES` inside
   `scripts/sync_public_release.py`
+- Public CI and release tools listed in `PUBLIC_TOOL_FILES` inside
+  `scripts/sync_public_release.py`
+- Generated OpenAPI contract `generated/openapi.json`, used to verify the
+  checked-in WebUI API types
 - Generated release metadata: `PUBLIC_RELEASE.md` and
   `PUBLIC_RELEASE_MANIFEST.json`
 
@@ -109,7 +115,7 @@ Recommended validation commands:
 
 ```bash
 pytest -q
-ruff check cli.py fnirs_flow tests scripts
+ruff check cli.py fnirs_flow tests scripts tools
 cd webui && npm install && npm run test:unit && npm run build -- --mode development
 ```
 

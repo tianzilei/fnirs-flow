@@ -1,5 +1,5 @@
 {
-  "copied_file_count": 386,
+  "copied_file_count": 396,
   "files": [
     {
       "bytes": 964,
@@ -8,9 +8,9 @@
       "source": ".gitignore"
     },
     {
-      "bytes": 27144,
+      "bytes": 27353,
       "path": "CHANGELOG.md",
-      "sha256": "5e3ac24116adfac4022b2ef4dab359adf690f18103647a425fe82febae332445",
+      "sha256": "15004f3aed0f57efc8162223a8327a01067f178b63c6f27585c85d2698f126b9",
       "source": "CHANGELOG.md"
     },
     {
@@ -20,9 +20,9 @@
       "source": "LICENSE"
     },
     {
-      "bytes": 6340,
+      "bytes": 6689,
       "path": "PUBLIC_SYNC_SPEC.md",
-      "sha256": "e779ae87f18bf35b7ac90c21c58425eed6fb48cec1dc1920b4bc673d7b08098b",
+      "sha256": "c7d983b1ce0c41718af16dd00b4b6e6d5f12a47c4fff7434dd406a2a809a5ff4",
       "source": "PUBLIC_SYNC_SPEC.md"
     },
     {
@@ -122,9 +122,9 @@
       "source": "configs/example_task_study.json"
     },
     {
-      "bytes": 3082,
+      "bytes": 3088,
       "path": "docs/README.md",
-      "sha256": "9bff46148d1935e59b4d5da3ef1f98c511ca2f222b5c782fef3a66ff0800083a",
+      "sha256": "72786b48270559c33d1ddff6eb63a5034782f19415db12881e31064ac3011fe8",
       "source": "docs/README.md"
     },
     {
@@ -1250,6 +1250,24 @@
       "source": "fnirs_flow/resources/webui/__init__.py"
     },
     {
+      "bytes": 570055,
+      "path": "fnirs_flow/resources/webui/dist/assets/index-B1OX05Mq.js",
+      "sha256": "466275a1b105ca9374c1cbca977d22af795be02def6db6435dac99d78dfb95b6",
+      "source": "fnirs_flow/resources/webui/dist/assets/index-B1OX05Mq.js"
+    },
+    {
+      "bytes": 67114,
+      "path": "fnirs_flow/resources/webui/dist/assets/index-DQBJFDki.css",
+      "sha256": "1a3b65398ff675709f844e64c5844b04528e7d346b6602218c3e6f240c903c02",
+      "source": "fnirs_flow/resources/webui/dist/assets/index-DQBJFDki.css"
+    },
+    {
+      "bytes": 595,
+      "path": "fnirs_flow/resources/webui/dist/index.html",
+      "sha256": "788f3fced7f313d78c33c41734646a61d4ffb09a8ee5890030d85f4e2b3b5898",
+      "source": "fnirs_flow/resources/webui/dist/index.html"
+    },
+    {
       "bytes": 79,
       "path": "fnirs_flow/security/__init__.py",
       "sha256": "fe1c325a4bde8023e13b709e89097da58bbf930964ac845ae7f2e1fd33213176",
@@ -1320,6 +1338,12 @@
       "path": "fnirs_flow/validation/state.py",
       "sha256": "63eeaa76719739d2b720166233db39da9b7e50f4964dc7d7b9dc5fc61e6f91d3",
       "source": "fnirs_flow/validation/state.py"
+    },
+    {
+      "bytes": 148265,
+      "path": "generated/openapi.json",
+      "sha256": "af5ed742eaafe16332385e2484fc25a32de492bd09489accd62203cb7e22c145",
+      "source": "generated/openapi.json"
     },
     {
       "bytes": 2804,
@@ -1406,9 +1430,9 @@
       "source": "scripts/run_ds007738_full_analysis.py"
     },
     {
-      "bytes": 14873,
+      "bytes": 17111,
       "path": "scripts/sync_public_release.py",
-      "sha256": "72ef7c8764667fa1f9c450c72be494646e6fd28e88a4ff79a9acf9722138dd95",
+      "sha256": "e8e9fe01ac5db5fb3a907558e2030a41b9daf4af50ebc381ffb21bd29a270fc0",
       "source": "scripts/sync_public_release.py"
     },
     {
@@ -1838,9 +1862,9 @@
       "source": "tests/test_project_uri.py"
     },
     {
-      "bytes": 1265,
+      "bytes": 2190,
       "path": "tests/test_public_sync.py",
-      "sha256": "046d9f1b1f5b5bfd833d9a251d5d3372e2ef1b5cfc13e718f3741bf3f8df91d4",
+      "sha256": "82ba835bc572eefcba58cf191163c0d1ae3a0b184d9617d628c46db924e971d0",
       "source": "tests/test_public_sync.py"
     },
     {
@@ -1862,9 +1886,9 @@
       "source": "tests/test_registry.py"
     },
     {
-      "bytes": 1148,
+      "bytes": 1336,
       "path": "tests/test_release_governance.py",
-      "sha256": "d24198ac1d484157833b2ab2bccbc63861da9688a7295f5caefeff21e3db105a",
+      "sha256": "463baeaa91bef30f90937508a95798cde9521c1a44ec18250b88a8fd93e789aa",
       "source": "tests/test_release_governance.py"
     },
     {
@@ -1970,6 +1994,42 @@
       "source": "tests/test_validation_api.py"
     },
     {
+      "bytes": 8956,
+      "path": "tools/benchmark/run_execution_benchmark.py",
+      "sha256": "647f1aafa65b6e3cf9779e630d8448094a982c30824506235b216fc7734e85fa",
+      "source": "tools/benchmark/run_execution_benchmark.py"
+    },
+    {
+      "bytes": 4234,
+      "path": "tools/release/check_licenses_and_notices.py",
+      "sha256": "be58fc0b9d79acbcdf61e319c7eaae8159d438a475fbd6e63ce9b624b833bd52",
+      "source": "tools/release/check_licenses_and_notices.py"
+    },
+    {
+      "bytes": 1712,
+      "path": "tools/release/check_package_contents.py",
+      "sha256": "4cddd1ae94000c140e64b1daab10e6e7cfa3172d94e46866514d1579a2526888",
+      "source": "tools/release/check_package_contents.py"
+    },
+    {
+      "bytes": 2624,
+      "path": "tools/release/check_release_version.py",
+      "sha256": "7a1d09da295e135749c4d7974b8968340e2f33ae31a03bca02ff57d6e40cdc74",
+      "source": "tools/release/check_release_version.py"
+    },
+    {
+      "bytes": 1475,
+      "path": "tools/release/render_current_status.py",
+      "sha256": "cdfb6c1ed81920936d6cb67a07490ff4e0f078112af2353c60cc13da669792d3",
+      "source": "tools/release/render_current_status.py"
+    },
+    {
+      "bytes": 3644,
+      "path": "tools/schema/generate_openapi.py",
+      "sha256": "369a4e6c243183867cb47f22aaea879b68081d97d0486a48e77695c7ed6584f5",
+      "source": "tools/schema/generate_openapi.py"
+    },
+    {
       "bytes": 3145,
       "path": "webui/e2e/ds007738-real.spec.ts",
       "sha256": "37db34c7803d52846992c8b6081612fbab56ac88abe3c7c6d1cb4a58510c8d76",
@@ -2066,9 +2126,9 @@
       "source": "webui/src/components/FlowChecklistPanel.tsx"
     },
     {
-      "bytes": 19653,
+      "bytes": 19405,
       "path": "webui/src/components/ParameterPanel.tsx",
-      "sha256": "9a041ebdacfee0f93ff509902f9b00724cb94dc300e375e4fd150e131f197017",
+      "sha256": "e74c2f6c715400bc69c67c5400d2eff4f5af959137a574ae81ebad863ae2aaff",
       "source": "webui/src/components/ParameterPanel.tsx"
     },
     {
@@ -2332,9 +2392,9 @@
   ],
   "generated_files": [
     {
-      "bytes": 657,
+      "bytes": 750,
       "path": "PUBLIC_RELEASE.md",
-      "sha256": "8c9633d463b2ae01c2ec8fe19cd6f6a3ab1e420712ff3729ef4cb83bcd4a3e0b"
+      "sha256": "ae337d1d9486b98c50b259e5f8897b74282124ce18eb2877142308db0c3a7a1b"
     }
   ],
   "schema_version": 1,

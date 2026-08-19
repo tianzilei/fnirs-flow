@@ -41,7 +41,7 @@ The primary local reproduction commands are:
 
 ```text
 python -m pytest --tb=short -q -p no:cacheprovider
-python -m ruff check cli.py fnirs_flow tests scripts
+python -m ruff check cli.py fnirs_flow tests scripts tools
 npm --prefix webui run test:unit
 npm --prefix webui run build
 ```

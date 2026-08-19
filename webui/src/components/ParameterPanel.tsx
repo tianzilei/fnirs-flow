@@ -215,7 +215,7 @@ export function ParameterPanel({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    setBulkStatus(`\u5df2\u5bfc\u51fa\u5305\u542b ${parameters.length} \u4e2a\u53c2\u6570\u7684 JSON \u6a21\u677f\u3002`);
+    setBulkStatus(`Exported a JSON template containing ${parameters.length} parameters.`);
   };
 
   const importData = async (file: File | null | undefined) => {
@@ -225,7 +225,7 @@ export function ParameterPanel({
       const result = parseParameterData(text, file.name, parameters);
       const entries = Object.entries(result.values);
       if (entries.length === 0) {
-        setBulkStatus('\u5bfc\u5165\u6587\u4ef6\u4e2d\u6ca1\u6709\u5339\u914d\u7684\u53c2\u6570\u3002');
+        setBulkStatus('The imported file contains no matching parameters.');
         return;
       }
       if (onBulkChange) {
@@ -233,10 +233,10 @@ export function ParameterPanel({
       } else {
         entries.forEach(([name, value]) => onChange(name, value));
       }
-      const ignoredSuffix = result.ignored.length > 0 ? ` \u5df2\u5ffd\u7565 ${result.ignored.length} \u4e2a\u672a\u77e5\u53c2\u6570\u3002` : '';
-      setBulkStatus(`\u5df2\u5bfc\u5165 ${entries.length} \u4e2a\u53c2\u6570\u503c\u3002${ignoredSuffix}`);
+      const ignoredSuffix = result.ignored.length > 0 ? ` Ignored ${result.ignored.length} unknown parameters.` : '';
+      setBulkStatus(`Imported ${entries.length} parameter values.${ignoredSuffix}`);
     } catch (error) {
-      setBulkStatus(error instanceof Error ? error.message : '\u5bfc\u5165\u5931\u8d25\u3002');
+      setBulkStatus(error instanceof Error ? error.message : 'Import failed.');
     }
   };
 
@@ -426,16 +426,16 @@ export function ParameterPanel({
     <section className="bulk-param-panel">
       <div className="bulk-param-summary">
         <strong>{parameters.length} parameters</strong>
-        <span>{'\u5148\u5bfc\u51fa JSON \u6a21\u677f\uff0c\u5728\u5916\u90e8\u586b\u5199\u53c2\u6570\uff0c\u518d\u5bfc\u5165\u5b8c\u6210\u7684\u6a21\u677f\u3002'}</span>
+        <span>Export a JSON template, fill in the parameters externally, then import the completed template.</span>
       </div>
       <div className="bulk-param-actions">
         <button type="button" className="icon-text-button" onClick={exportTemplate}>
           <Download size={14} />
-          <span>{'\u5bfc\u51fa\u6a21\u677f'}</span>
+          <span>Export Template</span>
         </button>
         <button type="button" className="icon-text-button subtle" onClick={() => bulkFileInputRef.current?.click()}>
           <Upload size={14} />
-          <span>{'\u5bfc\u5165\u6570\u636e'}</span>
+          <span>Import Data</span>
         </button>
         <input
           ref={bulkFileInputRef}
@@ -448,7 +448,7 @@ export function ParameterPanel({
           }}
         />
       </div>
-      {modifiedCount > 0 && <span className="bulk-param-note">{modifiedCount} {'\u4e2a\u53c2\u6570\u5df2\u5bfc\u5165\u6216\u624b\u52a8\u4fee\u6539\u3002'}</span>}
+      {modifiedCount > 0 && <span className="bulk-param-note">{modifiedCount} parameters imported or edited manually.</span>}
       {bulkStatus && <span className="bulk-param-note">{bulkStatus}</span>}
     </section>
   );

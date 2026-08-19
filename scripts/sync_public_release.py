@@ -67,6 +67,13 @@ WEBUI_DIRS = [
     "webui/tests",
 ]
 
+# Prebuilt runtime assets are required by the Python wheel and by API static
+# serving tests. They are handled separately because generic ``dist`` folders
+# remain excluded everywhere else.
+PUBLIC_RUNTIME_DIRS = [
+    "fnirs_flow/resources/webui/dist",
+]
+
 PUBLIC_DOC_FILES = [
     "docs/README.md",
     "docs/specs/fnirs_flow_public_api.md",
@@ -86,6 +93,19 @@ PUBLIC_SCRIPT_FILES = [
     "scripts/compare_ds007738_golden_rerun.py",
     "scripts/run_ds007738_full_analysis.py",
     "scripts/sync_public_release.py",
+]
+
+# CI/release tooling copied into the public tree. Keep this explicit: the
+# public workflow must never depend on development-only tools that disappear
+# during a clean synchronization.
+PUBLIC_TOOL_FILES = [
+    "generated/openapi.json",
+    "tools/benchmark/run_execution_benchmark.py",
+    "tools/release/check_licenses_and_notices.py",
+    "tools/release/check_package_contents.py",
+    "tools/release/check_release_version.py",
+    "tools/release/render_current_status.py",
+    "tools/schema/generate_openapi.py",
 ]
 
 EXCLUDED_NAMES = {
@@ -153,7 +173,9 @@ submission/public repository:
 - JSON schemas and demo configs
 - tests
 - WebUI source and package metadata
+- prebuilt WebUI runtime assets used by the Python package
 - selected public docs/specs
+- CI and release validation tools
 - license and third-party notice files
 
 It intentionally excludes manuscript drafts, literature extraction materials,
@@ -233,7 +255,7 @@ def iter_files(root: Path, rel_dir: str) -> list[Path]:
 def build_copy_plan(root: Path, target: Path) -> list[CopyItem]:
     plan: list[CopyItem] = []
 
-    for rel in ROOT_FILES + WEBUI_FILES + PUBLIC_DOC_FILES + PUBLIC_SCRIPT_FILES:
+    for rel in ROOT_FILES + WEBUI_FILES + PUBLIC_DOC_FILES + PUBLIC_SCRIPT_FILES + PUBLIC_TOOL_FILES:
         source = root / rel
         if is_forbidden_public_rel(Path(rel)):
             continue
@@ -243,6 +265,11 @@ def build_copy_plan(root: Path, target: Path) -> list[CopyItem]:
     for rel_dir in DIRS + WEBUI_DIRS:
         if is_forbidden_public_rel(Path(rel_dir)):
             continue
+        for source in iter_files(root, rel_dir):
+            rel = source.relative_to(root)
+            plan.append(CopyItem(source=source, target=target / rel))
+
+    for rel_dir in PUBLIC_RUNTIME_DIRS:
         for source in iter_files(root, rel_dir):
             rel = source.relative_to(root)
             plan.append(CopyItem(source=source, target=target / rel))
@@ -286,14 +313,17 @@ def validate_plan(plan: list[CopyItem], target: Path) -> None:
         raise SystemExit(f"Refusing to copy duplicate target path(s): {sample}")
 
 
-def _contains_han(text: str) -> bool:
-    """Return whether text contains a CJK unified ideograph."""
-    return any(
+def _is_han_char(char: str) -> bool:
+    return (
         "\u3400" <= char <= "\u4dbf"
         or "\u4e00" <= char <= "\u9fff"
         or "\uf900" <= char <= "\ufaff"
-        for char in text
     )
+
+
+def _contains_han(text: str) -> bool:
+    """Return whether text contains a literal or escaped CJK ideograph."""
+    return any(_is_han_char(char) for char in text)
 
 
 def validate_english_public_text(plan: list[CopyItem]) -> None:
@@ -367,6 +397,30 @@ def copy_items(plan: list[CopyItem], dry_run: bool) -> None:
         # The private working tree can live on a volume that reports every file
         # as executable; propagating that metadata creates noisy public diffs.
         shutil.copyfile(item.source, item.target)
+
+
+def audit_unexpected_target_files(target: Path, plan: list[CopyItem], dry_run: bool) -> None:
+    """Reject files outside the public whitelist, preserved paths, and manifest."""
+    if dry_run or not target.exists():
+        return
+    allowed = {
+        rel_to_target(item.target, target).as_posix().lower()
+        for item in plan
+    }
+    allowed.update({"public_release.md", PUBLIC_RELEASE_MANIFEST.lower()})
+    unexpected: list[str] = []
+    for path in target.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(target)
+        if rel.parts and rel.parts[0] in PRESERVED_TARGET_NAMES:
+            continue
+        if rel.as_posix().lower() not in allowed:
+            unexpected.append(rel.as_posix())
+    if unexpected:
+        sample = ", ".join(sorted(unexpected)[:20])
+        suffix = "" if len(unexpected) <= 20 else f" (+{len(unexpected) - 20} more)"
+        raise SystemExit(f"Unexpected file(s) exist in public release target: {sample}{suffix}")
 
 
 def init_git(target: Path, dry_run: bool) -> None:
@@ -500,6 +554,7 @@ def main() -> int:
     if not args.no_manifest:
         write_manifest(root, target, plan, args.dry_run)
     audit_target(target, args.dry_run)
+    audit_unexpected_target_files(target, plan, args.dry_run)
 
     if args.init_git:
         init_git(target, args.dry_run)

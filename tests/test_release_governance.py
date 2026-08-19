@@ -7,12 +7,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_legacy_script_classification_is_complete() -> None:
+    classifier = ROOT / "tools/audit/check_script_classification.py"
+    if not classifier.is_file():
+        pytest.skip("Internal script-classification policy is not part of the public release tree")
     completed = subprocess.run(
-        [sys.executable, "tools/audit/check_script_classification.py"],
+        [sys.executable, str(classifier)],
         cwd=ROOT,
         capture_output=True,
         text=True,

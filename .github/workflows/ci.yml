@@ -5,96 +5,217 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_call:
+  workflow_dispatch:
+
+# Third-party actions are constrained to official GitHub-maintained actions,
+# pinned to immutable commits, and kept current by Dependabot.
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  python:
+  core-contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e . pytest mypy ruff
+      - run: python -m ruff check cli.py fnirs_flow tests scripts tools
+      - run: python -m mypy --config-file config/mypy/core.ini
+      - run: >-
+          python -m pytest -q
+          tests/test_architecture_boundaries.py
+          tests/test_flow_models.py
+          tests/test_schemas.py
+          tests/test_compiler.py
+          tests/test_validation_api.py
+          tests/test_public_sync.py
+
+  runtime-mne:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev,mne,ml-motion,api]"
-
-      - name: Lint with Ruff
-        if: matrix.python-version == '3.12'
-        run: python -m ruff check cli.py fnirs_flow tests scripts
-
-      - name: Type check core profile
-        if: matrix.python-version == '3.12'
-        run: python -m mypy --config-file config/mypy/core.ini
-
-      - name: Type check MNE profile
-        if: matrix.python-version == '3.12'
+      - run: python -m pip install -e ".[full]" pytest pytest-cov mypy
+      - run: python -c "import fnirs_flow, mne, mne_nirs; print(fnirs_flow.__version__, mne.__version__, mne_nirs.__version__)"
+      - if: matrix.python-version == '3.12'
         run: python -m mypy --config-file config/mypy/mne.ini
-
-      - name: Type check Cedalion profile
-        if: matrix.python-version == '3.12'
-        run: python -m mypy --config-file config/mypy/cedalion.ini
-
-      - name: Run tests
-        env:
+      - env:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
           MNE_HOME: ${{ runner.temp }}
-        run: python -m pytest --tb=short -q --cov=fnirs_flow --cov-report=term --cov-fail-under=75
-
-      - name: Audit Python dependencies
+        run: python -m pytest -q --cov=fnirs_flow --cov-report=term --cov-fail-under=75
+      - name: Deterministic execution benchmark
         if: matrix.python-version == '3.12'
-        run: python -m pip_audit --skip-editable
-
-      - name: Build distributions
+        run: >-
+          python tools/benchmark/run_execution_benchmark.py
+          --backend serial --runs 2 --channels 4 --samples 200
+          --permutations 2 --output benchmark-report.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: matrix.python-version == '3.12'
+        with:
+          name: execution-benchmark
+          path: benchmark-report.json
+          retention-days: 90
+      - name: Download pinned real-data fixture
+        if: matrix.python-version == '3.12'
+        env:
+          SNIRF_URL: https://s3.amazonaws.com/openneuro.org/ds007738/sub-01/nirs/sub-01_task-covert_run-01_nirs.snirf
+          SNIRF_SHA256: 24bd9749af78b7af87423a820f39f80de17787975cb82f585dc497b5156aff24
         run: |
-          python -m pip install build
-          python -m build
-
-      - name: Verify installed wheel CLI
+          mkdir -p /tmp/fnirs-flow-real-data
+          curl --fail --location --retry 3 "$SNIRF_URL" --output /tmp/fnirs-flow-real-data/run.snirf
+          echo "$SNIRF_SHA256  /tmp/fnirs-flow-real-data/run.snirf" | sha256sum --check --strict
+      - name: Real-data MNE smoke and reference equivalence
         if: matrix.python-version == '3.12'
-        run: |
-          python -m venv /tmp/fnirs-flow-wheel
-          /tmp/fnirs-flow-wheel/bin/pip install dist/*.whl
-          cd /tmp
-          /tmp/fnirs-flow-wheel/bin/fnirs-flow --help
+        env:
+          FNIRS_TEST_SNIRF: /tmp/fnirs-flow-real-data/run.snirf
+          FNIRS_REQUIRE_REAL_DATA: "1"
+        run: >-
+          python -m pytest -q
+          tests/integration/test_real_data_smoke.py
+          tests/integration/test_mne_reference_equivalence.py
+
+  runtime-cedalion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[cedalion]" pytest mypy
+      - run: python -c "import cedalion; print(getattr(cedalion, '__version__', 'unknown'))"
+      - run: python -m mypy --config-file config/mypy/cedalion.ini
+      - run: python -m pytest -q tests/test_lazy_backend_verification.py tests/test_cross_backend_integration.py
 
   webui:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[api]"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: webui/package-lock.json
-
-      - name: Install and build WebUI
+      - run: npm ci
         working-directory: webui
-        run: |
-          npm ci
-          npm audit --audit-level=moderate
-          npm run test:unit
-          npm run build
-
-      - name: Install Playwright browser
+      - name: Verify generated API contracts
+        run: npm run generate:api && git -C .. diff --exit-code -- generated/openapi.json webui/src/api/generated.ts
         working-directory: webui
-        run: npx playwright install --with-deps chromium
-
-      - name: Run WebUI browser tests
+      - run: npm run test:unit && npm run build
         working-directory: webui
-        run: npm run test:e2e
+      - run: npx playwright install --with-deps chromium && npm run test:e2e
+        working-directory: webui
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-artifacts
+          path: |
+            webui/test-results
+            webui/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14
+
+  package-blackbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: webui
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: webui
+      - run: python -m pip install build && python -m build
+      - run: python tools/release/check_package_contents.py
+      - run: |
+          python -m venv /tmp/fnirs-flow-wheel
+          wheel=$(ls dist/fnirs_flow-*.whl)
+          /tmp/fnirs-flow-wheel/bin/pip install "${wheel}[api]"
+          cd /tmp
+          /tmp/fnirs-flow-wheel/bin/fnirs-flow --help
+          /tmp/fnirs-flow-wheel/bin/python "$GITHUB_WORKSPACE/tests/package_blackbox.py"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: python-distributions
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  security-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+      - run: python -m pip install -e ".[dev]" build
+      - run: python -m pip_audit --skip-editable
+      - run: npm ci && npm audit --audit-level=moderate
+        working-directory: webui
+      - run: npm run build
+        working-directory: webui
+      - run: python tools/release/check_release_version.py
+      - run: python -m build && python tools/release/check_package_contents.py
+      - run: python -m piplicenses --with-system --format=json --output-file=python-licenses.json
+      - run: python tools/release/check_licenses_and_notices.py --python-inventory python-licenses.json
+
+  current-status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [core-contract, runtime-mne, runtime-cedalion, webui, package-blackbox, security-release]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e .
+      - run: >-
+          python tools/release/render_current_status.py
+          --output current-status.md
+          --revision "${{ github.sha }}"
+          --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: current-status
+          path: current-status.md
+          retention-days: 90
