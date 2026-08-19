@@ -117,7 +117,7 @@ class TestReproducibility:
         flow = {"flow_id": "test", "nodes": []}
         snapshot = create_config_snapshot(flow)
         assert snapshot["flow"] == flow
-        assert "flow_hash" in snapshot
+        assert snapshot["flow"] == flow
 
     def test_generate_manifest(self, tmp_path):
         flow = {"flow_id": "test"}
@@ -132,4 +132,4 @@ class TestReproducibility:
         flow = {"flow_id": "test"}
         plan = {"schema_version": "0.1.0", "steps": []}
         manifest = generate_reproducibility_manifest(flow, plan_dict=plan, outdir=tmp_path)
-        assert manifest["config_snapshot"].get("plan_hash") is not None
+        assert manifest["config_snapshot"].get("plan") is not None

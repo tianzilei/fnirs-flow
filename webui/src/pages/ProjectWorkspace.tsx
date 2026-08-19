@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Archive, Boxes, ChevronLeft, Copy, Database, Download, FolderOpen, Play, ShieldCheck } from 'lucide-react';
 import { useStore } from '../store';
+import { selectProject as selectActiveProject, selectProjects } from '../features/project/store';
 import { formatApiError, listLocalFolders, type LocalFolder, type Project } from '../api/client';
 import { VersionHistoryPanel } from '../components/VersionHistoryPanel';
 import { DesignHistoryPanel } from '../components/DesignHistoryPanel';
@@ -14,8 +15,8 @@ type FolderSelectionStatus = {
 
 export function ProjectWorkspace() {
   const navigate = useNavigate();
-  const projects = useStore((s) => s.projects);
-  const project = useStore((s) => s.project);
+  const projects = useStore(selectProjects);
+  const project = useStore(selectActiveProject);
   const loading = useStore((s) => s.loading);
   const loadProjects = useStore((s) => s.loadProjects);
   const createProject = useStore((s) => s.createProject);

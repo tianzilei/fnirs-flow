@@ -1,0 +1,509 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fnirs-flow.dev/schemas/fnirs_flow.schema.json",
+  "title": "fnirs-flow Flow Graph",
+  "description": "Top-level schema for a fnirs-flow Flow definition. v0.2 introduces MethodAtom-first naming with flow_atoms, atom_type, and template_id.",
+  "type": "object",
+  "required": ["schema_version", "flow_id", "edges"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["0.1.0", "0.2.0", "0.3.0"],
+      "description": "Schema version. v0.2.0 introduces MethodAtom-first fields. v0.3.0 adds backend binding."
+    },
+    "flow_id": {
+      "type": "string",
+      "description": "Unique flow identifier"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable flow name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Flow description"
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/FlowNode" },
+      "description": "List of flow nodes (legacy field, use flow_atoms in v0.2+)"
+    },
+    "flow_atoms": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/FlowAtom" },
+      "description": "List of flow atoms (v0.2+ MethodAtom-first field). If absent, nodes is used."
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/FlowEdge" },
+      "description": "List of edges connecting atoms"
+    },
+    "adapter_registry": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/AdapterDefinition" },
+      "description": "Available adapter definitions"
+    },
+    "metadata": {
+      "$ref": "#/$defs/FlowMetadata"
+    }
+  },
+  "$defs": {
+    "FlowNode": {
+      "type": "object",
+      "required": ["id", "type", "category", "position"],
+      "description": "Legacy node definition. Use FlowAtom for v0.2+.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique node identifier"
+        },
+        "type": {
+          "type": "string",
+          "description": "Node type (e.g. dataset_discovery, optical_density)"
+        },
+        "category": {
+          "$ref": "#/$defs/MethodAtomCategory"
+        },
+        "origin": {
+          "$ref": "#/$defs/MethodAtomOrigin"
+        },
+        "position": {
+          "$ref": "#/$defs/Position"
+        },
+        "config": {
+          "type": "object",
+          "description": "Node-specific configuration parameters"
+        },
+        "ports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AtomPort" },
+          "description": "Input and output ports"
+        },
+        "adapter_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdapterInstance" },
+          "description": "Adapters bound to this node"
+        },
+        "references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NodeReference" },
+          "description": "Evidence, method, or documentation references"
+        },
+        "execution_trust_level": {
+          "$ref": "#/$defs/ExecutableTrustLevel"
+        },
+        "capability_manifest": {
+          "$ref": "#/$defs/CapabilityManifest"
+        },
+        "dependency_profile_id": {
+          "type": ["string", "null"],
+          "description": "Optional dependency profile required by this atom"
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Backend capabilities required by this atom"
+        },
+        "dependency_optional": {
+          "type": "boolean",
+          "default": false
+        },
+        "execution_scope": {
+          "type": "string",
+          "enum": ["run", "subject", "group", "project"],
+          "default": "run"
+        },
+        "readiness_status": {
+          "$ref": "#/$defs/ReadinessStatus"
+        },
+        "execution_status": {
+          "$ref": "#/$defs/ExecutionStatus"
+        },
+        "security_status": {
+          "$ref": "#/$defs/SecurityStatus"
+        },
+        "status": {
+          "$ref": "#/$defs/MethodAtomStatus"
+        },
+        "state_contract": {
+          "$ref": "#/$defs/FlowAtomStateContract",
+          "description": "Atom ingress/egress state contract"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional metadata"
+        }
+      }
+    },
+    "FlowAtom": {
+      "type": "object",
+      "required": ["id", "atom_type", "category", "position"],
+      "description": "v0.2 MethodAtom-first flow atom instance.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique atom identifier"
+        },
+        "atom_type": {
+          "type": "string",
+          "description": "Method atom type (e.g. optical_density, bandpass_filter)"
+        },
+        "type": {
+          "type": "string",
+          "description": "Legacy field, same as atom_type"
+        },
+        "template_id": {
+          "type": "string",
+          "description": "Source MethodAtomTemplate ID this atom was created from"
+        },
+        "operation": {
+          "type": "string",
+          "description": "The specific operation this atom performs"
+        },
+        "category": {
+          "$ref": "#/$defs/MethodAtomCategory"
+        },
+        "origin": {
+          "$ref": "#/$defs/MethodAtomOrigin"
+        },
+        "position": {
+          "$ref": "#/$defs/Position"
+        },
+        "config": {
+          "type": "object",
+          "description": "Atom-specific configuration parameters"
+        },
+        "ports": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AtomPort" },
+          "description": "Input and output ports"
+        },
+        "adapter_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdapterInstance" },
+          "description": "Adapters bound to this atom"
+        },
+        "backend_binding": {
+          "$ref": "#/$defs/BackendBinding",
+          "description": "Execution backend binding for this atom"
+        },
+        "references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/NodeReference" },
+          "description": "Evidence, method, or documentation references"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Evidence IDs supporting this atom"
+        },
+        "execution_trust_level": {
+          "$ref": "#/$defs/ExecutableTrustLevel"
+        },
+        "capability_manifest": {
+          "$ref": "#/$defs/CapabilityManifest"
+        },
+        "dependency_profile_id": {
+          "type": ["string", "null"],
+          "description": "Optional dependency profile required by this atom"
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Backend capabilities required by this atom"
+        },
+        "dependency_optional": {
+          "type": "boolean",
+          "default": false
+        },
+        "execution_scope": {
+          "type": "string",
+          "enum": ["run", "subject", "group", "project"],
+          "default": "run"
+        },
+        "readiness_status": {
+          "$ref": "#/$defs/ReadinessStatus"
+        },
+        "execution_status": {
+          "$ref": "#/$defs/ExecutionStatus"
+        },
+        "security_status": {
+          "$ref": "#/$defs/SecurityStatus"
+        },
+        "status": {
+          "$ref": "#/$defs/MethodAtomStatus"
+        },
+        "state_contract": {
+          "$ref": "#/$defs/FlowAtomStateContract",
+          "description": "Atom ingress/egress state contract"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional metadata"
+        }
+      }
+    },
+    "FlowEdge": {
+      "type": "object",
+      "required": ["id", "source", "target", "source_handle", "target_handle"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source atom ID"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target atom ID"
+        },
+        "source_handle": {
+          "type": "string",
+          "description": "Output port name on source atom"
+        },
+        "target_handle": {
+          "type": "string",
+          "description": "Input port name on target atom"
+        },
+        "adapter_id": {
+          "type": "string",
+          "description": "Adapter instance ID for this edge"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      }
+    },
+    "AtomPort": {
+      "type": "object",
+      "required": ["name", "direction", "schema"],
+      "description": "Input/output port on a MethodAtom.",
+      "properties": {
+        "name": { "type": "string" },
+        "direction": { "type": "string", "enum": ["in", "out"] },
+        "schema": { "type": "string", "description": "Data type this port accepts/produces" },
+        "required": { "type": "boolean", "default": true },
+        "default": { "description": "Default value if not required" },
+        "contract": {
+          "$ref": "#/$defs/BoundaryContract",
+          "description": "Port-level ingress/egress boundary contract"
+        }
+      }
+    },
+    "AdapterDefinition": {
+      "type": "object",
+      "required": ["adapter_id", "name", "source_type", "target_type"],
+      "properties": {
+        "adapter_id": { "type": "string" },
+        "name": { "type": "string" },
+        "source_type": { "type": "string", "description": "Input data type" },
+        "target_type": { "type": "string", "description": "Output data type" },
+        "transform": { "type": "string", "description": "Transformation description" },
+        "parameters": { "type": "object" },
+        "state_contract": {
+          "$ref": "#/$defs/AdapterStateContract",
+          "description": "Adapter ingress/egress state contract"
+        },
+        "reference": { "$ref": "#/$defs/NodeReference" }
+      }
+    },
+    "AdapterInstance": {
+      "type": "object",
+      "required": ["definition_id"],
+      "properties": {
+        "definition_id": { "type": "string" },
+        "parameters": { "type": "object" }
+      }
+    },
+    "BackendBinding": {
+      "type": "object",
+      "required": ["backend_id"],
+      "properties": {
+        "backend_id": { "type": "string", "description": "Execution backend identifier" },
+        "operation": { "type": "string", "description": "Specific operation to execute" },
+        "version_spec": { "type": "string", "description": "Backend version constraint" },
+        "parameters": { "type": "object", "description": "Backend-specific parameters" },
+        "dependency_profile_id": { "type": ["string", "null"] },
+        "required_capabilities": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "NodeReference": {
+      "type": "object",
+      "properties": {
+        "source_project": { "type": "string" },
+        "source_file": { "type": "string" },
+        "license": { "type": "string" },
+        "divergence_reason": { "type": "string" },
+        "reuse_mode": { "type": "string", "enum": ["adapt", "wrap", "inspire", "builtin"] }
+      }
+    },
+    "Position": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "FlowMetadata": {
+      "type": "object",
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "modified_at": { "type": "string", "format": "date-time" },
+        "author": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "ai_generation": {
+          "type": ["object", "null"],
+          "description": "Present only when flow was generated by AI. null for human-created flows.",
+          "properties": {
+            "generated_by": { "type": "string", "default": "generative_ai" },
+            "model": { "type": "string", "default": "unspecified" },
+            "created_at": { "type": "string" },
+            "input_summary": { "type": "string" },
+            "assumptions": { "type": "array", "items": { "type": "string" } },
+            "requires_user_confirmation": { "type": "array", "items": { "type": "string" } },
+            "confirmed_parameters": { "type": "array", "items": { "type": "string" } },
+            "confirmed_by": { "type": "string" },
+            "confirmed_at": { "type": "string" },
+            "not_used_for_execution": { "type": "boolean", "default": true }
+          }
+        },
+        "order_policy": {
+          "type": "object",
+          "description": "Reviewed risk acceptance switches for atom ordering and empty-link handling.",
+          "properties": {
+            "allow_order_violations": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, order violations are retained as non-fatal risks."
+            },
+            "allow_empty_edges": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, empty or floating-edge handling is retained as a non-fatal risk."
+            }
+          }
+        },
+        "checklist": {
+          "type": "object",
+          "description": "Optional guided-flow checklist selection and UI state.",
+          "properties": {
+            "scenario_id": { "type": "string" },
+            "version": { "type": "string" },
+            "recommendation_source": {
+              "type": "string",
+              "enum": ["flow_atoms", "user", "imported", "unknown"],
+              "description": "How the active checklist scenario was selected."
+            },
+            "choices": {
+              "type": "object",
+              "description": "Per-checklist-slot user choices and reviewed empty-processing markers.",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "template_id": { "type": "string" },
+                  "atom_id": { "type": "string" },
+                  "skipped": { "type": "boolean" },
+                  "skip_reason": { "type": "string" },
+                  "updated_at": { "type": "string" }
+                }
+              }
+            },
+            "updated_at": { "type": "string" }
+          }
+        }
+      }
+    },
+    "ExecutableTrustLevel": {
+      "type": "string",
+      "enum": ["builtin_managed", "backend_managed", "project_custom", "imported_custom"]
+    },
+    "CapabilityManifest": {
+      "type": "object",
+      "properties": {
+        "allowed_operations": { "type": "array", "items": { "type": "string" } },
+        "file_access": { "type": "array", "items": { "type": "string" } },
+        "network": { "type": "boolean", "default": false },
+        "shell": { "type": "boolean", "default": false },
+        "dependencies": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "BoundaryContract": {
+      "type": "object",
+      "properties": {
+        "allowed_statuses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ReadinessStatus" },
+          "description": "Atom statuses allowed at this boundary"
+        },
+        "blocked_statuses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ReadinessStatus" },
+          "description": "Atom statuses explicitly blocked at this boundary"
+        },
+        "required_config_keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Atom config keys required at this boundary"
+        },
+        "required_metadata_keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Atom metadata keys required at this boundary"
+        }
+      }
+    },
+    "FlowAtomStateContract": {
+      "type": "object",
+      "properties": {
+        "ingress": { "$ref": "#/$defs/BoundaryContract" },
+        "egress": { "$ref": "#/$defs/BoundaryContract" },
+        "post_readiness_status": { "$ref": "#/$defs/ReadinessStatus" },
+        "post_execution_status": { "$ref": "#/$defs/ExecutionStatus" },
+        "post_status": { "$ref": "#/$defs/MethodAtomStatus" }
+      }
+    },
+    "AdapterStateContract": {
+      "type": "object",
+      "properties": {
+        "ingress": { "$ref": "#/$defs/BoundaryContract" },
+        "egress": { "$ref": "#/$defs/BoundaryContract" },
+        "post_source_readiness": { "$ref": "#/$defs/ReadinessStatus" },
+        "post_target_readiness": { "$ref": "#/$defs/ReadinessStatus" },
+        "post_source_status": { "$ref": "#/$defs/MethodAtomStatus" },
+        "post_target_status": { "$ref": "#/$defs/MethodAtomStatus" }
+      }
+    },
+    "MethodAtomCategory": {
+      "type": "string",
+      "enum": ["data", "design", "preprocessing", "analysis", "output", "validation", "export"],
+      "description": "Functional category of a MethodAtom"
+    },
+    "MethodAtomOrigin": {
+      "type": "string",
+      "enum": ["builtin", "evidence_derived", "user_created", "imported"],
+      "description": "Where this atom definition came from"
+    },
+    "MethodAtomStatus": {
+      "type": "string",
+      "enum": ["not_configured", "configured", "warning", "quarantined", "blocked", "ready", "executed", "failed"],
+      "description": "Current atom status"
+    },
+    "ReadinessStatus": {
+      "type": "string",
+      "enum": ["not_configured", "configured", "needs_attention", "ready", "blocked"],
+      "description": "Configuration and human-review readiness state"
+    },
+    "ExecutionStatus": {
+      "type": "string",
+      "enum": ["not_run", "queued", "running", "executed", "failed", "skipped"],
+      "description": "Runtime execution state"
+    },
+    "SecurityStatus": {
+      "type": "string",
+      "enum": ["trusted", "needs_review", "quarantined", "blocked"],
+      "description": "Security and trust state"
+    }
+  }
+}

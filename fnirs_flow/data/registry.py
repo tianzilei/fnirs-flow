@@ -17,7 +17,6 @@ class DatasetEntry:
     description: str = ""
     folder_name: str = ""
     archive_name: str = ""
-    hash: str = ""
     config_key: str = ""
 
 
@@ -34,7 +33,6 @@ BUILTIN_DATASETS: dict[str, DatasetEntry] = {
         description="fNIRS motor task dataset: finger tapping experiment with 2 wavelengths",
         folder_name="MNE-fNIRS-motor-data",
         archive_name="MNE-fNIRS-motor-data.tgz",
-        hash="md5:c4935d19ddab35422a69f3326a01fef8",
         config_key="MNE_DATASETS_FNIRS_MOTOR_PATH",
     ),
     "bids-nirs-tapping": DatasetEntry(

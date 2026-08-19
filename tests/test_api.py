@@ -40,22 +40,13 @@ def test_atom_templates_api_is_not_shadowed_by_spa_fallback():
     assert isinstance(response.json(), list)
 
 
-def test_spa_fallback_is_registered_before_frontend_build(tmp_path, monkeypatch):
+def test_packaged_spa_is_registered_and_served():
     from fastapi.testclient import TestClient
 
-    import fnirs_flow.api.app as api_module
-
-    dist = tmp_path / "webui-dist"
-    monkeypatch.setattr(api_module, "_DIST_DIR", dist)
-    response = TestClient(app).get("/")
-    assert response.status_code == 404
-    assert "Frontend not built" in response.json()["detail"]
-
-    dist.mkdir()
-    (dist / "index.html").write_text("<div id=\"root\"></div>", encoding="utf-8")
     response = TestClient(app).get("/")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+    assert "id=\"root\"" in response.text
 
 
 def test_datasets_api_lists_builtin_registry():
@@ -392,7 +383,8 @@ def test_compile_flow():
     assert data["steps"] > 0
     assert data["dag_layers"]
     assert sum(len(layer) for layer in data["dag_layers"]) == data["steps"]
-    assert {"id", "atom_type", "node_type", "operation"} <= set(data["dag_layers"][0][0])
+    assert {"id", "atom_type", "operation"} <= set(data["dag_layers"][0][0])
+    assert "node_type" not in data["dag_layers"][0][0]
 
 
 def test_get_compile_result_rehydrates_from_disk():
@@ -409,7 +401,7 @@ def test_get_compile_result_rehydrates_from_disk():
 
     assert response.status_code == 200
     hydrated = response.json()
-    assert hydrated["flow_hash"] == posted["flow_hash"]
+    assert hydrated["revision"] == posted["revision"]
     assert hydrated["steps"] == posted["steps"]
     assert hydrated["dag_layers"] == posted["dag_layers"]
 
@@ -652,7 +644,7 @@ def test_create_snapshot():
     assert resp.status_code == 200
     data = resp.json()
     assert "snapshot_id" in data
-    assert "flow_hash" in data
+    assert data["revision"] >= 1
 
 
 def test_project_bundle_status_and_restore():
@@ -825,6 +817,8 @@ def test_atom_templates():
     assert study_design["parameter_specs"]["design_type"]["control"] == "select"
     bandpass = next(template for template in templates if template["id"] == "bandpass_filter")
     assert bandpass["parameter_specs"]["l_freq"] == {"type": "number", "control": "number", "minimum": 0}
+    assert set(bandpass["operation_contract"]["handler_backends"]) == {"cedalion", "mne_nirs"}
+    assert bandpass["operation_contract"]["execution_scope"] == "run"
     bids_import = next(template for template in templates if template["id"] == "bids_import")
     assert bids_import["parameter_specs"]["bids_dir"]["control"] == "path"
 

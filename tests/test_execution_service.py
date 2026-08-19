@@ -41,7 +41,7 @@ class TestBuildRunId:
         from fnirs_flow.execution.engine import _build_run_id
 
         result = _build_run_id({})
-        assert result == "run-unknown"
+        assert result == "run-unlabeled"
 
 
 # ============================================================================
@@ -319,7 +319,7 @@ class TestDispatchPreprocessing:
     def test_dispatch_unknown_raises(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
-        with pytest.raises(ValueError, match="Unknown preprocessing"):
+        with pytest.raises(ValueError, match="no registered preprocessing handler"):
             service._dispatch_preprocessing(adapter, "raw", "nonexistent", {})
 
 
@@ -500,7 +500,7 @@ class TestDispatchAnalysis:
     def test_dispatch_unknown_raises(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
-        with pytest.raises(ValueError, match="Unknown analysis"):
+        with pytest.raises(ValueError, match="no registered analysis handler"):
             service._dispatch_analysis(adapter, "raw", "nonexistent", {})
 
 
@@ -1798,7 +1798,7 @@ class TestGroupSummary:
         ]
 
     def test_group_summary_honors_participant_metadata_exclusions(self, tmp_path):
-        from fnirs_flow.data.participants import read_participant_table, write_participant_table_artifacts
+        from fnirs_flow.data.participant_tables import read_participant_table, write_participant_table_artifacts
         from fnirs_flow.execution.service import RunExecutionResult
 
         table_path = tmp_path / "participants.tsv"
@@ -1905,7 +1905,7 @@ class TestGroupSummary:
         ]
 
     def test_group_summary_writes_advanced_design_inference_artifacts(self, tmp_path):
-        from fnirs_flow.data.participants import read_participant_table, write_participant_table_artifacts
+        from fnirs_flow.data.participant_tables import read_participant_table, write_participant_table_artifacts
         from fnirs_flow.execution.service import RunExecutionResult
 
         table_path = tmp_path / "participants.tsv"

@@ -3,7 +3,6 @@ import { GitBranch, ArrowRight } from 'lucide-react';
 interface DagNode {
   id: string;
   atom_type?: string;
-  node_type?: string;
   operation?: string;
 }
 
@@ -48,8 +47,8 @@ export function DagLayerPreview({ layers, nodes }: DagLayerPreviewProps) {
               {layer.map((node, nodeIndex) => (
                 <div key={node.id || nodeIndex} className="dag-node">
                   <code className="node-id">{node.id}</code>
-                  {(node.atom_type || node.node_type) && (
-                    <span className="node-type">{node.atom_type || node.node_type}</span>
+                  {node.atom_type && (
+                    <span className="node-type">{node.atom_type}</span>
                   )}
                 </div>
               ))}

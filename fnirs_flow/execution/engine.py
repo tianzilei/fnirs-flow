@@ -5,13 +5,14 @@ Supports derivatives-style output layout and structured ActionAttempt tracking.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from fnirs_flow.execution.dag_payload import execution_atoms
 
 
 class RunContext(BaseModel):
@@ -22,7 +23,8 @@ class RunContext(BaseModel):
     task: str = ""
     data_path: str = ""
     relative_path: str = ""
-    data_sha256: str = ""
+    size_bytes: int = 0
+    modified_at: str = ""
     source_file_role: str = ""
     events_path: str = ""
     status: str = "pending"
@@ -73,7 +75,7 @@ def ensure_derivatives_layout(outdir: Path) -> dict[str, Path]:
 def _build_run_id(sr: dict[str, Any], _seen: set[str] | None = None) -> str:
     """Build a stable run id from available BIDS entities.
 
-    Appends a short path hash suffix if the BIDS-based ID would collide
+    Appends an explicit sequence suffix if the BIDS-based ID would collide
     with a previously generated ID in the same batch.
     """
     parts = []
@@ -89,17 +91,16 @@ def _build_run_id(sr: dict[str, Any], _seen: set[str] | None = None) -> str:
     if parts:
         run_id = "_".join(parts)
     else:
-        # No BIDS entities: derive from path
-        path = sr.get("path") or sr.get("relative_path") or ""
-        suffix = hashlib.sha256(path.encode()).hexdigest()[:8] if path else "unknown"
-        run_id = f"run-{suffix}"
+        run_id = "run-unlabeled"
 
     # Deduplicate within a batch
     if _seen is not None:
         if run_id in _seen:
-            path = sr.get("path") or sr.get("relative_path") or ""
-            suffix = hashlib.sha256(path.encode()).hexdigest()[:8]
-            run_id = f"{run_id}_{suffix}"
+            base = run_id
+            sequence = 2
+            while run_id in _seen:
+                run_id = f"{base}_{sequence}"
+                sequence += 1
         _seen.add(run_id)
 
     return run_id
@@ -127,6 +128,7 @@ def dry_run(
         if not dag_path.exists():
             raise FileNotFoundError(f"execution_dag.json not found in {plan_dir}")
     dag = json.loads(dag_path.read_text(encoding="utf-8"))
+    atoms = execution_atoms(dag)
 
     # Load data manifest if available (from compiled/ subdirectory)
     runs: list[RunContext] = []
@@ -141,7 +143,7 @@ def dry_run(
         seen_run_ids: set[str] = set()
         for sr in manifest.get("subject_session_runs", []):
             run_id = _build_run_id(sr, _seen=seen_run_ids)
-            steps = [n["step_id"] for n in dag.get("nodes", [])]
+            steps = [atom["atom_id"] for atom in atoms]
             runs.append(
                 RunContext(
                     run_id=run_id,
@@ -151,7 +153,8 @@ def dry_run(
                     task=sr.get("task", ""),
                     data_path=sr.get("path", ""),
                     relative_path=sr.get("relative_path", ""),
-                    data_sha256=sr.get("data_sha256", ""),
+                    size_bytes=int(sr.get("size_bytes", 0)),
+                    modified_at=str(sr.get("modified_at", "")),
                     source_file_role=sr.get("source_file_role", ""),
                     events_path=sr.get("events_path", ""),
                     status="planned",
@@ -161,7 +164,7 @@ def dry_run(
             )
     else:
         # No data manifest: create a single placeholder run
-        steps = [n["step_id"] for n in dag.get("nodes", [])]
+        steps = [atom["atom_id"] for atom in atoms]
         runs.append(
             RunContext(
                 run_id="dry-run-placeholder",
@@ -175,8 +178,8 @@ def dry_run(
         total_runs=len(runs),
         planned_runs=runs,
         summary={
-            "dag_nodes": len(dag.get("nodes", [])),
-            "dag_atoms": len(dag.get("atoms", dag.get("nodes", []))),
+            "dag_nodes": len(atoms),
+            "dag_atoms": len(atoms),
             "execution_layers": len(dag.get("execution_layers", [])),
         },
     )
@@ -199,9 +202,6 @@ def dry_run(
 def _write_run_report(outdir: Path, result: DryRunResult, plan_dir: Path) -> None:
     """Write run_report.md with summary stats and planned runs table."""
 
-    def short_hash(value: str) -> str:
-        return value[:12] if value else ""
-
     lines = [
         "# Dry-Run Report",
         "",
@@ -217,14 +217,14 @@ def _write_run_report(outdir: Path, result: DryRunResult, plan_dir: Path) -> Non
         "",
         "## Planned Runs",
         "",
-        "| Run ID | Subject | Session | Task | Run | Source | SHA256 | Status | Steps |",
-        "|--------|---------|---------|------|-----|--------|--------|--------|-------|",
+        "| Run ID | Subject | Session | Task | Run | Source | Bytes | Modified | Status | Steps |",
+        "|--------|---------|---------|------|-----|--------|-------|----------|--------|-------|",
     ]
     for run in result.planned_runs:
         lines.append(
             f"| `{run.run_id}` | {run.subject} | {run.session} | "
             f"{run.task} | {run.run} | {run.relative_path} | "
-            f"{short_hash(run.data_sha256)} | {run.status} | "
+            f"{run.size_bytes} | {run.modified_at} | {run.status} | "
             f"{len(run.steps_completed)} |"
         )
     lines.append("")

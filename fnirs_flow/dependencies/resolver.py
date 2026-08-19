@@ -25,6 +25,7 @@ from fnirs_flow.dependencies.models import (
     RequirementStatus,
     ResolvedRequirement,
 )
+from fnirs_flow.execution.dag_payload import execution_atoms
 from fnirs_flow.registry.dependency_profiles import (
     DependencyProfileRegistry,
     get_profile_registry,
@@ -65,12 +66,12 @@ class DependencyResolver:
         )
 
         # Collect atoms and their dependency requirements
-        atoms_list = dag.get("atoms", dag.get("nodes", []))
+        atoms_list = execution_atoms(dag)
         requirements_by_profile: dict[str, list[PackageRequirement]] = {}
         affected_atoms: dict[str, list[str]] = {}  # profile_id -> [atom_ids]
 
         for atom in atoms_list:
-            atom_id = atom.get("atom_id") or atom.get("step_id", "")
+            atom_id = atom.get("atom_id", "")
             backend_id = atom.get("backend_id")
 
             if not backend_id:
@@ -140,8 +141,6 @@ class DependencyResolver:
         plan.requires_user_approval = requires_approval
         plan.network_required = network_required
         plan.status = PlanStatus.SATISFIED if all_satisfied else PlanStatus.APPROVAL_REQUIRED
-        plan.plan_fingerprint = plan.compute_fingerprint()
-
         return plan
 
     def _resolve_package(

@@ -8,6 +8,13 @@ import {
   type ProjectDataFolder,
 } from '../api/client';
 import { useStore } from '../store';
+import {
+  selectDiscover,
+  selectDiscoverResult,
+  selectImportParticipantTable,
+  selectParticipantTableResult,
+} from '../features/data/store';
+import { selectProject } from '../features/project/store';
 
 interface Dataset {
   id: string;
@@ -62,11 +69,11 @@ function formatMetadataValue(value: unknown): string {
 }
 
 export function DataWorkspace() {
-  const project = useStore((s) => s.project);
-  const discover = useStore((s) => s.discover);
-  const importParticipantTable = useStore((s) => s.importParticipantTable);
-  const discoverResult = useStore((s) => s.discoverResult);
-  const participantTableResult = useStore((s) => s.participantTableResult);
+  const project = useStore(selectProject);
+  const discover = useStore(selectDiscover);
+  const importParticipantTable = useStore(selectImportParticipantTable);
+  const discoverResult = useStore(selectDiscoverResult);
+  const participantTableResult = useStore(selectParticipantTableResult);
   const [activeStep, setActiveStep] = useState<DataStep>('dataset');
   const [selectedDataset, setSelectedDataset] = useState('');
   const [datasetPath, setDatasetPath] = useState('');
@@ -460,8 +467,8 @@ export function DataWorkspace() {
             <dd>{participantTableResult.validation_report.join_preview.matched_subjects.length}</dd>
             <dt>Excluded Subjects</dt>
             <dd>{participantTableResult.validation_report.join_preview.excluded_subjects.length}</dd>
-            <dt>Hash</dt>
-            <dd>{String(participantTableResult.manifest.sha256 || '')}</dd>
+            <dt>File size</dt>
+            <dd>{String(participantTableResult.manifest.size_bytes || 0)} bytes</dd>
           </dl>
           {participantTableResult.validation_report.errors.length > 0 && (
             <div className="error-message">{participantTableResult.validation_report.errors.join('; ')}</div>

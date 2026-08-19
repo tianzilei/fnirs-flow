@@ -9,12 +9,12 @@ from fnirs_flow.validation.models import RiskItem
 def validate_adapters(flow: FlowGraph) -> list[RiskItem]:
     """Check adapter compatibility across edges. Returns list of RiskItems."""
     risks: list[RiskItem] = []
-    node_map = {n.id: n for n in flow.nodes}
+    node_map = {n.id: n for n in flow.flow_atoms}
     adapter_map = {a.adapter_id: a for a in flow.adapter_registry}
 
     # Check for mixed backend usage without bridge
     backend_atoms = {}
-    for node in flow.nodes:
+    for node in flow.flow_atoms:
         if node.backend_binding:
             backend_atoms[node.id] = node.backend_binding.backend_id
 

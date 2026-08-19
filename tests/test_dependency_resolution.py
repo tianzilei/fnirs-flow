@@ -68,13 +68,10 @@ class TestDependencyModels:
             probe_module="test.probe",
         )
 
-        fp1 = profile.fingerprint()
-        fp2 = profile.fingerprint()
-        assert fp1 == fp2
-        assert len(fp1) == 64  # SHA-256 hex
+        assert profile.model_dump() == profile.model_copy().model_dump()
 
-    def test_dependency_plan_fingerprint_stable(self):
-        """Verify plan fingerprint is deterministic."""
+    def test_dependency_plan_revision_is_explicit(self):
+        """Verify dependency plans carry an explicit revision."""
         from fnirs_flow.dependencies.models import (
             DependencyPlan,
             PackageRequirement,
@@ -100,9 +97,7 @@ class TestDependencyModels:
             affected_atoms={"test-1.0": ["atom1"]},
         )
 
-        fp1 = plan.compute_fingerprint()
-        fp2 = plan.compute_fingerprint()
-        assert fp1 == fp2
+        assert plan.revision == 1
 
     def test_dependency_plan_is_satisfied(self):
         """Verify is_satisfied() correctly checks all requirements."""
@@ -299,8 +294,7 @@ class TestDependencyResolver:
 
         # Should have requirements for mne and mne-nirs
         assert len(plan.requirements) > 0
-        # Plan should have fingerprint
-        assert len(plan.plan_fingerprint) == 64
+        assert plan.revision == 1
 
     def test_resolve_cedalion_flow_without_cedalion(self):
         """Verify Cedalion Flow returns approval_required when Cedalion missing.

@@ -95,10 +95,12 @@ class TestDiscovery:
         assert first.subject == "01"
         assert first.task == "tapping"
         assert first.relative_path.endswith("_nirs.snirf")
-        assert first.data_sha256
+        assert first.size_bytes > 0
+        assert first.modified_at
         assert len(manifest.metadata_tables) == 1
         assert manifest.metadata_tables[0].path.endswith("participants.tsv")
-        assert manifest.metadata_tables[0].sha256
+        assert manifest.metadata_tables[0].size_bytes > 0
+        assert manifest.metadata_tables[0].modified_at
         # data_manifest.json is now written to compiled/ subdirectory
         assert (tmp_path / "compiled" / "data_manifest.json").exists()
         assert (tmp_path / "compiled" / "run_table.csv").exists()

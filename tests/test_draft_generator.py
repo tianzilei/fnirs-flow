@@ -13,31 +13,33 @@ class TestDraftGenerator:
         with pytest.raises(ValueError, match="Unknown scenario: nonexistent"):
             generate_draft_flow("nonexistent")
 
-    def test_task_scenario_generates_nodes(self):
+    def test_task_scenario_generates_canonical_atoms(self):
         flow = generate_draft_flow("task")
-        assert len(flow["nodes"]) > 0
-        for node in flow["nodes"]:
-            assert "id" in node
-            assert "type" in node
-            assert "label" in node
+        assert "nodes" not in flow
+        assert len(flow["flow_atoms"]) > 0
+        for atom in flow["flow_atoms"]:
+            assert "id" in atom
+            assert "atom_type" in atom
+            assert "type" not in atom
+            assert "label" in atom
 
     def test_task_scenario_uses_executable_default_templates(self):
         flow = generate_draft_flow("task")
-        node_ids = {node["id"] for node in flow["nodes"]}
-        template_ids = {node["template_id"] for node in flow["nodes"]}
+        node_ids = {node["id"] for node in flow["flow_atoms"]}
+        template_ids = {node["template_id"] for node in flow["flow_atoms"]}
         assert "n_read_run" in node_ids
         assert "tddr_motion_correction" in template_ids
         assert "bandpass_filter" in template_ids
-        assert all(node["readiness_status"] != "not_configured" for node in flow["nodes"])
+        assert all(node["readiness_status"] != "not_configured" for node in flow["flow_atoms"])
 
     def test_dataset_discovery_draft_config_has_no_source_kind(self):
         flow = generate_draft_flow("task", data_format="bids_nirs")
-        dataset_node = next(node for node in flow["nodes"] if node["template_id"] == "dataset_discovery")
+        dataset_node = next(node for node in flow["flow_atoms"] if node["template_id"] == "dataset_discovery")
         assert dataset_node["config"] == {"dataset_id": ""}
 
     def test_required_atoms_connect_only_compatible_ports(self):
         flow = generate_draft_flow("task")
-        nodes = {node["id"]: node for node in flow["nodes"]}
+        nodes = {node["id"]: node for node in flow["flow_atoms"]}
         assert flow["edges"]
         for edge in flow["edges"]:
             source_ports = {
@@ -69,7 +71,7 @@ class TestDraftGenerator:
 
     def test_supported_non_task_scenario_includes_run_reader(self):
         flow = generate_draft_flow("resting_state")
-        node_ids = {node["id"] for node in flow["nodes"]}
+        node_ids = {node["id"] for node in flow["flow_atoms"]}
         assert "n_read_run" in node_ids
         assert "n_optical_density" in node_ids
 
@@ -89,10 +91,10 @@ class TestDraftGenerator:
     def test_high_impact_atoms_marked_for_review(self):
         flow = generate_draft_flow("task")
         high_impact = {"motion_correction", "filtering", "design_matrix", "first_level_glm", "contrast"}
-        for node in flow["nodes"]:
-            if node["type"] in high_impact:
-                assert node.get("requires_review")
-                assert node["readiness_status"] == "needs_attention"
+        for atom in flow["flow_atoms"]:
+            if atom["atom_type"] in high_impact:
+                assert atom.get("requires_review")
+                assert atom["readiness_status"] == "needs_attention"
 
     def test_assumptions_include_format_and_conditions(self):
         flow = generate_draft_flow("task", data_format="nirx", conditions=["left", "right"])

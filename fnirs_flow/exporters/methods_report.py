@@ -149,9 +149,6 @@ def _format_reproducibility(plan: dict[str, Any]) -> str:
         "software versions, and processing logs is available as supplementary material.",
     ]
 
-    if plan.get("flow_hash"):
-        lines.append(f"Flow configuration hash: {plan['flow_hash'][:16]}...")
-
     return " ".join(lines)
 
 

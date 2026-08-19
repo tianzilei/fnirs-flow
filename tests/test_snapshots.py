@@ -17,18 +17,18 @@ class TestProjectSnapshot:
         snap = ProjectSnapshot(
             snapshot_id="snap-001",
             flow={"nodes": [], "edges": []},
-            flow_hash="abc123",
+            revision=3,
             created_at="2026-01-01T00:00:00Z",
         )
         assert snap.snapshot_id == "snap-001"
-        assert snap.flow_hash == "abc123"
+        assert snap.revision == 3
 
     def test_snapshot_no_attempt_field(self):
         """ProjectSnapshot must not contain current_attempt."""
         snap = ProjectSnapshot(
             snapshot_id="s1",
             flow={},
-            flow_hash="h",
+            revision=1,
             created_at="t",
         )
         d = snap.model_dump()

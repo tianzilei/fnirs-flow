@@ -6,8 +6,8 @@ from pydantic import ValidationError
 
 from fnirs_flow.flow.checklists import validate_checklist_coverage
 from fnirs_flow.flow.empty_markers import normalize_empty_markers
-from fnirs_flow.flow.models import FlowGraph
 from fnirs_flow.flow.schemas import validate_flow_dict
+from fnirs_flow.flow.serialization import load_canonical_flow
 from fnirs_flow.registry.validators import validate_scenario_constraints
 from fnirs_flow.security.validation import validate_security
 from fnirs_flow.validation.adapters import validate_adapters
@@ -48,7 +48,7 @@ def validate_flow(flow_dict: dict, scenario_id: str | None = None) -> Validation
 
     # 2. Parse to model
     try:
-        flow = FlowGraph.model_validate(flow_dict)
+        flow = load_canonical_flow(flow_dict)
     except (ValueError, KeyError, TypeError, ValidationError) as e:
         report.errors.append(f"Flow model parsing failed: {e}")
         report.readiness = report.derive_readiness()

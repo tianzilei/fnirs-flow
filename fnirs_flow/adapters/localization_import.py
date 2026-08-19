@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 import re
 from collections import Counter
@@ -68,7 +67,7 @@ def import_projection_coordinate_csv(
     selected_label_column = _select_first_existing(headers, [label_column] if label_column else LABEL_COLUMN_CANDIDATES)
     selected_index_column = _select_first_existing(headers, INDEX_COLUMN_CANDIDATES)
     status_allowlist = set(include_match_statuses or DEFAULT_STATUS_ALLOWLIST)
-    source_sha256 = _sha256(source)
+    source_stat = source.stat()
     coordinate_set = coordinate_set_id or _first_nonempty(rows, "group_id") or source.stem
 
     normalized_rows: list[dict[str, Any]] = []
@@ -107,7 +106,7 @@ def import_projection_coordinate_csv(
                 "coordinate_method": str(row.get("coordinate_method", "")).strip(),
                 "match_status": str(row.get("match_status", "")).strip(),
                 "accuracy_caveat": str(row.get("accuracy_caveat", "")).strip() or accuracy_caveat,
-                "source_file_sha256": source_sha256,
+                "source_file_size": source_stat.st_size,
             }
         )
 
@@ -132,7 +131,8 @@ def import_projection_coordinate_csv(
         "atom_id": atom_id,
         "method_id": method_id,
         "source_file": str(source),
-        "source_file_sha256": source_sha256,
+        "source_file_size": source_stat.st_size,
+        "source_file_modified": source_stat.st_mtime_ns,
         "source_rows": len(rows),
         "imported_rows": len(normalized_rows),
         "skipped_missing_mni": skipped_missing_mni,
@@ -181,7 +181,8 @@ def import_projection_coordinate_csv(
         "warnings": warnings,
         "provenance": {
             "source_file": str(source),
-            "source_file_sha256": source_sha256,
+            "source_file_size": source_stat.st_size,
+            "source_file_modified": source_stat.st_mtime_ns,
             "coordinate_columns": list(selected_coordinate_columns),
             "method_id": method_id,
             "accuracy_caveat": accuracy_caveat,
@@ -282,14 +283,6 @@ def _write_rows(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _safe_stem(value: str) -> str:

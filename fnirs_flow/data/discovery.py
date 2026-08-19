@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,22 +14,13 @@ from fnirs_flow.data.manifest import (
     SubjectSessionRun,
     write_data_manifest,
 )
-from fnirs_flow.data.participants import read_participant_table, write_participant_table_artifacts
+from fnirs_flow.data.participant_tables import read_participant_table, write_participant_table_artifacts
 from fnirs_flow.data.registry import DatasetEntry, DatasetRegistry
-from fnirs_flow.filesystem import (
+from fnirs_flow.infrastructure.filesystem import (
     is_macos_metadata_path,
     is_visible_data_file,
     remove_macos_metadata_paths,
 )
-
-
-def _compute_file_hash(filepath: Path) -> str:
-    """Compute SHA256 hash of a file."""
-    h = hashlib.sha256()
-    with open(filepath, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def _discover_mne_dataset(entry: DatasetEntry, outdir: Path) -> DataManifest:
@@ -42,7 +32,7 @@ def _discover_mne_dataset(entry: DatasetEntry, outdir: Path) -> DataManifest:
     except (ImportError, OSError, RuntimeError):
         local_root = Path.home() / "mne_data" / entry.folder_name
 
-    from fnirs_flow.api.uri import create_external_data_uri
+    from fnirs_flow.infrastructure.uri import create_external_data_uri
 
     files: list[DataFile] = []
     subject_runs: list[SubjectSessionRun] = []
@@ -56,8 +46,8 @@ def _discover_mne_dataset(entry: DatasetEntry, outdir: Path) -> DataManifest:
                 DataFile(
                     path=rel_path,
                     uri=str(create_external_data_uri(entry.dataset_id, rel_path)),
-                    sha256=_compute_file_hash(f),
                     size_bytes=f.stat().st_size,
+                    modified_at=datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat(),
                     role="raw_snirf",
                 )
             )
@@ -144,7 +134,7 @@ def _discover_local_bids_nirs(
         else (_find_workspace_root() / entry.folder_name).resolve()
     )
 
-    from fnirs_flow.api.uri import create_external_data_uri
+    from fnirs_flow.infrastructure.uri import create_external_data_uri
 
     files: list[DataFile] = []
     subject_runs: list[SubjectSessionRun] = []
@@ -167,8 +157,8 @@ def _discover_local_bids_nirs(
                 DataFile(
                     path=rel_path,
                     uri=str(create_external_data_uri(entry.dataset_id, rel_path)),
-                    sha256=_compute_file_hash(f),
                     size_bytes=f.stat().st_size,
+                    modified_at=datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat(),
                     role=role,
                 )
             )
@@ -192,8 +182,8 @@ def _discover_local_bids_nirs(
                     encoding=participant_table.source.encoding,
                     delimiter=participant_table.source.delimiter,
                     id_normalization=participant_table.source.id_normalization,
-                    sha256=participant_table.source.sha256,
                     size_bytes=participant_table.source.size_bytes,
+                    modified_at=participant_table.source.modified_at,
                     columns=[column.model_dump() for column in participant_table.columns],
                 )
             )
@@ -225,7 +215,8 @@ def _discover_local_bids_nirs(
                     path=rel_path,
                     uri=str(create_external_data_uri(entry.dataset_id, rel_path)),
                     relative_path=rel_path,
-                    data_sha256=_compute_file_hash(f),
+                    size_bytes=f.stat().st_size,
+                    modified_at=datetime.fromtimestamp(f.stat().st_mtime, timezone.utc).isoformat(),
                     source_file_role="raw_snirf",
                     events_path=events_path,
                     events_uri=(
@@ -331,7 +322,8 @@ def discover_dataset(
                 "task",
                 "path",
                 "relative_path",
-                "data_sha256",
+                "size_bytes",
+                "modified_at",
             ]
         )
         for sr in manifest.subject_session_runs:
@@ -343,7 +335,8 @@ def discover_dataset(
                     sr.task,
                     sr.uri or sr.path,
                     sr.relative_path,
-                    sr.data_sha256,
+                    sr.size_bytes,
+                    sr.modified_at,
                 ]
             )
 

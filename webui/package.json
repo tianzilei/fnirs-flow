@@ -1,12 +1,13 @@
 {
   "name": "fnirs-flow-webui",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=18.0.0"
   },
   "scripts": {
+    "generate:api": "python ../tools/schema/generate_openapi.py",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",

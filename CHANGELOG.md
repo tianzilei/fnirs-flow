@@ -1,5 +1,53 @@
 # Changelog
 
+## [1.2.1] - 2026-08-19
+
+This release records the current synchronized development and public trees.
+
+### Release metadata
+
+- Project version is `1.2.1` across Python, WebUI, API metadata, and public documentation.
+- Public release synchronization and English-only documentation checks passed.
+
+## Unreleased
+
+### Added
+
+- Validated `FNIRS_RUN_WORKERS`, `FNIRS_BLAS_THREADS`,
+  `FNIRS_PARALLEL_BACKEND`, and `FNIRS_MEMORY_BUDGET_MB` settings with effective
+  CPU/memory admission, runtime native-thread limits, and audit metadata.
+- Spawn-safe, opt-in run process backend with scalar/path-only worker contracts,
+  deterministic input-order aggregation, API-thread coverage, cooperative
+  cancellation polling, and no post-start serial retry.
+- Deterministic execution benchmark runner and CI artifact upload.
+- ADR-0006 read-migrate/canonical-write policy for legacy Flow/DAG fields.
+
+### Changed
+
+- Updated the public documentation index and release notices so every shipped
+  document is self-contained, English-only, and limited to files present in the
+  public release tree.
+- Participant-table and group-statistics implementations now live behind their
+  dedicated modules; `data.participants` is a deprecated re-export facade.
+- MNE preprocessing and first-level analysis implementations now live behind
+  stage-specific modules; `mne_nirs_steps` is a deprecated re-export facade.
+- IIR filtering is vectorized across channels.
+- Group permutations use deterministic `SeedSequence` streams, reuse invariant
+  matrix inverses, expose seed/chunk/execution audit fields, and check
+  cancellation at chunk boundaries.
+- Registry CSV loading rejects missing and duplicate MethodAtom IDs.
+
+### Verified
+
+- Full suite (`1212 passed, 2 skipped`), Ruff, core mypy (`170` files), and
+  MNE mypy (`9` files) passed.
+- CPU-bound four-run benchmark, three-run medians: `9.03 s` serial vs `4.74 s`
+  with four processes (`1.90x`), with identical result digests.
+- Real two-run SNIRF serial/process orchestration matched status, artifact
+  identity/type/checksum, atom status, and numerical result tables.
+- DAG-layer parallelism remains disabled because run-level processing removes
+  the measured bottleneck and small workloads regress under extra scheduling.
+
 ## [1.2.0] - 2026-07-15
 
 ### Verified — 2026-08-15 Public Sync

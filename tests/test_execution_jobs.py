@@ -137,7 +137,7 @@ def test_running_job_can_be_cancelled(tmp_path):
 
 
 def test_project_execution_cancellation_is_not_logged_as_failure(monkeypatch, tmp_path):
-    import fnirs_flow.api.projects as projects_module
+    import fnirs_flow.application.project_use_cases as projects_module
     from fnirs_flow.execution.service import ExecutionService
 
     store = ProjectStore(tmp_path)

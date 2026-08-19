@@ -4,6 +4,9 @@ import {
   BarChart3, Copy, XCircle
 } from 'lucide-react';
 import { useStore } from '../store';
+import { selectExecuteInfo, selectRuns } from '../features/execution/store';
+import { selectImportStatus } from '../features/packages/store';
+import { selectProject } from '../features/project/store';
 import { formatApiError, getProjectResults, type ArtifactSummary, type ProjectResults } from '../api/client';
 import { sanitizeSvg } from '../utils/sanitizeSvg';
 
@@ -12,10 +15,10 @@ interface LocatedArtifact extends ArtifactSummary {
 }
 
 export function ResultsWorkspace() {
-  const runs = useStore((s) => s.runs);
-  const executeInfo = useStore((s) => s.executeInfo);
-  const project = useStore((s) => s.project);
-  const importStatus = useStore((s) => s.importStatus);
+  const runs = useStore(selectRuns);
+  const executeInfo = useStore(selectExecuteInfo);
+  const project = useStore(selectProject);
+  const importStatus = useStore(selectImportStatus);
   const [selectedTab, setSelectedTab] = useState<'artifacts' | 'qc' | 'channel' | 'roi' | 'group'>('artifacts');
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [backendResults, setBackendResults] = useState<ProjectResults | null>(null);
@@ -229,7 +232,7 @@ export function ResultsWorkspace() {
                         <tr>
                           <th>Type</th>
                           <th>Path</th>
-                          <th>Checksum</th>
+                          <th>Integrity SHA-256</th>
                           <th>Run</th>
                           <th>Atom</th>
                           <th>Actions</th>

@@ -207,7 +207,6 @@ class MethodAtomLibrary:
 
         return FlowAtom(
             id=atom_id,
-            type=template.atom_type,
             atom_type=template.atom_type,
             template_id=template.template_id,
             operation=template.operation or config.get("operation"),

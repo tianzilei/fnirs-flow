@@ -635,7 +635,7 @@ class TestDependencyPlanIntegration:
         assert "plan_id" in plan_data
         assert "requirements" in plan_data
         assert "affected_atoms" in plan_data
-        assert "plan_fingerprint" in plan_data
+        assert plan_data["revision"] == 1
 
     def test_dependency_plan_serializable(self):
         """Dependency plan is fully serializable to JSON."""

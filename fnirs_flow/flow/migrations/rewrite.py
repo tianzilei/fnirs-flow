@@ -45,20 +45,16 @@ def _migrate_v0_1_to_v0_2(flow_dict: dict[str, Any]) -> dict[str, Any]:
     """v0.1 -> v0.2: MethodAtom-first migration.
 
     Changes:
-      - nodes -> flow_atoms (dual-write, keep nodes for compat)
-      - node_type -> atom_type (dual-write on each atom)
+      - nodes -> flow_atoms
+      - type -> atom_type
       - Add template_id field to each atom
     """
-    result = dict(flow_dict)
+    from fnirs_flow.flow.serialization import normalize_flow_payload
 
-    # Dual-write: keep nodes, add flow_atoms
-    nodes = result.get("nodes", [])
+    result = normalize_flow_payload(flow_dict)
     flow_atoms = []
-    for node in nodes:
-        atom = dict(node)
-        # Add atom_type = node_type
-        if "atom_type" not in atom and "type" in atom:
-            atom["atom_type"] = atom["type"]
+    for item in result.get("flow_atoms", []):
+        atom = dict(item)
         # Ensure template_id field exists
         if "template_id" not in atom:
             atom["template_id"] = atom.get("metadata", {}).get("template_id")

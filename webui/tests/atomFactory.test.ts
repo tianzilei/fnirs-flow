@@ -70,7 +70,7 @@ const checklist = {
 function flowWithLinearAtoms() {
   return {
     flow_id: 'f1',
-    nodes: [
+    flow_atoms: [
       {
         id: 'dataset',
         template_id: 'dataset_discovery',
@@ -108,16 +108,16 @@ function flowWithLinearAtoms() {
 }
 
 test('inferChecklistScenario picks the most specific scenario from atoms', () => {
-  assert.equal(inferChecklistScenario({ nodes: [{ template_id: 'svm_model', category: 'analysis' }] }), 'ml_classification');
+  assert.equal(inferChecklistScenario({ flow_atoms: [{ template_id: 'svm_model', category: 'analysis' }] }), 'ml_classification');
   assert.equal(
-    inferChecklistScenario({ nodes: [{ template_id: 'connectivity_analysis', category: 'analysis' }] }),
+    inferChecklistScenario({ flow_atoms: [{ template_id: 'connectivity_analysis', category: 'analysis' }] }),
     'resting_state_connectivity'
   );
   assert.equal(
-    inferChecklistScenario({ nodes: [{ template_id: 'participant_table_input', category: 'data' }] }),
+    inferChecklistScenario({ flow_atoms: [{ template_id: 'participant_table_input', category: 'data' }] }),
     'group_analysis'
   );
-  assert.equal(inferChecklistScenario({ nodes: [] }), 'task_glm');
+  assert.equal(inferChecklistScenario({ flow_atoms: [] }), 'task_glm');
 });
 
 test('connectChecklistAtomsWithReport connects compatible required inputs and reports them', () => {
@@ -133,7 +133,7 @@ test('connectChecklistAtomsWithReport connects compatible required inputs and re
   );
   assert.equal(report.skipped_inputs.filter((item) => item.reason !== 'already_connected').length, 0);
 
-  const qc = report.flow.nodes.find((node) => node.id === 'qc');
+  const qc = report.flow.flow_atoms.find((node) => node.id === 'qc');
   assert.deepEqual(getAtomInputStatuses(report.flow, qc).map((input) => input.connected), [true]);
 });
 
@@ -174,11 +174,11 @@ test('buildChecklistMissingSequence previews added atoms and links without mutat
     },
   ];
 
-  const preview = buildChecklistMissingSequence({ nodes: [], edges: [], metadata: {} }, checklist, templates);
+  const preview = buildChecklistMissingSequence({ flow_atoms: [], edges: [], metadata: {} }, checklist, templates);
 
   assert.deepEqual(preview.added_atoms.map((atom) => atom.template_id), ['dataset_discovery', 'read_run', 'qc_metrics']);
   assert.equal(preview.connected_edges.length, 2);
-  assert.equal((preview.flow.nodes as Array<Record<string, unknown>>).length, 3);
+  assert.equal((preview.flow.flow_atoms as Array<Record<string, unknown>>).length, 3);
 });
 
 test('connectAtomRequiredInputsWithReport reports detailed failure reasons', () => {
@@ -188,11 +188,11 @@ test('connectAtomRequiredInputsWithReport reports detailed failure reasons', () 
     ports: [{ name: 'features', direction: 'in', schema: 'FeatureMatrix', required: true }],
   };
 
-  const noUpstream = connectAtomRequiredInputsWithReport({ nodes: [target], edges: [] }, target);
+  const noUpstream = connectAtomRequiredInputsWithReport({ flow_atoms: [target], edges: [] }, target);
   assert.equal(noUpstream.skipped_inputs[0].reason, 'no_upstream_atoms');
 
   const mismatch = connectAtomRequiredInputsWithReport({
-    nodes: [
+    flow_atoms: [
       target,
       { id: 'source', category: 'data', ports: [{ name: 'raw', direction: 'out', schema: 'RawData', required: true }] },
     ],
@@ -203,7 +203,7 @@ test('connectAtomRequiredInputsWithReport reports detailed failure reasons', () 
 
 test('previewEmptyRiskRemoval removes empty atoms and clears skip choices', () => {
   const flow = {
-    nodes: [
+    flow_atoms: [
       {
         id: 'empty_preprocessing',
         atom_type: 'empty_marker',
@@ -352,7 +352,7 @@ test('createFlowAtomFromTemplate keeps internal defaults out of config', () => {
 
 test('clearChecklistChoiceForAtom removes stale atom and skip markers after canvas deletion', () => {
   const flow = {
-    nodes: [{
+    flow_atoms: [{
       id: 'empty_preprocessing',
       atom_type: 'empty_marker',
       operation: 'empty_marker',
@@ -373,7 +373,7 @@ test('clearChecklistChoiceForAtom removes stale atom and skip markers after canv
     },
   };
 
-  const nextFlow = clearChecklistChoiceForAtom(flow, flow.nodes[0]);
+  const nextFlow = clearChecklistChoiceForAtom(flow, flow.flow_atoms[0]);
 
   assert.equal(nextFlow.metadata.checklist.choices.quality_control.template_id, 'qc_metrics');
   assert.equal(nextFlow.metadata.checklist.choices.quality_control.atom_id, undefined);

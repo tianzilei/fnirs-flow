@@ -28,12 +28,11 @@ class TestGoldenPlan:
         plan = json.loads((outdir / "plan.json").read_text())
         assert plan["flow_id"] == "demo-task-001"
 
-    def test_plan_has_dual_write_chains(self, tmp_path):
+    def test_plan_has_canonical_atom_chains_only(self, tmp_path):
         outdir = _compile_demo(tmp_path)
         plan = json.loads((outdir / "plan.json").read_text())
-        # Legacy chains
-        assert "preprocessing_chain" in plan
-        assert "analysis_chain" in plan
+        assert "preprocessing_chain" not in plan
+        assert "analysis_chain" not in plan
         # MethodAtom-first chains
         assert "preprocessing_atoms" in plan
         assert "analysis_atoms" in plan
@@ -56,55 +55,54 @@ class TestGoldenPlan:
 
 
 class TestGoldenDag:
-    def test_dag_has_nodes(self, tmp_path):
+    def test_dag_has_atoms(self, tmp_path):
         outdir = _compile_demo(tmp_path)
         dag = json.loads((outdir / "execution_dag.json").read_text())
-        assert len(dag["nodes"]) > 0
+        assert len(dag["atoms"]) > 0
 
     def test_dag_has_layers(self, tmp_path):
         outdir = _compile_demo(tmp_path)
         dag = json.loads((outdir / "execution_dag.json").read_text())
         assert len(dag["execution_layers"]) > 0
 
-    def test_dag_node_has_atom_fields(self, tmp_path):
+    def test_dag_atom_has_canonical_fields(self, tmp_path):
         outdir = _compile_demo(tmp_path)
         dag = json.loads((outdir / "execution_dag.json").read_text())
-        for node in dag["nodes"]:
-            assert "atom_id" in node
-            assert "atom_type" in node
-            assert "step_id" in node
+        for atom in dag["atoms"]:
+            assert "atom_id" in atom
+            assert "atom_type" in atom
+            assert "step_id" not in atom
+            assert "node_type" not in atom
 
-    def test_dag_dual_write(self, tmp_path):
+    def test_dag_does_not_dual_write_legacy_nodes(self, tmp_path):
         outdir = _compile_demo(tmp_path)
         dag = json.loads((outdir / "execution_dag.json").read_text())
-        # nodes and atoms should have same length
-        assert len(dag["nodes"]) == len(dag.get("atoms", dag["nodes"]))
+        assert "nodes" not in dag
 
 
-class TestGoldenHash:
-    def test_hash_stability_100x(self, tmp_path):
+class TestGoldenStructuralMatching:
+    def test_structural_snapshot_stability_100x(self, tmp_path):
         demo_path = Path(__file__).parent.parent / "configs" / "demo_task_flow.json"
         flow_dict = json.loads(demo_path.read_text())
-        from fnirs_flow.compiler.hashing import compute_flow_hash
+        from fnirs_flow.compiler.matching import canonical_flow_snapshot
 
-        hashes = [compute_flow_hash(flow_dict) for _ in range(100)]
-        assert len(set(hashes)) == 1
+        snapshots = [canonical_flow_snapshot(flow_dict) for _ in range(100)]
+        assert all(snapshot == snapshots[0] for snapshot in snapshots)
 
-    def test_hash_sensitivity(self, tmp_path):
-        from fnirs_flow.compiler.hashing import compute_flow_hash
+    def test_structural_change_is_detected(self, tmp_path):
+        from fnirs_flow.compiler.matching import flows_match
 
-        flow = {"flow_id": "test", "nodes": [{"id": "n1", "type": "a"}], "edges": []}
-        h1 = compute_flow_hash(flow)
-        flow["nodes"][0]["type"] = "b"
-        h2 = compute_flow_hash(flow)
-        assert h1 != h2
+        demo_path = Path(__file__).parent.parent / "configs" / "demo_task_flow.json"
+        flow = json.loads(demo_path.read_text())
+        changed = {**flow, "name": "Changed"}
+        assert not flows_match(flow, changed)
 
-    def test_two_compilations_same_hash(self, tmp_path):
+    def test_two_compilations_same_structure(self, tmp_path):
         outdir1 = _compile_demo(tmp_path / "c1")
         outdir2 = _compile_demo(tmp_path / "c2")
         plan1 = json.loads((outdir1 / "plan.json").read_text())
         plan2 = json.loads((outdir2 / "plan.json").read_text())
-        assert plan1["flow_hash"] == plan2["flow_hash"]
+        assert plan1 == plan2
 
 
 class TestGoldenManifests:

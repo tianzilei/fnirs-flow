@@ -14,7 +14,7 @@ def validate_atom_slot_contracts(flow: FlowGraph) -> list[RiskItem]:
     the target input port's schema.
     """
     risks: list[RiskItem] = []
-    node_map = {n.id: n for n in flow.nodes}
+    node_map = {n.id: n for n in flow.flow_atoms}
 
     for edge in flow.edges:
         source_node = node_map.get(edge.source)
@@ -68,7 +68,7 @@ def validate_graph(flow: FlowGraph) -> tuple[list[str], list[str], list[RiskItem
     risks: list[RiskItem] = []
 
     # Check atom IDs unique
-    node_ids = [n.id for n in flow.nodes]
+    node_ids = [n.id for n in flow.flow_atoms]
     seen_ids: set[str] = set()
     for nid in node_ids:
         if nid in seen_ids:
@@ -92,7 +92,7 @@ def validate_graph(flow: FlowGraph) -> tuple[list[str], list[str], list[RiskItem
             errors.append(f"Edge '{edge.id}' references non-existent target atom '{edge.target}'")
 
     # Check source/target ports exist
-    node_map = {n.id: n for n in flow.nodes}
+    node_map = {n.id: n for n in flow.flow_atoms}
     for edge in flow.edges:
         source_node = node_map.get(edge.source)
         target_node = node_map.get(edge.target)
@@ -112,7 +112,7 @@ def validate_graph(flow: FlowGraph) -> tuple[list[str], list[str], list[RiskItem
                 )
 
     # Check required inputs are connected
-    for node in flow.nodes:
+    for node in flow.flow_atoms:
         required_in = [p for p in node.ports if p.direction == "in" and p.required]
         connected_targets = {e.target_handle for e in flow.edges if e.target == node.id}
         for port in required_in:

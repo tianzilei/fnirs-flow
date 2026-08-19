@@ -2,7 +2,7 @@
 
 MethodAtom-first naming:
   - atom_id, atom_type, template_id, operation are the preferred fields.
-  - step_id, node_type are retained for backward compatibility.
+  - step_id and node_type are accepted only as legacy input aliases.
 """
 
 from __future__ import annotations
@@ -21,16 +21,13 @@ class DagNode(BaseModel):
       - template_id: source MethodAtomTemplate ID
       - operation: the specific operation this atom performs
 
-    Legacy fields (kept for backward compatibility):
+    Legacy input aliases:
       - step_id: same as atom_id
       - node_type: same as atom_type
     """
 
-    step_id: str
-    node_type: str
-    # MethodAtom-first dual-write fields
-    atom_id: str | None = None
-    atom_type: str | None = None
+    atom_id: str
+    atom_type: str
     template_id: str | None = None
     operation: str | None = None
     category: str = ""
@@ -50,32 +47,28 @@ class DagNode(BaseModel):
     output_artifacts: list[str] = Field(default_factory=list)
     dependencies: list[str] = Field(default_factory=list)
 
-    def model_post_init(self, __context: Any) -> None:
-        """Auto-sync legacy fields if atom fields are set."""
-        if self.atom_id is None and self.step_id:
-            self.atom_id = self.step_id
-        if self.atom_type is None and self.node_type:
-            self.atom_type = self.node_type
+    @property
+    def step_id(self) -> str:
+        """Deprecated read-only alias for legacy Python callers."""
+        return self.atom_id
+
+    @property
+    def node_type(self) -> str:
+        """Deprecated read-only alias for legacy Python callers."""
+        return self.atom_type
 
 
 class ExecutionDag(BaseModel):
     schema_version: str = "0.1.0"
     flow_id: str = ""
-    flow_hash: str = ""
-    nodes: list[DagNode] = Field(default_factory=list)
+    atoms: list[DagNode] = Field(default_factory=list)
     edges: list[dict[str, str]] = Field(default_factory=list)
     execution_layers: list[list[str]] = Field(default_factory=list)
-    # v0.2 dual-write: atoms mirrors nodes with MethodAtom-first naming
-    atoms: list[DagNode] | None = None
-
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Serialize with atoms dual-write."""
-        result = super().model_dump(**kwargs)
-        if result.get("atoms") is None:
-            result["atoms"] = result.get("nodes", [])
-        return result
+    @property
+    def nodes(self) -> list[DagNode]:
+        """Deprecated read-only alias for legacy Python callers."""
+        return self.atoms
 
     def atom_map(self) -> dict[str, DagNode]:
-        """MethodAtom-first accessor: returns atoms if present, else nodes."""
-        source = self.atoms if self.atoms is not None else self.nodes
-        return {n.atom_id or n.step_id: n for n in source}
+        """Return the canonical atom map."""
+        return {atom.atom_id: atom for atom in self.atoms}

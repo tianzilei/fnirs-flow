@@ -8,27 +8,26 @@ from pathlib import Path
 import pytest
 
 from fnirs_flow.compiler.compiler import compile_flow
-from fnirs_flow.compiler.hashing import compute_flow_hash
+from fnirs_flow.compiler.matching import canonical_flow_snapshot, flows_match
 
 pytestmark = pytest.mark.core
 
 
-class TestFlowHash:
-    def test_same_input_same_hash(self):
-        d = {"a": 1, "b": 2}
-        h1 = compute_flow_hash(d)
-        h2 = compute_flow_hash(d)
-        assert h1 == h2
+class TestFlowMatching:
+    @staticmethod
+    def _demo_flow() -> dict:
+        path = Path(__file__).parent.parent / "configs" / "demo_task_flow.json"
+        return json.loads(path.read_text())
 
-    def test_different_input_different_hash(self):
-        h1 = compute_flow_hash({"a": 1})
-        h2 = compute_flow_hash({"a": 2})
-        assert h1 != h2
+    def test_normalized_snapshot_matches_equivalent_flow(self):
+        demo_flow_dict = self._demo_flow()
+        snapshot = canonical_flow_snapshot(demo_flow_dict)
+        assert flows_match(demo_flow_dict, snapshot)
 
-    def test_deterministic(self):
-        d = {"nodes": [{"id": "n1"}], "edges": []}
-        hashes = [compute_flow_hash(d) for _ in range(10)]
-        assert len(set(hashes)) == 1
+    def test_structural_change_does_not_match(self):
+        demo_flow_dict = self._demo_flow()
+        changed = {**demo_flow_dict, "name": "Changed name"}
+        assert not flows_match(demo_flow_dict, changed)
 
 
 class TestCompiler:
@@ -39,7 +38,7 @@ class TestCompiler:
 
         assert result.plan is not None
         assert result.execution_dag is not None
-        assert result.flow_hash
+        assert "flow_hash" not in result.plan
 
     def test_compile_flow_atoms_only_input(self, tmp_path):
         flow_dict = {
@@ -90,9 +89,9 @@ class TestCompiler:
         plan = json.loads(plan_path.read_text())
         assert plan["schema_version"] == "0.2.0"
         assert plan["flow_id"] == "demo-task-001"
-        assert "preprocessing_chain" in plan
-        assert "analysis_chain" in plan
-        # MethodAtom-first: dual-write chains
+        assert "preprocessing_chain" not in plan
+        assert "analysis_chain" not in plan
+        # MethodAtom-first chains are canonical.
         assert "preprocessing_atoms" in plan
         assert "analysis_atoms" in plan
         assert len(plan["preprocessing_atoms"]) > 0
@@ -108,7 +107,8 @@ class TestCompiler:
         dag_path = result.outdir / "execution_dag.json"
         assert dag_path.exists()
         dag = json.loads(dag_path.read_text())
-        assert len(dag["nodes"]) > 0
+        assert len(dag["atoms"]) > 0
+        assert "nodes" not in dag
         assert len(dag["execution_layers"]) > 0
 
     def test_generates_manifests(self, tmp_path):
@@ -130,7 +130,6 @@ class TestCompiler:
         r1 = compile_flow(flow_dict, tmp_path / "out1")
         r2 = compile_flow(flow_dict, tmp_path / "out2")
 
-        assert r1.flow_hash == r2.flow_hash
         plan1 = json.loads((r1.outdir / "plan.json").read_text())
         plan2 = json.loads((r2.outdir / "plan.json").read_text())
         assert plan1 == plan2

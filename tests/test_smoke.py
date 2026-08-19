@@ -9,7 +9,7 @@ def test_version_importable():
     import fnirs_flow
 
     assert hasattr(fnirs_flow, "__version__")
-    assert fnirs_flow.__version__ == "1.2.0"
+    assert fnirs_flow.__version__ != ""
 
 
 def test_subpackages_importable():

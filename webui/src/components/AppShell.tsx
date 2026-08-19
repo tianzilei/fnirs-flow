@@ -19,7 +19,6 @@ import {
   X,
 } from 'lucide-react';
 import { useStore } from '../store';
-import { subscribeProgress } from '../api/client';
 import type { Project } from '../api/client';
 
 type NavId = 'projects' | 'flow' | 'atoms' | 'data' | 'checks' | 'runs' | 'results' | 'compile' | 'package' | 'import' | 'system';
@@ -60,6 +59,7 @@ export function AppShell() {
   const validate = useStore((s) => s.validate);
   const compile = useStore((s) => s.compile);
   const execute = useStore((s) => s.execute);
+  const subscribeExecutionProgress = useStore((s) => s.subscribeExecutionProgress);
   const readOnly = useStore((s) => s.importStatus?.read_only ?? false);
 
   // Auto-load project when URL has :id
@@ -86,13 +86,8 @@ export function AppShell() {
   // Subscribe to SSE progress
   useEffect(() => {
     if (!project) return;
-    const unsubscribe = subscribeProgress(project.id, (event) => {
-      useStore.setState((prev) => ({
-        progressEvents: [...prev.progressEvents.slice(-50), event],
-      }));
-    });
-    return unsubscribe;
-  }, [project]);
+    return subscribeExecutionProgress(project.id);
+  }, [project, subscribeExecutionProgress]);
 
   const getActiveNav = useCallback((): NavId => {
     const path = location.pathname;

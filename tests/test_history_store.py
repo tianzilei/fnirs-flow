@@ -225,7 +225,7 @@ class TestServiceDiff:
         result = svc.diff(c1, c2)
         changed = [ch for ch in result.changes if ch.kind == "node_changed"]
         assert len(changed) == 1
-        assert changed[0].path == "type"
+        assert changed[0].path == "atom_type"
         assert changed[0].before == "preprocess"
         assert changed[0].after == "glm"
 

@@ -29,9 +29,8 @@ class TestFlowSchemaMigration:
 
         assert v02["schema_version"] == "0.2.0"
         assert v02["flow_id"] == "test-flow"
-        # nodes preserved
-        assert len(v02["nodes"]) == 1
-        # flow_atoms added
+        # Legacy nodes are consumed at the migration boundary.
+        assert "nodes" not in v02
         assert len(v02["flow_atoms"]) == 1
         assert v02["flow_atoms"][0]["atom_type"] == "optical_density"
 

@@ -40,9 +40,7 @@ import {
   addTemplateAtomToFlow,
   atomCollectionKey,
   asRecords,
-  clearChecklistChoiceForAtom,
   connectionProblem,
-  editableConfig,
   findPort,
   flowAtoms as getFlowAtoms,
   getAtomInputStatuses,
@@ -55,6 +53,21 @@ import {
 } from '../flow/atomFactory';
 import { ParameterPanel } from './ParameterPanel';
 import { useStore } from '../store';
+import {
+  shouldSyncNodeChanges,
+  syncCanvasFlow as syncFlow,
+} from '../features/flow/canvasModel';
+import { shouldSyncEdgeChanges, toCanvasEdges as toEdges } from '../features/flow/edgeModel';
+import {
+  atomToDetailWithDefaults,
+  type NodeDetail,
+  parameterOptionsForNode,
+  parameterSpecForNode,
+  parameterTypeForValue,
+  visibleParameterEntries,
+} from '../features/flow/nodeModel';
+import { deleteAtomCommand } from '../features/flow/commands';
+import { selectAtomDetail } from '../features/flow/selectionModel';
 
 interface FlowCanvasProps {
   flow: Record<string, unknown>;
@@ -93,20 +106,6 @@ const nodeTypes = {
   flowAtom: FlowAtomNode,
 };
 
-interface NodeDetail {
-  id: string;
-  template_id: string;
-  atom_type: string;
-  operation: string;
-  category: string;
-  readiness_status: string;
-  config: Record<string, unknown>;
-  parameters: Record<string, unknown>;
-  parameter_options: Record<string, unknown[]>;
-  parameter_specs: Record<string, Record<string, unknown>>;
-  ports: Array<{ name: string; direction: string; schema: string }>;
-}
-
 interface PortNeighbor {
   id: string;
   atomType: string;
@@ -134,7 +133,7 @@ function edgeTargetHandle(edge: Record<string, unknown>): string {
 
 function atomTypeLabel(atom: Record<string, unknown> | undefined, fallbackId: string): string {
   if (!atom) return fallbackId;
-  return String(atom.atom_type || atom.type || atom.operation || atom.id || fallbackId);
+  return String(atom.atom_type || atom.operation || atom.id || fallbackId);
 }
 
 function atomCategory(atom: Record<string, unknown> | undefined): string {
@@ -235,7 +234,7 @@ function NodeLabel({
   portConnectionHints: PortConnectionHints;
 }) {
   const category = String(atom.category || 'node');
-  const atomType = String(atom.atom_type || atom.type || atom.id || 'Atom');
+  const atomType = String(atom.atom_type || atom.id || 'Atom');
   const operation = String(atom.operation || atomType);
   const Icon = categoryIcons[category] || CircleDot;
   const inputPorts = getAtomPorts(atom).filter((port) => port.direction === 'in');
@@ -302,7 +301,7 @@ function NodeLabel({
 }
 
 function toNodes(flow: Record<string, unknown>, focusedAtomId?: string | null): Node[] {
-  const flowAtoms = asRecords(flow.flow_atoms).length > 0 ? asRecords(flow.flow_atoms) : asRecords(flow.nodes);
+  const flowAtoms = asRecords(flow.flow_atoms);
   const connectionHints = buildPortConnectionHints(flowAtoms, asRecords(flow.edges));
   return flowAtoms.map((atom) => ({
     ...(() => {
@@ -338,185 +337,6 @@ function toNodes(flow: Record<string, unknown>, focusedAtomId?: string | null): 
       };
     })(),
   }));
-}
-
-function toEdges(flow: Record<string, unknown>): Edge[] {
-  return asRecords(flow.edges).map((edge) => ({
-    id: String(edge.id),
-    source: String(edge.source),
-    target: String(edge.target),
-    sourceHandle: edge.source_handle ? String(edge.source_handle) : undefined,
-    targetHandle: edge.target_handle ? String(edge.target_handle) : undefined,
-    animated: true,
-    className: 'flow-edge',
-  }));
-}
-
-function syncFlow(flow: Record<string, unknown>, nodes: Node[], edges: Edge[]): Record<string, unknown> {
-  const atomKey = Array.isArray(flow.flow_atoms) ? 'flow_atoms' : 'nodes';
-  const existingAtoms = asRecords(flow[atomKey]);
-  const atomById = new Map(existingAtoms.map((atom) => [String(atom.id), atom]));
-  const nextAtoms = nodes.map((node) => ({
-    ...(atomById.get(String(node.id)) || { id: String(node.id), type: String(node.id) }),
-    id: String(node.id),
-    position: node.position,
-  }));
-  const nextEdges = edges.map((edge, index) => {
-    const source = String(edge.source);
-    const target = String(edge.target);
-    const sourcePort = findPort(atomById.get(source), edge.sourceHandle, 'out');
-    const targetPort = findPort(atomById.get(target), edge.targetHandle, 'in');
-    return {
-      id: String(edge.id || `edge-${index + 1}`),
-      source,
-      target,
-      source_handle: String(edge.sourceHandle || sourcePort?.name || 'output'),
-      target_handle: String(edge.targetHandle || targetPort?.name || 'input'),
-    };
-  });
-  const nextFlow = {
-    ...flow,
-    [atomKey]: nextAtoms,
-    edges: nextEdges,
-  };
-  if (atomKey === 'flow_atoms' && Array.isArray(flow.nodes)) {
-    nextFlow.nodes = nextAtoms;
-  }
-  return nextFlow;
-}
-
-function shouldSyncNodeChanges(changes: NodeChange[]): boolean {
-  return changes.some((change) => ['position', 'remove'].includes(change.type));
-}
-
-function shouldSyncEdgeChanges(changes: EdgeChange[]): boolean {
-  return changes.some((change) => change.type === 'remove');
-}
-
-function normalizePorts(atom: Record<string, unknown>): NodeDetail['ports'] {
-  return getAtomPorts(atom).map((port) => ({
-    name: port.name,
-    direction: port.direction,
-    schema: port.schema,
-  }));
-}
-
-function atomToDetail(atom: Record<string, unknown>): NodeDetail {
-  const metadata = (atom.metadata as Record<string, unknown>) || {};
-  return {
-    id: String(atom.id),
-    template_id: String(atom.template_id || metadata.template_id || ''),
-    atom_type: String(atom.atom_type || atom.type || ''),
-    operation: String(atom.operation || ''),
-    category: String(atom.category || ''),
-    readiness_status: String(atom.readiness_status || atom.status || ''),
-    config: (atom.config as Record<string, unknown>) || {},
-    parameters: (atom.parameters as Record<string, unknown>) || {},
-    parameter_options: {
-      ...(((metadata.parameter_options as Record<string, unknown[]> | undefined) || {}) as Record<string, unknown[]>),
-      ...(((atom.parameter_options as Record<string, unknown[]> | undefined) || {}) as Record<string, unknown[]>),
-    },
-    parameter_specs: {
-      ...(((metadata.parameter_specs as Record<string, Record<string, unknown>> | undefined) || {}) as Record<string, Record<string, unknown>>),
-      ...(((atom.parameter_specs as Record<string, Record<string, unknown>> | undefined) || {}) as Record<string, Record<string, unknown>>),
-    },
-    ports: normalizePorts(atom),
-  };
-}
-
-function primitiveOptionValue(value: unknown): value is string | number {
-  return typeof value === 'string' || typeof value === 'number';
-}
-
-function uniqueOptionValues(values: unknown[]): unknown[] {
-  const seen = new Set<string>();
-  return values.filter((value) => {
-    if (!primitiveOptionValue(value)) return false;
-    const key = `${typeof value}:${String(value)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function templateMatchesDetail(template: AtomTemplate, node: NodeDetail): boolean {
-  return (
-    Boolean(node.template_id && template.id === node.template_id) ||
-    Boolean(node.operation && template.operation === node.operation) ||
-    Boolean(node.atom_type && template.atom_type === node.atom_type)
-  );
-}
-
-function parameterOptionsForNode(name: string, value: unknown, node: NodeDetail, templates: AtomTemplate[]): unknown[] | undefined {
-  if (!primitiveOptionValue(value)) return undefined;
-  const templateOptions = templates.find((template) => templateMatchesDetail(template, node))?.parameter_options?.[name] || [];
-  const options = uniqueOptionValues([
-    ...(node.parameter_options[name] || []),
-    ...templateOptions,
-  ]);
-  if (options.length === 0) return undefined;
-  const hasCurrentValue = options.some((option) => String(option) === String(value));
-  const withCurrent = hasCurrentValue || String(value) === '' ? options : [value, ...options];
-  return withCurrent.length > 1 ? withCurrent : undefined;
-}
-
-function parameterSpecForNode(name: string, node: NodeDetail, templates: AtomTemplate[]): Record<string, unknown> {
-  const templateSpec = templates.find((template) => templateMatchesDetail(template, node))?.parameter_specs?.[name] || {};
-  return {
-    ...templateSpec,
-    ...(node.parameter_specs[name] || {}),
-  };
-}
-
-function defaultConfigForAtom(atom: Record<string, unknown>, templates: AtomTemplate[]): Record<string, unknown> {
-  const metadata = (atom.metadata as Record<string, unknown> | undefined) || {};
-  const preferredIds = [
-    String(atom.template_id || ''),
-    String(metadata.template_id || ''),
-  ].filter(Boolean);
-  const byId = templates.find((item) => preferredIds.includes(item.id));
-  if (byId) return byId.default_config || {};
-
-  const operation = String(atom.operation || '');
-  if (operation) {
-    const byOperation = templates.find((item) => item.operation === operation || item.id === operation);
-    if (byOperation) return byOperation.default_config || {};
-  }
-
-  const atomType = String(atom.atom_type || atom.type || '');
-  if (atomType) {
-    const matches = templates.filter((item) => item.atom_type === atomType || item.id === atomType);
-    if (matches.length === 1) return matches[0].default_config || {};
-  }
-
-  return {};
-}
-
-function atomToDetailWithDefaults(atom: Record<string, unknown>, templates: AtomTemplate[]): NodeDetail {
-  const detail = atomToDetail(atom);
-  const defaultConfig = defaultConfigForAtom(atom, templates);
-  return {
-    ...detail,
-    config: editableConfig({
-      ...defaultConfig,
-      ...detail.config,
-    }),
-  };
-}
-
-function visibleParameterEntries(node: NodeDetail): Array<[string, unknown]> {
-  const entries = Object.entries(editableConfig({ ...node.config, ...node.parameters }));
-  if (node.operation === 'bids_import') {
-    return entries.filter(([name]) => name !== 'datatype');
-  }
-  return entries;
-}
-
-function parameterTypeForValue(value: unknown): string {
-  if (typeof value === 'boolean') return 'boolean';
-  if (typeof value === 'number') return 'number';
-  if (Array.isArray(value) && value.every((item) => typeof item === 'number')) return 'number-list';
-  return 'text';
 }
 
 export function FlowCanvas({
@@ -586,24 +406,25 @@ export function FlowCanvas({
   useEffect(() => {
     const nodeId = searchParams.get('node');
     if (!nodeId) return;
-    const atom = flowAtoms.find((item) => String(item.id) === nodeId);
-    if (atom) {
-      setSelectedNode(atomToDetailWithDefaults(atom, atomTemplates));
+    const detail = selectAtomDetail(flow, nodeId, atomTemplates);
+    if (detail) {
+      setSelectedNode(detail);
       onInspectingChange?.(true);
     }
-  }, [atomTemplates, flowAtoms, onInspectingChange, searchParams]);
+  }, [atomTemplates, flow, onInspectingChange, searchParams]);
 
   useEffect(() => {
     if (!focusedAtomId) return;
     const atom = flowAtoms.find((item) => String(item.id) === focusedAtomId);
-    if (!atom) return;
-    setSelectedNode(atomToDetailWithDefaults(atom, atomTemplates));
+    const detail = selectAtomDetail(flow, focusedAtomId, atomTemplates);
+    if (!atom || !detail) return;
+    setSelectedNode(detail);
     onInspectingChange?.(true);
     const position = (atom.position as { x: number; y: number }) || undefined;
     if (position && reactFlowInstance) {
       reactFlowInstance.setCenter(position.x + 90, position.y + 40, { zoom: 1, duration: 300 });
     }
-  }, [atomTemplates, flowAtoms, focusedAtomId, onInspectingChange, reactFlowInstance]);
+  }, [atomTemplates, flow, flowAtoms, focusedAtomId, onInspectingChange, reactFlowInstance]);
 
   useEffect(() => {
     if (!selectedNode || atomTemplates.length === 0) return;
@@ -714,13 +535,13 @@ export function FlowCanvas({
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
-      const atom = flowAtoms.find((item) => String(item.id) === node.id);
-      if (atom) {
-        setSelectedNode(atomToDetailWithDefaults(atom, atomTemplates));
+      const detail = selectAtomDetail(flow, node.id, atomTemplates);
+      if (detail) {
+        setSelectedNode(detail);
         onInspectingChange?.(true);
       }
     },
-    [atomTemplates, flowAtoms, onInspectingChange]
+    [atomTemplates, flow, onInspectingChange]
   );
 
   const onPaneClick = useCallback(() => {
@@ -730,20 +551,16 @@ export function FlowCanvas({
 
   const deleteSelectedNode = useCallback(() => {
     if (readOnly || !selectedNode) return;
-    const removedAtom = flowAtoms.find((atom) => String(atom.id) === selectedNode.id);
-    const nextNodes = nodesRef.current.filter((node) => node.id !== selectedNode.id);
-    const nextEdges = edgesRef.current.filter(
-      (edge) => edge.source !== selectedNode.id && edge.target !== selectedNode.id
-    );
+    const deleted = deleteAtomCommand(flow, selectedNode.id, nodesRef.current, edgesRef.current);
+    const { nodes: nextNodes, edges: nextEdges } = deleted;
     nodesRef.current = nextNodes;
     edgesRef.current = nextEdges;
     setNodes(nextNodes);
     setEdges(nextEdges);
     setSelectedNode(null);
     onInspectingChange?.(false);
-    const syncedFlow = syncFlow(flow, nextNodes, nextEdges);
-    onChange(removedAtom ? clearChecklistChoiceForAtom(syncedFlow, removedAtom) : syncedFlow);
-  }, [flow, flowAtoms, onChange, onInspectingChange, readOnly, selectedNode, setEdges, setNodes]);
+    onChange(deleted.flow);
+  }, [flow, onChange, onInspectingChange, readOnly, selectedNode, setEdges, setNodes]);
 
   useEffect(() => {
     if (readOnly || !selectedNode) return undefined;
@@ -798,11 +615,7 @@ export function FlowCanvas({
           const metadata = (atom.metadata as Record<string, unknown>) || {};
           return { ...atom, metadata: { ...metadata, checklist_slot_id: activeChecklistStep.slotId } };
         });
-        nextFlow = {
-          ...nextFlow,
-          [atomKey]: nextAtoms,
-          ...(atomKey === 'flow_atoms' && Array.isArray(nextFlow.nodes) ? { nodes: nextAtoms } : {}),
-        };
+        nextFlow = { ...nextFlow, [atomKey]: nextAtoms };
         nextFlow = withChecklistChoice(nextFlow, activeChecklistStep.scenarioId, activeChecklistStep.slotId, {
           template_id: template.id,
           atom_id: String(added.atom.id),
@@ -959,16 +772,14 @@ export function FlowCanvas({
                 ? 'configured'
                 : selectedNode.readiness_status;
               setSelectedNode({ ...selectedNode, config: updatedConfig, readiness_status: nextReadiness });
-              const atomKey = Array.isArray(flow.flow_atoms) ? 'flow_atoms' : 'nodes';
-              const nextAtoms = asRecords(flow[atomKey]).map((atom) =>
+              const nextAtoms = asRecords(flow.flow_atoms).map((atom) =>
                 String(atom.id) === selectedNode.id
                   ? { ...atom, config: updatedConfig, readiness_status: nextReadiness }
                   : atom
               );
               onChange({
                 ...flow,
-                [atomKey]: nextAtoms,
-                ...(atomKey === 'flow_atoms' && Array.isArray(flow.nodes) ? { nodes: nextAtoms } : {}),
+                flow_atoms: nextAtoms,
               });
             }}
             onBulkChange={(values) => {
@@ -978,16 +789,14 @@ export function FlowCanvas({
                 ? 'configured'
                 : selectedNode.readiness_status;
               setSelectedNode({ ...selectedNode, config: updatedConfig, readiness_status: nextReadiness });
-              const atomKey = Array.isArray(flow.flow_atoms) ? 'flow_atoms' : 'nodes';
-              const nextAtoms = asRecords(flow[atomKey]).map((atom) =>
+              const nextAtoms = asRecords(flow.flow_atoms).map((atom) =>
                 String(atom.id) === selectedNode.id
                   ? { ...atom, config: updatedConfig, readiness_status: nextReadiness }
                   : atom
               );
               onChange({
                 ...flow,
-                [atomKey]: nextAtoms,
-                ...(atomKey === 'flow_atoms' && Array.isArray(flow.nodes) ? { nodes: nextAtoms } : {}),
+                flow_atoms: nextAtoms,
               });
             }}
             atomInfo={{

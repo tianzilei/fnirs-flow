@@ -11,12 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from fnirs_flow.api.uri import ProjectURI, URIBindingStore, create_external_data_uri
-from fnirs_flow.filesystem import (
+from fnirs_flow.infrastructure.filesystem import (
     is_macos_metadata_path,
     macos_metadata_ignore,
     remove_macos_metadata_paths,
 )
+from fnirs_flow.infrastructure.uri import ProjectURI, URIBindingStore, create_external_data_uri
 
 MAX_PACKAGE_BYTES = 10 * 1024**2
 MAX_UNCOMPRESSED_BYTES = 10 * 1024**2

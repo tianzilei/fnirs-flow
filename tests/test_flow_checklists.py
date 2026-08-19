@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from fnirs_flow.flow.checklists import get_flow_checklist, list_flow_checklists, validate_checklist_coverage
-from fnirs_flow.flow.models import FlowGraph
+from fnirs_flow.flow.serialization import load_canonical_flow
 from fnirs_flow.validation.api import validate_flow
 
 pytestmark = pytest.mark.core
@@ -38,7 +38,7 @@ def test_multiple_guided_scenarios_available():
 
 
 def test_checklist_coverage_reports_missing_required_steps(minimal_flow_dict):
-    flow = FlowGraph.model_validate(minimal_flow_dict)
+    flow = load_canonical_flow(minimal_flow_dict)
 
     risks = validate_checklist_coverage(flow, "task_glm")
 
@@ -57,7 +57,7 @@ def test_validate_flow_uses_metadata_checklist(minimal_flow_dict):
 
 
 def test_checklist_coverage_reports_existing_atom_missing_input_links():
-    flow = FlowGraph.model_validate(
+    flow = load_canonical_flow(
         {
             "schema_version": "0.1.0",
             "flow_id": "input-risk-flow",
@@ -97,7 +97,7 @@ def test_checklist_coverage_reports_existing_atom_missing_input_links():
 
 def test_task_glm_demo_flow_satisfies_required_checklist_steps():
     flow_dict = json.loads(Path("configs/demo_task_glm_real.json").read_text(encoding="utf-8"))
-    flow = FlowGraph.model_validate(flow_dict)
+    flow = load_canonical_flow(flow_dict)
 
     risks = validate_checklist_coverage(flow, "task_glm")
 

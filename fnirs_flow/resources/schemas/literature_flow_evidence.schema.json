@@ -1,0 +1,530 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fnirs-flow.dev/schemas/literature_flow_evidence.schema.json",
+  "title": "fnirs-flow Literature-to-Flow Evidence",
+  "description": "Intermediate evidence schema for translating structured fNIRS literature extraction into method atoms, parameter candidates, flow slot contracts, risk rules, reporting requirements, and evidence-backed node links.",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["0.1.0", "0.2.0"],
+      "description": "v0.2.0 introduces AtomEvidenceLink and target_atom_type"
+    },
+    "generated_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "source_tables": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Input extraction tables used to create this evidence layer."
+    },
+    "method_atoms": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/MethodAtom" },
+      "default": []
+    },
+    "parameter_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ParameterCandidate" },
+      "default": []
+    },
+    "flow_slot_contracts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/FlowSlotContract" },
+      "default": []
+    },
+    "risk_rule_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/RiskRuleCandidate" },
+      "default": []
+    },
+    "reporting_requirements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ReportingRequirement" },
+      "default": []
+    },
+    "node_evidence_links": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/NodeEvidenceLink" },
+      "description": "Legacy field. Use atom_evidence_links in v0.2+.",
+      "default": []
+    },
+    "atom_evidence_links": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/AtomEvidenceLink" },
+      "description": "v0.2 MethodAtom-first evidence links.",
+      "default": []
+    },
+    "readiness_profiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ReadinessProfile" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "EvidenceUse": {
+      "type": "string",
+      "enum": [
+        "method_atom",
+        "parameter_candidate",
+        "preset_node",
+        "risk_rule",
+        "reporting_requirement",
+        "background_only",
+        "exclude"
+      ]
+    },
+    "EvidenceLevel": {
+      "type": "string",
+      "enum": ["verbatim", "inferred", "not_reported", "not_applicable"]
+    },
+    "Confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "Scenario": {
+      "type": "string",
+      "enum": [
+        "task",
+        "resting_state",
+        "real_world",
+        "hyperscanning",
+        "machine_learning",
+        "review",
+        "multi_site",
+        "general"
+      ]
+    },
+    "Domain": {
+      "type": "string",
+      "enum": [
+        "acquisition",
+        "data_import",
+        "metadata",
+        "qc",
+        "preprocessing",
+        "motion",
+        "physiology",
+        "analysis",
+        "statistics",
+        "machine_learning",
+        "reporting",
+        "reproducibility",
+        "inclusion"
+      ]
+    },
+    "ParameterStatus": {
+      "type": "string",
+      "enum": [
+        "reported",
+        "inferred",
+        "candidate",
+        "project_default",
+        "missing",
+        "not_applicable"
+      ]
+    },
+    "EvidenceRef": {
+      "type": "object",
+      "required": ["evidence_id", "study_id"],
+      "properties": {
+        "evidence_id": { "type": "string" },
+        "study_id": { "type": "string" },
+        "source_id": { "type": "string" },
+        "linked_table": { "type": "string" },
+        "linked_field": { "type": "string" },
+        "evidence_level": { "$ref": "#/$defs/EvidenceLevel" },
+        "extraction_confidence": { "$ref": "#/$defs/Confidence" },
+        "verification_status": {
+          "type": "string",
+          "enum": [
+            "checked_against_full_text",
+            "matched_value_requires_second_pass",
+            "abstract_only",
+            "metadata_only",
+            "blocked"
+          ]
+        },
+        "quote_or_summary": { "type": "string" },
+        "source_url_or_path": { "type": "string" },
+        "section_or_anchor": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "MethodAtom": {
+      "type": "object",
+      "required": [
+        "atom_id",
+        "domain",
+        "scenario",
+        "operation",
+        "target_flow_slot",
+        "input_schema",
+        "output_schema",
+        "evidence_use",
+        "readiness_status"
+      ],
+      "properties": {
+        "atom_id": { "type": "string" },
+        "study_id": { "type": "string" },
+        "domain": { "$ref": "#/$defs/Domain" },
+        "scenario": { "$ref": "#/$defs/Scenario" },
+        "operation": {
+          "type": "string",
+          "description": "Atomic method operation, such as optical_density, wavelet_motion_correction, bandpass_filter, mbll, first_level_glm, pearson_connectivity, subject_wise_split."
+        },
+        "method_label": { "type": "string" },
+        "target_flow_slot": { "type": "string" },
+        "target_node_type": { "type": "string", "description": "Legacy field, use target_atom_type" },
+        "target_atom_type": { "type": "string", "description": "v0.2 MethodAtom-first target type" },
+        "input_schema": { "type": "string" },
+        "output_schema": { "type": "string" },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "parameter_status": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/ParameterStatus" }
+        },
+        "applicable_when": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "not_applicable_when": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "required_metadata_keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "required_user_confirmations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "missing_for_execution": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "evidence_use": { "$ref": "#/$defs/EvidenceUse" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceRef" },
+          "default": []
+        },
+        "confidence": { "$ref": "#/$defs/Confidence" },
+        "readiness_status": {
+          "type": "string",
+          "enum": ["ready", "needs_attention", "blocked"]
+        },
+        "review_required": { "type": "boolean", "default": true },
+        "notes": { "type": "string" }
+      }
+    },
+    "ParameterCandidate": {
+      "type": "object",
+      "required": [
+        "candidate_id",
+        "domain",
+        "scenario",
+        "target_flow_slot",
+        "parameter_name",
+        "parameter_status",
+        "evidence_use"
+      ],
+      "properties": {
+        "candidate_id": { "type": "string" },
+        "domain": { "$ref": "#/$defs/Domain" },
+        "scenario": { "$ref": "#/$defs/Scenario" },
+        "target_flow_slot": { "type": "string" },
+        "target_node_type": { "type": "string", "description": "Legacy field, use target_atom_type" },
+        "target_atom_type": { "type": "string", "description": "v0.2 MethodAtom-first target type" },
+        "parameter_name": { "type": "string" },
+        "value": {},
+        "unit": { "type": "string" },
+        "value_range": {
+          "type": "array",
+          "items": { "type": ["number", "string"] },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "parameter_status": { "$ref": "#/$defs/ParameterStatus" },
+        "support_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "aggregation_method": {
+          "type": "string",
+          "enum": [
+            "single_study",
+            "frequency_count",
+            "manual_synthesis",
+            "review_guidance",
+            "not_aggregated"
+          ]
+        },
+        "promote_to_default": {
+          "type": "string",
+          "enum": ["yes", "no", "conditional"]
+        },
+        "evidence_use": { "$ref": "#/$defs/EvidenceUse" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceRef" },
+          "default": []
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "sensitivity_recommendations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "FlowSlotContract": {
+      "type": "object",
+      "required": ["slot_id", "name", "domain", "scenario", "input_schema", "output_schema"],
+      "properties": {
+        "slot_id": { "type": "string" },
+        "name": { "type": "string" },
+        "domain": { "$ref": "#/$defs/Domain" },
+        "scenario": { "$ref": "#/$defs/Scenario" },
+        "input_schema": { "type": "string" },
+        "output_schema": { "type": "string" },
+        "allowed_operations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "allowed_node_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Legacy field, use allowed_atom_types",
+          "default": []
+        },
+        "allowed_atom_types": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "v0.2 MethodAtom-first allowed types",
+          "default": []
+        },
+        "required_metadata_keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "required_config_keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "forbidden_if": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "risk_rule_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "reporting_requirement_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "RiskRuleCandidate": {
+      "type": "object",
+      "required": ["rule_id", "domain", "severity", "condition", "message_template", "evidence_use"],
+      "properties": {
+        "rule_id": { "type": "string" },
+        "domain": { "$ref": "#/$defs/Domain" },
+        "scenario": { "$ref": "#/$defs/Scenario" },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "fatal", "unclear"]
+        },
+        "condition": { "type": "string" },
+        "message_template": { "type": "string" },
+        "suggested_action": { "type": "string" },
+        "target_flow_slot": { "type": "string" },
+        "target_node_type": { "type": "string", "description": "Legacy field, use target_atom_type" },
+        "target_atom_type": { "type": "string", "description": "v0.2 MethodAtom-first target type" },
+        "evidence_use": { "$ref": "#/$defs/EvidenceUse" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceRef" },
+          "default": []
+        },
+        "review_required": { "type": "boolean", "default": true },
+        "notes": { "type": "string" }
+      }
+    },
+    "ReportingRequirement": {
+      "type": "object",
+      "required": ["requirement_id", "domain", "scenario", "requirement_text", "evidence_use"],
+      "properties": {
+        "requirement_id": { "type": "string" },
+        "domain": { "$ref": "#/$defs/Domain" },
+        "scenario": { "$ref": "#/$defs/Scenario" },
+        "target_flow_slot": { "type": "string" },
+        "requirement_text": { "type": "string" },
+        "required_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "report_section": {
+          "type": "string",
+          "enum": [
+            "methods",
+            "results",
+            "limitations",
+            "supplement",
+            "data_availability",
+            "reproducibility_package"
+          ]
+        },
+        "evidence_use": { "$ref": "#/$defs/EvidenceUse" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EvidenceRef" },
+          "default": []
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "NodeEvidenceLink": {
+      "type": "object",
+      "required": ["link_id", "target_node_type", "evidence_use"],
+      "description": "Legacy field. Use AtomEvidenceLink for v0.2+.",
+      "properties": {
+        "link_id": { "type": "string" },
+        "target_node_type": { "type": "string" },
+        "target_atom_type": { "type": "string", "description": "v0.2 MethodAtom-first target type" },
+        "target_template_id": { "type": "string" },
+        "target_flow_slot": { "type": "string" },
+        "method_atom_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "parameter_candidate_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "risk_rule_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "reporting_requirement_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "evidence_use": { "$ref": "#/$defs/EvidenceUse" },
+        "promote_to_node_library": {
+          "type": "string",
+          "enum": ["yes", "no", "conditional"],
+          "description": "Legacy field, use promote_to_atom_library"
+        },
+        "promote_to_atom_library": {
+          "type": "string",
+          "enum": ["yes", "no", "conditional"],
+          "description": "v0.2 MethodAtom-first promotion flag"
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "AtomEvidenceLink": {
+      "type": "object",
+      "required": ["link_id", "target_atom_type", "evidence_use"],
+      "description": "v0.2 MethodAtom-first evidence link connecting evidence to a MethodAtom type.",
+      "properties": {
+        "link_id": { "type": "string" },
+        "target_atom_type": { "type": "string", "description": "Target method atom type" },
+        "target_template_id": { "type": "string", "description": "Source MethodAtomTemplate ID" },
+        "target_flow_slot": { "type": "string" },
+        "method_atom_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "parameter_candidate_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "risk_rule_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "reporting_requirement_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "evidence_use": { "$ref": "#/$defs/EvidenceUse" },
+        "promote_to_atom_library": {
+          "type": "string",
+          "enum": ["yes", "no", "conditional"]
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "ReadinessProfile": {
+      "type": "object",
+      "required": ["profile_id", "target_flow_slot", "target_node_type"],
+      "properties": {
+        "profile_id": { "type": "string" },
+        "target_flow_slot": { "type": "string" },
+        "target_node_type": { "type": "string", "description": "Legacy field, use target_atom_type" },
+        "target_atom_type": { "type": "string", "description": "v0.2 MethodAtom-first target type" },
+        "required_extraction_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "high_priority_missing_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "blocking_missing_fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "minimum_evidence_rules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

@@ -34,10 +34,10 @@ from fnirs_flow.validation.state import (
 class TestNodeStateValidation:
     def test_ready_node_passes(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="test",
+                    atom_type="test",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.READY,
                 ),
@@ -48,10 +48,10 @@ class TestNodeStateValidation:
 
     def test_blocked_node_fails(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="test",
+                    atom_type="test",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.BLOCKED,
                 ),
@@ -62,10 +62,10 @@ class TestNodeStateValidation:
 
     def test_quarantined_node_fails(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="test",
+                    atom_type="test",
                     category=NodeCategory.DATA,
                     security_status=SecurityStatus.QUARANTINED,
                 ),
@@ -76,10 +76,10 @@ class TestNodeStateValidation:
 
     def test_not_configured_node_fails(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="test",
+                    atom_type="test",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.NOT_CONFIGURED,
                 ),
@@ -93,10 +93,10 @@ class TestNodeStateValidation:
         from fnirs_flow.security.validation import validate_security
 
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="test",
+                    atom_type="test",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.READY,
                     security_status=SecurityStatus.TRUSTED,
@@ -113,10 +113,10 @@ class TestNodeStateValidation:
         from fnirs_flow.security.validation import validate_security
 
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="test",
+                    atom_type="test",
                     category=NodeCategory.DATA,
                     security_status=SecurityStatus.QUARANTINED,
                     execution_trust_level=ExecutableTrustLevel.IMPORTED_CUSTOM,
@@ -132,16 +132,16 @@ class TestNodeStateValidation:
 class TestAdapterTagValidation:
     def test_valid_category_transition(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="data",
+                    atom_type="data",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="out", direction="out", schema="X")],
                 ),
                 FlowNode(
                     id="tgt",
-                    type="prep",
+                    atom_type="prep",
                     category=NodeCategory.PREPROCESSING,
                     ports=[NodePort(name="in", direction="in", schema="X")],
                 ),
@@ -164,16 +164,16 @@ class TestAdapterTagValidation:
 
         for source_category, target_category in cases:
             flow = FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="src",
-                        type="src",
+                        atom_type="src",
                         category=source_category,
                         ports=[NodePort(name="out", direction="out", schema="X")],
                     ),
                     FlowNode(
                         id="tgt",
-                        type="tgt",
+                        atom_type="tgt",
                         category=target_category,
                         ports=[NodePort(name="in", direction="in", schema="X")],
                     ),
@@ -188,16 +188,16 @@ class TestAdapterTagValidation:
 
     def test_invalid_category_transition(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="export",
+                    atom_type="export",
                     category=NodeCategory.EXPORT,
                     ports=[NodePort(name="out", direction="out", schema="X")],
                 ),
                 FlowNode(
                     id="tgt",
-                    type="data",
+                    atom_type="data",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="in", direction="in", schema="X")],
                 ),
@@ -211,17 +211,17 @@ class TestAdapterTagValidation:
 
     def test_scenario_tag_mismatch(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="out", direction="out", schema="X")],
                     metadata={"tags": ["task"]},
                 ),
                 FlowNode(
                     id="tgt",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.PREPROCESSING,
                     ports=[NodePort(name="in", direction="in", schema="X")],
                     metadata={"tags": ["resting_state"]},
@@ -238,10 +238,10 @@ class TestAdapterTagValidation:
 class TestStateContracts:
     def test_node_egress_rejects_disallowed_source_state(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.CONFIGURED,
                     ports=[NodePort(name="out", direction="out", schema="X")],
@@ -249,7 +249,7 @@ class TestStateContracts:
                 ),
                 FlowNode(
                     id="tgt",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.PREPROCESSING,
                     readiness_status=ReadinessStatus.READY,
                     ports=[NodePort(name="in", direction="in", schema="X")],
@@ -265,17 +265,17 @@ class TestStateContracts:
 
     def test_adapter_ingress_rejects_disallowed_source_state(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.CONFIGURED,
                     ports=[NodePort(name="out", direction="out", schema="A")],
                 ),
                 FlowNode(
                     id="tgt",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.PREPROCESSING,
                     readiness_status=ReadinessStatus.READY,
                     ports=[NodePort(name="in", direction="in", schema="B")],
@@ -308,17 +308,17 @@ class TestStateContracts:
 
     def test_port_contract_requires_target_metadata(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.READY,
                     ports=[NodePort(name="out", direction="out", schema="X")],
                 ),
                 FlowNode(
                     id="tgt",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.PREPROCESSING,
                     readiness_status=ReadinessStatus.READY,
                     ports=[
@@ -340,10 +340,10 @@ class TestStateContracts:
 
     def test_invalid_node_post_state_transition_fails(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.READY,
                     state_contract=NodeStateContract(post_readiness_status=ReadinessStatus.NOT_CONFIGURED),
@@ -355,10 +355,10 @@ class TestStateContracts:
 
     def test_valid_contracts_pass(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     readiness_status=ReadinessStatus.READY,
                     config={"dataset_id": "demo"},
@@ -374,7 +374,7 @@ class TestStateContracts:
                 ),
                 FlowNode(
                     id="tgt",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.PREPROCESSING,
                     readiness_status=ReadinessStatus.READY,
                     metadata={"validated_ingress": True},
@@ -403,7 +403,7 @@ class TestCustomNodeSafety:
     def test_builtin_no_risks(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             execution_trust_level=ExecutableTrustLevel.BUILTIN_MANAGED,
         )
@@ -413,7 +413,7 @@ class TestCustomNodeSafety:
     def test_custom_no_manifest_fails(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             execution_trust_level=ExecutableTrustLevel.PROJECT_CUSTOM,
             capability_manifest=None,
@@ -424,7 +424,7 @@ class TestCustomNodeSafety:
     def test_custom_network_fails(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             execution_trust_level=ExecutableTrustLevel.PROJECT_CUSTOM,
             capability_manifest=CapabilityManifest(network=True),
@@ -435,7 +435,7 @@ class TestCustomNodeSafety:
     def test_custom_shell_fails(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             execution_trust_level=ExecutableTrustLevel.PROJECT_CUSTOM,
             capability_manifest=CapabilityManifest(shell=True),
@@ -446,7 +446,7 @@ class TestCustomNodeSafety:
     def test_custom_external_path_fails(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             execution_trust_level=ExecutableTrustLevel.PROJECT_CUSTOM,
             capability_manifest=CapabilityManifest(file_access=["/etc/passwd"]),
@@ -454,16 +454,17 @@ class TestCustomNodeSafety:
         risks = validate_custom_node_safety(node)
         assert any("project-external" in r.message for r in risks)
 
-    def test_imported_no_checksum_warns(self):
+    def test_imported_atom_requires_quarantine_without_checksum_gate(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             execution_trust_level=ExecutableTrustLevel.IMPORTED_CUSTOM,
-            capability_manifest=CapabilityManifest(checksum=""),
+            capability_manifest=CapabilityManifest(),
         )
         risks = validate_custom_node_safety(node)
-        assert any("checksum" in r.message for r in risks)
+        assert any("quarantined" in r.message for r in risks)
+        assert not any("checksum" in r.message for r in risks)
 
 
 class TestStateTransition:
@@ -481,7 +482,7 @@ class TestNodeApproval:
     def test_approve_quarantined(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             security_status=SecurityStatus.QUARANTINED,
         )
@@ -491,7 +492,7 @@ class TestNodeApproval:
     def test_approve_blocked(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             readiness_status=ReadinessStatus.BLOCKED,
         )
@@ -501,7 +502,7 @@ class TestNodeApproval:
     def test_quarantine_node(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             readiness_status=ReadinessStatus.READY,
         )

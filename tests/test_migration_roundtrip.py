@@ -18,7 +18,7 @@ from fnirs_flow.flow.migration import (
     ensure_dag_atom_fields,
     migrate_flow_schema_v0_1_to_v0_2,
 )
-from fnirs_flow.flow.models import FlowGraph
+from fnirs_flow.flow.serialization import load_canonical_flow
 
 CONFIGS_DIR = Path(__file__).parent.parent / "configs"
 DEMO_FLOW_PATH = CONFIGS_DIR / "demo_task_flow.json"
@@ -36,7 +36,7 @@ class TestDemoFlowMigrationRoundTrip:
 
     def test_v01_flow_loads(self, v01_flow_dict: dict):
         """v0.1 demo flow can be parsed as FlowGraph."""
-        flow = FlowGraph.model_validate(v01_flow_dict)
+        flow = load_canonical_flow(v01_flow_dict)
         assert flow.schema_version == "0.1.0"
         assert len(flow.nodes) > 0
 
@@ -46,24 +46,25 @@ class TestDemoFlowMigrationRoundTrip:
 
         assert v02["schema_version"] == "0.2.0"
         assert "flow_atoms" in v02
-        assert len(v02["flow_atoms"]) == len(v02["nodes"])
+        assert "nodes" not in v02
+        assert len(v02["flow_atoms"]) == len(v01_flow_dict["nodes"])
 
         # Each atom should have atom_type
         for atom in v02["flow_atoms"]:
             assert "atom_type" in atom
-            assert atom["atom_type"] == atom["type"]
+            assert "type" not in atom
 
     def test_v02_flow_parses(self, v01_flow_dict: dict):
         """Migrated v0.2 flow can be parsed as FlowGraph."""
         v02 = migrate_flow_schema_v0_1_to_v0_2(v01_flow_dict)
-        flow = FlowGraph.model_validate(v02)
+        flow = load_canonical_flow(v02)
         assert flow.schema_version == "0.2.0"
         assert len(flow.nodes) > 0
 
     def test_v02_atom_map_works(self, v01_flow_dict: dict):
         """Migrated v0.2 flow atom_map accessor works."""
         v02 = migrate_flow_schema_v0_1_to_v0_2(v01_flow_dict)
-        flow = FlowGraph.model_validate(v02)
+        flow = load_canonical_flow(v02)
 
         atoms = flow.atom_map()
         assert len(atoms) == len(flow.nodes)
@@ -94,7 +95,7 @@ class TestMigrationHelperEdgeCases:
         v01 = {"schema_version": "0.1.0", "flow_id": "empty", "nodes": [], "edges": []}
         v02 = migrate_flow_schema_v0_1_to_v0_2(v01)
         assert v02["flow_atoms"] == []
-        assert v02["nodes"] == []
+        assert "nodes" not in v02
 
     def test_node_with_existing_atom_type(self):
         node = {"id": "n1", "type": "old", "atom_type": "new"}

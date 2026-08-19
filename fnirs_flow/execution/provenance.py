@@ -1,4 +1,4 @@
-"""Provenance logger: records parameters, versions, and artifact hashes."""
+"""Provenance logger: records parameters, versions, and design anchors."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _sanitize_for_json(obj: Any, project_root: Path | None = None) -> Any:
             except (OSError, ValueError):
                 return candidate.name
             else:
-                from fnirs_flow.api.uri import create_project_uri
+                from fnirs_flow.infrastructure.uri import create_project_uri
 
                 return str(create_project_uri(f"outputs/{relative.as_posix()}"))
     try:
@@ -48,15 +48,12 @@ class ProvenanceRecord:
         self,
         step_id: str,
         parameters: dict[str, Any],
-        input_hashes: dict[str, str] | None = None,
-        output_hashes: dict[str, str] | None = None,
+        **legacy_fields: Any,
     ) -> None:
         record: dict[str, Any] = {
             "step_id": step_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "parameters": parameters,
-            "input_hashes": input_hashes or {},
-            "output_hashes": output_hashes or {},
             "python_version": sys.version,
         }
         if self._commit_id:

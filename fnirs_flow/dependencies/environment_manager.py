@@ -2,7 +2,7 @@
 
 Implements §8.1 of the design document:
 - Each dependency profile uses an isolated environment
-- Path: <cache_root>/backend-envs/<profile_id>/<lock_fingerprint>/
+- Path: <cache_root>/backend-envs/<profile_id>/<environment_revision>/
 - Does NOT modify fnirs-flow main Python environment
 - Does NOT modify user's base Conda environment
 - Does NOT modify system Python
@@ -10,14 +10,13 @@ Implements §8.1 of the design document:
 - Atomic publish on success, quarantine on failure
 
 §8.4 - Concurrency:
-- Keyed by (profile_id, lock_fingerprint)
+- Keyed by (profile_id, environment revision)
 - Cross-process locking
 - Shared installation task for concurrent requests
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -51,7 +50,7 @@ class EnvironmentInfo(BaseModel):
 
     environment_id: str
     profile_id: str
-    lock_fingerprint: str
+    environment_revision: str
     path: str
     status: EnvironmentStatus = EnvironmentStatus.CREATING
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -60,7 +59,6 @@ class EnvironmentInfo(BaseModel):
     platform: str = ""
     installed_packages: dict[str, str] = Field(default_factory=dict)
     frozen_requirements: str = ""
-    environment_hash: str = ""
     error: str | None = None
 
 
@@ -134,7 +132,7 @@ class EnvironmentManager:
     """Manages isolated environments for dependency installation.
 
     Implements §8.1:
-    - <cache_root>/backend-envs/<profile_id>/<lock_fingerprint>/
+    - <cache_root>/backend-envs/<profile_id>/<environment_revision>/
     - Atomic publish on success
     - Quarantine on failure
 
@@ -169,27 +167,27 @@ class EnvironmentManager:
                 except (json.JSONDecodeError, ValueError) as e:
                     logger.warning("Failed to load environment info from %s: %s", info_path, e)
 
-    def _compute_environment_id(self, profile_id: str, lock_fingerprint: str) -> str:
+    def _compute_environment_id(self, profile_id: str, environment_revision: str) -> str:
         """Compute unique environment ID."""
-        return f"{profile_id}/{lock_fingerprint}"
+        return f"{profile_id}/{environment_revision}"
 
-    def get_environment_path(self, profile_id: str, lock_fingerprint: str) -> Path:
+    def get_environment_path(self, profile_id: str, environment_revision: str) -> Path:
         """Get the path for an environment."""
-        return self._cache_root / profile_id / lock_fingerprint
+        return self._cache_root / profile_id / environment_revision
 
-    def get_quarantine_path(self, profile_id: str, lock_fingerprint: str) -> Path:
+    def get_quarantine_path(self, profile_id: str, environment_revision: str) -> Path:
         """Get the quarantine path for a failed environment."""
-        return self._cache_root / ".quarantine" / profile_id / lock_fingerprint
+        return self._cache_root / ".quarantine" / profile_id / environment_revision
 
-    def environment_exists(self, profile_id: str, lock_fingerprint: str) -> bool:
+    def environment_exists(self, profile_id: str, environment_revision: str) -> bool:
         """Check if an environment exists and is ready."""
-        env_id = self._compute_environment_id(profile_id, lock_fingerprint)
+        env_id = self._compute_environment_id(profile_id, environment_revision)
         info = self._environments.get(env_id)
         return info is not None and info.status == EnvironmentStatus.READY
 
-    def get_environment(self, profile_id: str, lock_fingerprint: str) -> EnvironmentInfo | None:
+    def get_environment(self, profile_id: str, environment_revision: str) -> EnvironmentInfo | None:
         """Get environment info."""
-        env_id = self._compute_environment_id(profile_id, lock_fingerprint)
+        env_id = self._compute_environment_id(profile_id, environment_revision)
         return self._environments.get(env_id)
 
     def list_environments(self) -> list[EnvironmentInfo]:
@@ -199,7 +197,7 @@ class EnvironmentManager:
     def create_environment(
         self,
         profile_id: str,
-        lock_fingerprint: str,
+        environment_revision: str,
         python_version: str | None = None,
     ) -> EnvironmentInfo:
         """Create a new isolated environment.
@@ -209,17 +207,17 @@ class EnvironmentManager:
 
         §8.1: Environment creation and installation run in a separate process.
         """
-        env_id = self._compute_environment_id(profile_id, lock_fingerprint)
-        env_path = self.get_environment_path(profile_id, lock_fingerprint)
+        env_id = self._compute_environment_id(profile_id, environment_revision)
+        env_path = self.get_environment_path(profile_id, environment_revision)
 
         # Create staging directory (not yet published)
-        staging_path = env_path.parent / f".staging-{lock_fingerprint}"
+        staging_path = env_path.parent / f".staging-{environment_revision}"
         staging_path.mkdir(parents=True, exist_ok=True)
 
         info = EnvironmentInfo(
             environment_id=env_id,
             profile_id=profile_id,
-            lock_fingerprint=lock_fingerprint,
+            environment_revision=environment_revision,
             path=str(env_path),
             status=EnvironmentStatus.CREATING,
             python_version=python_version
@@ -234,14 +232,14 @@ class EnvironmentManager:
         self._environments[env_id] = info
         return info
 
-    def publish_environment(self, profile_id: str, lock_fingerprint: str) -> bool:
+    def publish_environment(self, profile_id: str, environment_revision: str) -> bool:
         """Publish an environment by atomic rename.
 
         §8.1: Successful installations are published by atomic rename.
         """
-        env_id = self._compute_environment_id(profile_id, lock_fingerprint)
-        env_path = self.get_environment_path(profile_id, lock_fingerprint)
-        staging_path = env_path.parent / f".staging-{lock_fingerprint}"
+        env_id = self._compute_environment_id(profile_id, environment_revision)
+        env_path = self.get_environment_path(profile_id, environment_revision)
+        staging_path = env_path.parent / f".staging-{environment_revision}"
 
         if not staging_path.exists():
             logger.error("Staging directory not found: %s", staging_path)
@@ -267,15 +265,15 @@ class EnvironmentManager:
             logger.error("Failed to publish environment: %s", e)
             return False
 
-    def quarantine_environment(self, profile_id: str, lock_fingerprint: str, error: str = "") -> bool:
+    def quarantine_environment(self, profile_id: str, environment_revision: str, error: str = "") -> bool:
         """Move a failed environment to quarantine.
 
         §8.1: Failed environments enter quarantine or the cleanup queue.
         """
-        env_id = self._compute_environment_id(profile_id, lock_fingerprint)
-        env_path = self.get_environment_path(profile_id, lock_fingerprint)
-        staging_path = env_path.parent / f".staging-{lock_fingerprint}"
-        quarantine_path = self.get_quarantine_path(profile_id, lock_fingerprint)
+        env_id = self._compute_environment_id(profile_id, environment_revision)
+        env_path = self.get_environment_path(profile_id, environment_revision)
+        staging_path = env_path.parent / f".staging-{environment_revision}"
+        quarantine_path = self.get_quarantine_path(profile_id, environment_revision)
 
         # Move staging or env to quarantine
         source = staging_path if staging_path.exists() else env_path
@@ -300,14 +298,14 @@ class EnvironmentManager:
             logger.error("Failed to quarantine environment: %s", e)
             return False
 
-    def remove_environment(self, profile_id: str, lock_fingerprint: str) -> bool:
+    def remove_environment(self, profile_id: str, environment_revision: str) -> bool:
         """Remove an environment.
 
         §8.2: Cancellability and environment removal.
         """
-        env_id = self._compute_environment_id(profile_id, lock_fingerprint)
-        env_path = self.get_environment_path(profile_id, lock_fingerprint)
-        quarantine_path = self.get_quarantine_path(profile_id, lock_fingerprint)
+        env_id = self._compute_environment_id(profile_id, environment_revision)
+        env_path = self.get_environment_path(profile_id, environment_revision)
+        quarantine_path = self.get_quarantine_path(profile_id, environment_revision)
 
         removed = False
         for path in [env_path, quarantine_path]:
@@ -360,31 +358,24 @@ class EnvironmentManager:
 
         return cleaned
 
-    def get_lock(self, profile_id: str, lock_fingerprint: str) -> EnvironmentLock:
+    def get_lock(self, profile_id: str, environment_revision: str) -> EnvironmentLock:
         """Get a cross-process lock for an environment."""
         lock_dir = self._cache_root / ".locks"
         lock_dir.mkdir(parents=True, exist_ok=True)
-        lock_name = f"{profile_id}-{lock_fingerprint}.lock"
+        lock_name = f"{profile_id}-{environment_revision}.lock"
         return EnvironmentLock(lock_dir / lock_name)
 
-    def compute_lock_fingerprint(
+    def environment_revision_name(
         self,
         profile_id: str,
         packages: list[dict[str, str]],
     ) -> str:
-        """Compute a stable fingerprint for lock file.
-
-        §8.4: Keyed by (profile_id, lock_fingerprint).
-        """
-        data = {
-            "profile_id": profile_id,
-            "packages": sorted(packages, key=lambda p: p.get("distribution", "")),
-            "python_version": f"{sys.version_info.major}.{sys.version_info.minor}",
-            "platform": platform.platform(),
-        }
-        return hashlib.sha256(
-            json.dumps(data, sort_keys=True).encode()
-        ).hexdigest()[:16]
+        """Return an explicit revision name for a dependency environment."""
+        versions = "-".join(
+            f"{item.get('distribution', 'package')}-{item.get('version', item.get('version_specifier', 'any'))}"
+            for item in sorted(packages, key=lambda item: item.get("distribution", ""))
+        )
+        return f"{profile_id}-py{sys.version_info.major}.{sys.version_info.minor}-{versions or 'empty'}"
 
 
 # Global environment manager

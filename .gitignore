@@ -67,6 +67,8 @@ pubmed_*.csv
 # Node.js
 webui/node_modules/
 webui/dist/
+!fnirs_flow/resources/
+!fnirs_flow/resources/**
 webui/.vite/
 webui/test-results/
 webui/playwright-report/

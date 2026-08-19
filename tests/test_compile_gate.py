@@ -16,6 +16,20 @@ def _demo_flow() -> dict:
 
 
 class TestCompileGateErrors:
+    def test_rejects_unregistered_operation(self, tmp_path):
+        flow = _demo_flow()
+        flow["nodes"][0]["config"]["operation"] = "not_registered_anywhere"
+
+        with pytest.raises(ValueError, match="Unknown operation: not_registered_anywhere"):
+            compile_flow(flow, tmp_path / "out")
+
+    def test_rejects_registered_operation_without_handler(self, tmp_path):
+        flow = _demo_flow()
+        flow["nodes"][0]["config"]["operation"] = "mara"
+
+        with pytest.raises(ValueError, match="Operation mara has no registered handler"):
+            compile_flow(flow, tmp_path / "out")
+
     def test_rejects_missing_flow_id(self, tmp_path):
         flow = _demo_flow()
         del flow["flow_id"]

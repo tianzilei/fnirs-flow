@@ -79,15 +79,15 @@ def _extract_chat_content(body: dict[str, Any]) -> str:
         return ""
     message = first.get("message")
     if isinstance(message, dict) and isinstance(message.get("content"), str):
-        return message["content"]
+        return str(message["content"])
     if isinstance(first.get("text"), str):
-        return first["text"]
+        return str(first["text"])
     return ""
 
 
 def _extract_responses_content(body: dict[str, Any]) -> str:
     if isinstance(body.get("output_text"), str):
-        return body["output_text"]
+        return str(body["output_text"])
     output = body.get("output")
     if not isinstance(output, list):
         return ""
@@ -205,11 +205,11 @@ def _flow_prompt(
             ],
             "hard_requirements": [
                 "The root object itself must be the FlowGraph.",
-                "Include schema_version, flow_id, name, description, metadata, nodes, and edges.",
+                "Include schema_version, flow_id, name, description, metadata, flow_atoms, and edges.",
                 "Use a stable non-placeholder flow_id derived from the study name.",
                 "Do not leave empty strings, TODO, unknown, TBD, null, or placeholder values in required fields.",
                 (
-                    "Every node must include id, type, atom_type, template_id, operation, category, origin, "
+                    "Every atom must include id, atom_type, template_id, operation, category, origin, "
                     "position, config, ports, readiness_status, execution_status, security_status, "
                     "and execution_trust_level."
                 ),

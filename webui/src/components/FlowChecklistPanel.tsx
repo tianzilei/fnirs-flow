@@ -301,7 +301,6 @@ export function FlowChecklistPanel({
     return {
       ...nextFlow,
       [atomKey]: nextAtoms,
-      ...(atomKey === 'flow_atoms' && Array.isArray(nextFlow.nodes) ? { nodes: nextAtoms } : {}),
     };
   };
 

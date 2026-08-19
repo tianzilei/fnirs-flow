@@ -51,7 +51,7 @@ class TestMethodAtomAliases:
     def test_create_flow_atom_with_new_name(self):
         atom = FlowAtom(
             id="test-atom",
-            type="optical_density",
+            atom_type="optical_density",
             category=MethodAtomCategory.PREPROCESSING,
         )
         assert atom.id == "test-atom"
@@ -61,7 +61,7 @@ class TestMethodAtomAliases:
         atom = FlowAtom.model_validate(
             {
                 "id": "legacy-atom",
-                "type": "dataset_discovery",
+                "atom_type": "dataset_discovery",
                 "category": "data",
                 "config": {
                     "dataset_id": "demo",
@@ -93,9 +93,9 @@ class TestFlowGraphAtomAccessors:
     def _make_flow(self) -> FlowGraph:
         return FlowGraph(
             flow_id="test-flow",
-            nodes=[
-                FlowNode(id="n1", type="optical_density", category="preprocessing"),
-                FlowNode(id="n2", type="beer_lambert_law", category="preprocessing"),
+            flow_atoms=[
+                FlowNode(id="n1", atom_type="optical_density", category="preprocessing"),
+                FlowNode(id="n2", atom_type="beer_lambert_law", category="preprocessing"),
             ],
         )
 
@@ -119,12 +119,9 @@ class TestFlowGraphAtomAccessors:
     def test_atom_map_prefers_flow_atoms(self):
         flow = FlowGraph(
             flow_id="test-flow",
-            nodes=[
-                FlowNode(id="n1", type="optical_density", category="preprocessing"),
-            ],
             flow_atoms=[
-                FlowNode(id="n1", type="optical_density", category="preprocessing"),
-                FlowNode(id="n2", type="beer_lambert_law", category="preprocessing"),
+                FlowNode(id="n1", atom_type="optical_density", category="preprocessing"),
+                FlowNode(id="n2", atom_type="beer_lambert_law", category="preprocessing"),
             ],
         )
         atoms = flow.atom_map()
@@ -142,7 +139,7 @@ class TestFlowGraphAtomAccessors:
                         "atom_type": "optical_density",
                         "category": "preprocessing",
                         "position": {"x": 0, "y": 0},
-                        "status": "configured",
+                        "readiness_status": "configured",
                     },
                 ],
                 "edges": [],
@@ -154,22 +151,18 @@ class TestFlowGraphAtomAccessors:
         assert flow.atom_map()["a1"].type == "optical_density"
 
 
-class TestFlowGraphDualWrite:
-    """Test FlowGraph flow_atoms dual-write field."""
+class TestFlowGraphCanonicalAtoms:
+    """Test the canonical FlowGraph atom collection."""
 
-    def test_flow_atoms_default_none(self):
+    def test_flow_atoms_default_empty(self):
         flow = FlowGraph(flow_id="test")
-        assert flow.flow_atoms is None
+        assert flow.flow_atoms == []
 
     def test_flow_atoms_populated(self):
         flow = FlowGraph(
             flow_id="test",
-            nodes=[
-                FlowNode(id="n1", type="optical_density", category="preprocessing"),
-            ],
             flow_atoms=[
-                FlowNode(id="n1", type="optical_density", category="preprocessing"),
+                FlowNode(id="n1", atom_type="optical_density", category="preprocessing"),
             ],
         )
-        assert flow.flow_atoms is not None
         assert len(flow.flow_atoms) == 1

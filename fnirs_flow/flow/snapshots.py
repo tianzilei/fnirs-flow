@@ -22,7 +22,7 @@ class ProjectSnapshot(BaseModel):
 
     snapshot_id: str
     flow: dict[str, Any]
-    flow_hash: str
+    revision: int
     created_at: str
     description: str = ""
     tags: list[str] = Field(default_factory=list)

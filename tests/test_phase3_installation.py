@@ -23,7 +23,7 @@ class TestEnvironmentManager:
         info = manager.create_environment("test-1.0", "abc123")
 
         assert info.profile_id == "test-1.0"
-        assert info.lock_fingerprint == "abc123"
+        assert info.environment_revision == "abc123"
         assert info.status.value == "creating"
 
     def test_publish_environment(self, tmp_path):
@@ -102,8 +102,8 @@ class TestEnvironmentManager:
         envs = manager.list_environments()
         assert len(envs) == 2
 
-    def test_lock_fingerprint_stable(self, tmp_path):
-        """Verify lock fingerprint is deterministic (§8.4)."""
+    def test_environment_revision_name_stable(self, tmp_path):
+        """Verify environment revision naming is deterministic (§8.4)."""
         from fnirs_flow.dependencies.environment_manager import EnvironmentManager
 
         manager = EnvironmentManager(tmp_path / "envs")
@@ -112,10 +112,10 @@ class TestEnvironmentManager:
             {"distribution": "pkg-b", "version": "2.0"},
         ]
 
-        fp1 = manager.compute_lock_fingerprint("test-1.0", packages)
-        fp2 = manager.compute_lock_fingerprint("test-1.0", packages)
-        assert fp1 == fp2
-        assert len(fp1) == 16
+        name1 = manager.environment_revision_name("test-1.0", packages)
+        name2 = manager.environment_revision_name("test-1.0", packages)
+        assert name1 == name2
+        assert "pkg-a-1.0" in name1
 
     def test_lock_acquisition(self, tmp_path):
         """Verify cross-process locking (§8.4)."""
@@ -152,8 +152,8 @@ class TestEnvironmentManager:
 class TestDependencyInstaller:
     """Test dependency installer (§8.2, §8.3, §8.4)."""
 
-    def test_validate_approval_fingerprint(self, tmp_path):
-        """Verify approval fingerprint validation (§8.2)."""
+    def test_validate_approval_revision(self, tmp_path):
+        """Verify approval revision validation (§8.2)."""
         from fnirs_flow.dependencies.installer import DependencyInstaller
         from fnirs_flow.dependencies.models import (
             ApprovalRecord,
@@ -182,27 +182,25 @@ class TestDependencyInstaller:
                 )
             ],
         )
-        plan.plan_fingerprint = plan.compute_fingerprint()
-
-        # Matching fingerprint
+        # Matching revision
         approval_ok = ApprovalRecord(
             plan_id="test-plan",
-            plan_fingerprint=plan.plan_fingerprint,
+            plan_revision=plan.revision,
             decision=InstallPolicy.APPROVED_ONCE,
         )
         is_valid, errors = installer.validate_approval(plan, approval_ok)
         assert is_valid
         assert len(errors) == 0
 
-        # Mismatched fingerprint
+        # Mismatched revision
         approval_bad = ApprovalRecord(
             plan_id="test-plan",
-            plan_fingerprint="wrong-fingerprint",
+            plan_revision=plan.revision + 1,
             decision=InstallPolicy.APPROVED_ONCE,
         )
         is_valid, errors = installer.validate_approval(plan, approval_bad)
         assert not is_valid
-        assert any("fingerprint" in e.lower() for e in errors)
+        assert any("revision" in e.lower() for e in errors)
 
     def test_validate_approval_source(self, tmp_path):
         """Verify source allowlist validation (§8.3)."""
@@ -235,11 +233,9 @@ class TestDependencyInstaller:
                 )
             ],
         )
-        plan_ok.plan_fingerprint = plan_ok.compute_fingerprint()
-
         approval = ApprovalRecord(
             plan_id="test",
-            plan_fingerprint=plan_ok.plan_fingerprint,
+            plan_revision=plan_ok.revision,
             decision=InstallPolicy.APPROVED_ONCE,
         )
 
@@ -277,11 +273,9 @@ class TestDependencyInstaller:
                 )
             ],
         )
-        plan_bad.plan_fingerprint = plan_bad.compute_fingerprint()
-
         approval = ApprovalRecord(
             plan_id="test",
-            plan_fingerprint=plan_bad.plan_fingerprint,
+            plan_revision=plan_bad.revision,
             decision=InstallPolicy.APPROVED_ONCE,
         )
 
@@ -319,16 +313,14 @@ class TestDependencyInstaller:
                 )
             ],
         )
-        plan.plan_fingerprint = plan.compute_fingerprint()
-
         # Approve plan
         from fnirs_flow.dependencies.policies import get_policy_manager
         policy_manager = get_policy_manager()
-        policy_manager.approve_plan(plan.plan_fingerprint)
+        policy_manager.approve_plan(f"{plan.plan_id}:{plan.revision}")
 
         approval = ApprovalRecord(
             plan_id="test",
-            plan_fingerprint=plan.plan_fingerprint,
+            plan_revision=plan.revision,
             decision=InstallPolicy.APPROVED_ONCE,
         )
 
@@ -453,16 +445,14 @@ class TestPhase3Integration:
                 )
             ],
         )
-        plan.plan_fingerprint = plan.compute_fingerprint()
-
         # Approve plan
         from fnirs_flow.dependencies.policies import get_policy_manager
         policy_manager = get_policy_manager()
-        policy_manager.approve_plan(plan.plan_fingerprint)
+        policy_manager.approve_plan(f"{plan.plan_id}:{plan.revision}")
 
         approval = ApprovalRecord(
             plan_id="integration-test",
-            plan_fingerprint=plan.plan_fingerprint,
+            plan_revision=plan.revision,
             decision=InstallPolicy.APPROVED_ONCE,
         )
 
@@ -519,7 +509,7 @@ class TestDesignDocumentCompliance:
 
         approval = ApprovalRecord(
             plan_id="depplan-test",
-            plan_fingerprint="sha256:abc123",
+            plan_revision=1,
             decision=InstallPolicy.APPROVED_ONCE,
             approved_by="local-user",
             allowed_sources=["github.com/ibs-lab/cedalion"],

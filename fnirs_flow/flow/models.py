@@ -22,7 +22,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 # Import first-class models from atoms.py
 from fnirs_flow.flow.atoms import (
@@ -115,27 +115,17 @@ class FlowGraph(BaseModel):
     flow_id: str = ""
     name: str = ""
     description: str = ""
-    nodes: list[FlowAtom] = Field(default_factory=list)
+    flow_atoms: list[FlowAtom] = Field(default_factory=list)
     edges: list[FlowEdge] = Field(default_factory=list)
     adapter_registry: list[AdapterDefinition] = Field(default_factory=list)
     metadata: FlowMetadata = Field(default_factory=FlowMetadata)
-    # v0.2 dual-write: flow_atoms mirrors nodes with MethodAtom-first naming
-    flow_atoms: list[FlowAtom] | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_atom_collections(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        result = dict(data)
-        flow_atoms = result.get("flow_atoms")
-        nodes = result.get("nodes")
-        if flow_atoms is not None and not nodes:
-            result["nodes"] = flow_atoms
-        return result
+    @property
+    def nodes(self) -> list[FlowAtom]:
+        """Deprecated read-only alias for source compatibility."""
+        return self.flow_atoms
 
     def node_map(self) -> dict[str, FlowAtom]:
-        return {n.id: n for n in self.nodes}
+        return {n.id: n for n in self.flow_atoms}
 
     def edge_map(self) -> dict[str, FlowEdge]:
         return {e.id: e for e in self.edges}
@@ -144,21 +134,8 @@ class FlowGraph(BaseModel):
         return self.node_map().get(node_id)
 
     def atom_map(self) -> dict[str, FlowAtom]:
-        """MethodAtom-first accessor: returns atoms from flow_atoms if present, else nodes."""
-        source = self.flow_atoms if self.flow_atoms is not None else self.nodes
-        return {n.id: n for n in source}
+        return {n.id: n for n in self.flow_atoms}
 
     def get_atom(self, atom_id: str) -> FlowAtom | None:
         """MethodAtom-first accessor."""
         return self.atom_map().get(atom_id)
-
-    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Serialize with flow_atoms dual-write.
-
-        When flow_atoms was not explicitly set, auto-populates it from nodes for v0.2 export.
-        """
-        result = super().model_dump(**kwargs)
-        # Auto-populate flow_atoms from nodes only if not explicitly set by caller
-        if "flow_atoms" not in self.model_fields_set and result.get("flow_atoms") is None:
-            result["flow_atoms"] = result.get("nodes", [])
-        return result

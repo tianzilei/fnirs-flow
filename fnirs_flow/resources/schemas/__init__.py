@@ -1,0 +1,1 @@
+"""Authoritative JSON Schema resources."""

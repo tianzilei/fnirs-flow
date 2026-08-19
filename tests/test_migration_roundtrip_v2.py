@@ -22,6 +22,7 @@ from fnirs_flow.flow.migrations.schema import (
     needs_migration,
 )
 from fnirs_flow.flow.models import FlowGraph
+from fnirs_flow.flow.serialization import load_canonical_flow
 from fnirs_flow.validation.error_codes import (
     ERROR_CODE_MAP,
     ErrorCode,
@@ -127,19 +128,20 @@ class TestV01ToV02Migration:
         v01 = _v0_1_flow_dict()
         v02 = migrate_flow_schema_v0_1_to_v0_2(v01)
         assert "flow_atoms" in v02
-        assert len(v02["flow_atoms"]) == len(v02["nodes"])
+        assert "nodes" not in v02
+        assert len(v02["flow_atoms"]) == len(v01["nodes"])
 
     def test_adds_atom_type(self):
         v01 = _v0_1_flow_dict()
         v02 = migrate_flow_schema_v0_1_to_v0_2(v01)
         for atom in v02["flow_atoms"]:
             assert "atom_type" in atom
-            assert atom["atom_type"] == atom["type"]
+            assert "type" not in atom
 
-    def test_preserves_nodes(self):
+    def test_removes_legacy_nodes(self):
         v01 = _v0_1_flow_dict()
         v02 = migrate_flow_schema_v0_1_to_v0_2(v01)
-        assert len(v02["nodes"]) == len(v01["nodes"])
+        assert "nodes" not in v02
 
     def test_does_not_mutate_original(self):
         v01 = _v0_1_flow_dict()
@@ -202,7 +204,7 @@ class TestMigrateFlowRewrite:
         dumped = flow.model_dump(exclude_none=True)
         assert dumped["schema_version"] == "0.3.0"
         assert len(dumped.get("flow_atoms", [])) == 2
-        assert len(dumped.get("nodes", [])) == 2
+        assert "nodes" not in dumped
 
 
 # ============================================================================
@@ -210,15 +212,16 @@ class TestMigrateFlowRewrite:
 # ============================================================================
 
 
-class TestFlowGraphDualWrite:
-    def test_model_dump_populates_flow_atoms(self):
+class TestFlowGraphCanonicalModel:
+    def test_model_dump_uses_flow_atoms_only(self):
         v02 = _v0_2_flow_dict()
         # Remove flow_atoms to test auto-population
         v02.pop("flow_atoms", None)
-        flow = FlowGraph.model_validate(v02)
+        flow = load_canonical_flow(v02)
         dumped = flow.model_dump(exclude_none=True)
         assert "flow_atoms" in dumped
-        assert len(dumped["flow_atoms"]) == len(dumped["nodes"])
+        assert "nodes" not in dumped
+        assert len(dumped["flow_atoms"]) == 2
 
     def test_atom_map_uses_flow_atoms(self):
         v02 = _v0_2_flow_dict()

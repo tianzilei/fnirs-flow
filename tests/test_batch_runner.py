@@ -72,7 +72,7 @@ class TestDryRun:
         assert run.task == "tapping"
         assert run.data_path == "/data/sub-01_task-tapping_nirs.snirf"
         assert run.relative_path == "sub-01/nirs/sub-01_task-tapping_nirs.snirf"
-        assert run.data_sha256 == "abc123"
+        assert run.size_bytes == 0
         assert run.source_file_role == "raw_snirf"
 
     def test_dry_run_missing_dag_raises(self, tmp_path):

@@ -1,0 +1,13 @@
+"""Persistence port for project use cases."""
+
+from __future__ import annotations
+
+from typing import Any, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class ProjectRepository(Protocol):
+    def get(self, project_id: str) -> dict[str, Any] | None: ...
+    def get_flow(self, project_id: str) -> dict[str, Any] | None: ...
+    def update_state(self, project_id: str, **values: Any) -> None: ...
+    def get_output_dir(self, project_id: str) -> Any: ...

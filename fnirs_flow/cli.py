@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
-import os
 from collections.abc import Callable
+from importlib.resources import files
 from pathlib import Path
 from typing import cast
 
@@ -22,11 +22,15 @@ def _is_loopback_host(host: str) -> bool:
 
 
 def _webui_dir() -> Path:
-    """Return the WebUI source directory for source-tree and packaged layouts."""
+    """Return the source-only WebUI directory used by explicit dev mode."""
     repo_webui = Path(__file__).resolve().parent.parent / "webui"
     if repo_webui.is_dir():
         return repo_webui
-    return Path(__file__).resolve().parent / "webui"
+    raise RuntimeError("WebUI developer sources are unavailable in this installation")
+
+
+def _packaged_webui_ready() -> bool:
+    return files("fnirs_flow.resources.webui").joinpath("dist").joinpath("index.html").is_file()
 
 
 def cmd_backends(args: argparse.Namespace) -> int:
@@ -66,7 +70,7 @@ def cmd_backends(args: argparse.Namespace) -> int:
 
 
 def cmd_validate(args: argparse.Namespace) -> int:
-    from fnirs_flow.validation.api import validate_flow
+    from fnirs_flow.application.flow_use_cases import validate_flow_payload
 
     flow_path = Path(args.flow_json)
     if not flow_path.exists():
@@ -74,7 +78,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
         return 1
 
     flow_dict = json.loads(flow_path.read_text(encoding="utf-8"))
-    report = validate_flow(flow_dict)
+    report = validate_flow_payload(flow_dict)
 
     if report.is_valid and not report.has_fatal_risks:
         print(f"Flow '{flow_dict.get('flow_id', 'unknown')}' passed validation.")
@@ -103,7 +107,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_compile(args: argparse.Namespace) -> int:
-    from fnirs_flow.compiler.compiler import compile_flow
+    from fnirs_flow.application.flow_use_cases import compile_flow_payload
 
     flow_path = Path(args.flow_json)
     if not flow_path.exists():
@@ -111,12 +115,11 @@ def cmd_compile(args: argparse.Namespace) -> int:
         return 1
 
     flow_dict = json.loads(flow_path.read_text(encoding="utf-8"))
-    result = compile_flow(flow_dict, args.outdir)
+    result = compile_flow_payload(flow_dict, args.outdir)
 
     print(f"Compiled flow '{result.flow_graph.flow_id}'")
-    print(f"  Flow hash: {result.flow_hash[:16]}...")
     print(f"  Output:    {result.outdir}")
-    print(f"  Steps:     {len(result.execution_dag.nodes)}")
+    print(f"  Steps:     {len(result.execution_dag.atoms)}")
     print(f"  Layers:    {len(result.execution_dag.execution_layers)}")
     print()
     print("Generated files:")
@@ -126,10 +129,10 @@ def cmd_compile(args: argparse.Namespace) -> int:
 
 
 def cmd_discover(args: argparse.Namespace) -> int:
-    from fnirs_flow.data.discovery import discover_dataset
+    from fnirs_flow.application.data_use_cases import discover_dataset_to_workspace
 
     try:
-        manifest = discover_dataset(args.dataset_id, args.outdir)
+        manifest = discover_dataset_to_workspace(args.dataset_id, args.outdir)
         compiled_dir = Path(args.outdir) / "compiled"
         print(f"Dataset '{args.dataset_id}' discovered")
         print(f"  Files:      {len(manifest.files)}")
@@ -147,10 +150,10 @@ def cmd_discover(args: argparse.Namespace) -> int:
 
 
 def cmd_dry_run(args: argparse.Namespace) -> int:
-    from fnirs_flow.execution.engine import dry_run
+    from fnirs_flow.application.execution_use_cases import dry_run_compiled_project
 
     try:
-        result = dry_run(args.plan_dir, outdir=args.outdir)
+        result = dry_run_compiled_project(args.plan_dir, outdir=args.outdir)
         report_path = Path(args.outdir) / "derivatives" / "reports" / "run_report.md"
         print(f"Dry-run complete for '{args.plan_dir}'")
         print(f"  Planned runs: {result.total_runs}")
@@ -168,10 +171,10 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     """Execute real analysis runs via ExecutionService."""
-    from fnirs_flow.execution.service import ExecutionRequest, ExecutionService
+    from fnirs_flow.application.execution_use_cases import execute_compiled_project
+    from fnirs_flow.execution.service import ExecutionRequest
 
     try:
-        service = ExecutionService()
         request = ExecutionRequest(
             project_dir=args.plan_dir,
             outdir=args.outdir,
@@ -182,7 +185,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             run_labels=getattr(args, "run_label", []) or [],
             continue_on_failure=getattr(args, "continue_on_failure", True),
         )
-        result = service.execute(request)
+        result = execute_compiled_project(request)
 
         # Print summary
         print(f"Execution complete for '{args.plan_dir}'")
@@ -541,10 +544,10 @@ def cmd_deps_resolve(args: argparse.Namespace) -> int:
             return 1
     else:
         # Compile the flow first
-        from fnirs_flow.compiler.compiler import compile_flow
+        from fnirs_flow.application.flow_use_cases import compile_flow_payload
         flow_dict = json.loads(source.read_text(encoding="utf-8"))
         outdir = source.parent / "compiled"
-        result = compile_flow(flow_dict, outdir)
+        result = compile_flow_payload(flow_dict, outdir)
         dag_path = result.outdir / "execution_dag.json"
 
     # Load DAG and resolve
@@ -559,7 +562,7 @@ def cmd_deps_resolve(args: argparse.Namespace) -> int:
     print(f"Dependency Resolution: {plan.plan_id}")
     print(f"  Status:    {plan.status.value}")
     print(f"  Flow ID:   {plan.flow_id}")
-    print(f"  Fingerprint: {plan.plan_fingerprint[:16]}...")
+    print(f"  Revision:   {plan.revision}")
     print()
     print(f"  Requirements: {len(plan.requirements)}")
     for req in plan.requirements:
@@ -616,7 +619,8 @@ def cmd_deps_install(args: argparse.Namespace) -> int:
 
     # Check if approved
     policy_manager = get_policy_manager()
-    if not policy_manager.is_approved(plan.plan_fingerprint):
+    plan_key = f"{plan.plan_id}:{plan.revision}"
+    if not policy_manager.is_approved(plan_key):
         print("Plan is not approved.")
         if plan.requires_user_approval:
             print(f"  Requirements: {len(plan.requirements)}")
@@ -626,12 +630,12 @@ def cmd_deps_install(args: argparse.Namespace) -> int:
             if confirm not in ("y", "yes"):
                 print("Installation cancelled.")
                 return 1
-        policy_manager.approve_plan(plan.plan_fingerprint)
+        policy_manager.approve_plan(plan_key)
 
     # Create approval record
     approval = ApprovalRecord(
         plan_id=plan.plan_id,
-        plan_fingerprint=plan.plan_fingerprint,
+        plan_revision=plan.revision,
         decision=InstallPolicy.APPROVED_ONCE,
     )
 
@@ -668,7 +672,7 @@ def cmd_deps_status(args: argparse.Namespace) -> int:
                 print(f"Dependency Plan: {plan_id}")
                 print(f"  Status:      {data.get('status', 'unknown')}")
                 print(f"  Flow ID:     {data.get('flow_id', 'unknown')}")
-                print(f"  Fingerprint: {data.get('plan_fingerprint', '')[:16]}...")
+                print(f"  Revision:    {data.get('revision', 1)}")
                 print(f"  Requirements: {len(data.get('requirements', []))}")
                 print(f"  Requires approval: {data.get('requires_user_approval', False)}")
                 print(f"  Network required: {data.get('network_required', False)}")
@@ -720,7 +724,7 @@ def cmd_deps_env_remove(args: argparse.Namespace) -> int:
     parts = environment_id.split("/", 1)
     if len(parts) != 2:
         print(f"Error: Invalid environment_id format: {environment_id}")
-        print("Expected format: profile_id/lock_fingerprint")
+        print("Expected format: profile_id/environment_revision")
         return 1
 
     orchestrator = get_installation_orchestrator()
@@ -740,10 +744,11 @@ def cmd_webui(args: argparse.Namespace) -> int:
         import uvicorn
 
         from fnirs_flow.api.app import app
+        from fnirs_flow.settings import settings
 
         host = args.host or "127.0.0.1"
         port = args.port
-        if not _is_loopback_host(host) and not os.environ.get("FNIRS_API_KEY"):
+        if not _is_loopback_host(host) and not settings.api_key:
             print("Error: binding WebUI to a non-localhost host requires FNIRS_API_KEY.")
             print("Set FNIRS_API_KEY or use --host 127.0.0.1 for local-only access.")
             return 1
@@ -777,19 +782,10 @@ def cmd_webui(args: argparse.Namespace) -> int:
                 vite_proc.wait(timeout=5)
         else:
             # Production mode: serve built frontend from FastAPI
-            webui_dir = _webui_dir()
-            dist_dir = webui_dir / "dist"
-            if not dist_dir.exists():
-                print("Frontend not built. Building now...")
-                import subprocess
-                import sys
-
-                if not (webui_dir / "node_modules").exists():
-                    print("Installing frontend dependencies...")
-                    subprocess.run(["npm", "install"], cwd=webui_dir, check=True)
-                print("Building frontend...")
-                subprocess.run(["npm", "run", "build"], cwd=webui_dir, check=True)
-                print()
+            if not _packaged_webui_ready():
+                print("Error: packaged WebUI assets are missing from this installation.")
+                print("Reinstall fnirs-flow; npm/Vite are only invoked with --dev.")
+                return 1
 
             print(f"Starting fnirs-flow WebUI on http://{host}:{port}")
             print("Press Ctrl+C to stop")
@@ -1035,7 +1031,7 @@ def main(argv: list[str] | None = None) -> int:
     p_env_list = env_subparsers.add_parser("list", help="List all environments")
     p_env_list.set_defaults(func=cmd_deps_env_list)
     p_env_remove = env_subparsers.add_parser("remove", help="Remove an environment")
-    p_env_remove.add_argument("environment_id", help="Environment ID (profile_id/lock_fingerprint)")
+    p_env_remove.add_argument("environment_id", help="Environment ID (profile_id/environment_revision)")
     p_env_remove.set_defaults(func=cmd_deps_env_remove)
 
     # Legacy aliases (backward compatibility)

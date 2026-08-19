@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from fnirs_flow.flow.serialization import normalize_flow_payload
 from fnirs_flow.history.models import DiffChange
 
 
@@ -14,10 +15,12 @@ def compute_flow_diff(from_flow: dict[str, Any], to_flow: dict[str, Any]) -> lis
     ``(source, source_port, target, target_port)`` when no edge ID exists).
     """
     changes: list[DiffChange] = []
+    from_flow = normalize_flow_payload(from_flow)
+    to_flow = normalize_flow_payload(to_flow)
 
     # --- Nodes ---
-    from_nodes = {n.get("id", ""): n for n in from_flow.get("nodes", [])}
-    to_nodes = {n.get("id", ""): n for n in to_flow.get("nodes", [])}
+    from_nodes = {n.get("id", ""): n for n in from_flow.get("flow_atoms", [])}
+    to_nodes = {n.get("id", ""): n for n in to_flow.get("flow_atoms", [])}
 
     for nid in sorted(set(from_nodes) - set(to_nodes)):
         changes.append(DiffChange(kind="node_removed", node_id=nid))

@@ -19,20 +19,20 @@ class TestSecurityValidation:
     def _node(self, trust_level, cap_manifest=None, status=NodeStatus.CONFIGURED):
         return FlowNode(
             id="n1",
-            type="custom",
+            atom_type="custom",
             category=NodeCategory.DATA,
             execution_trust_level=trust_level,
             capability_manifest=cap_manifest,
-            status=status,
+            readiness_status=status,
         )
 
     def test_builtin_no_risk(self):
         risks = validate_security(
             FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="n1",
-                        type="x",
+                        atom_type="x",
                         category=NodeCategory.DATA,
                         execution_trust_level=ExecutableTrustLevel.BUILTIN_MANAGED,
                     )
@@ -44,10 +44,10 @@ class TestSecurityValidation:
     def test_imported_custom_no_manifest_fatal(self):
         risks = validate_security(
             FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="n1",
-                        type="x",
+                        atom_type="x",
                         category=NodeCategory.DATA,
                         execution_trust_level=ExecutableTrustLevel.IMPORTED_CUSTOM,
                         capability_manifest=None,
@@ -61,10 +61,10 @@ class TestSecurityValidation:
     def test_imported_custom_with_manifest_no_network(self):
         risks = validate_security(
             FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="n1",
-                        type="x",
+                        atom_type="x",
                         category=NodeCategory.DATA,
                         execution_trust_level=ExecutableTrustLevel.IMPORTED_CUSTOM,
                         capability_manifest=CapabilityManifest(network=False),
@@ -78,10 +78,10 @@ class TestSecurityValidation:
     def test_imported_custom_network_fatal(self):
         risks = validate_security(
             FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="n1",
-                        type="x",
+                        atom_type="x",
                         category=NodeCategory.DATA,
                         execution_trust_level=ExecutableTrustLevel.IMPORTED_CUSTOM,
                         capability_manifest=CapabilityManifest(network=True),
@@ -95,10 +95,10 @@ class TestSecurityValidation:
     def test_imported_custom_shell_fatal(self):
         risks = validate_security(
             FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="n1",
-                        type="x",
+                        atom_type="x",
                         category=NodeCategory.DATA,
                         execution_trust_level=ExecutableTrustLevel.IMPORTED_CUSTOM,
                         capability_manifest=CapabilityManifest(shell=True),
@@ -111,10 +111,10 @@ class TestSecurityValidation:
     def test_imported_custom_external_path_fatal(self):
         risks = validate_security(
             FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="n1",
-                        type="x",
+                        atom_type="x",
                         category=NodeCategory.DATA,
                         execution_trust_level=ExecutableTrustLevel.IMPORTED_CUSTOM,
                         capability_manifest=CapabilityManifest(file_access=["/etc/passwd"]),
@@ -127,14 +127,14 @@ class TestSecurityValidation:
     def test_imported_custom_not_quarantined_warns(self):
         risks = validate_security(
             FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="n1",
-                        type="x",
+                        atom_type="x",
                         category=NodeCategory.DATA,
                         execution_trust_level=ExecutableTrustLevel.IMPORTED_CUSTOM,
                         capability_manifest=CapabilityManifest(),
-                        status=NodeStatus.CONFIGURED,
+                        readiness_status=NodeStatus.CONFIGURED,
                     )
                 ]
             )
@@ -144,10 +144,10 @@ class TestSecurityValidation:
     def test_project_custom_no_manifest_fatal(self):
         risks = validate_security(
             FlowGraph(
-                nodes=[
+                flow_atoms=[
                     FlowNode(
                         id="n1",
-                        type="x",
+                        atom_type="x",
                         category=NodeCategory.DATA,
                         execution_trust_level=ExecutableTrustLevel.PROJECT_CUSTOM,
                         capability_manifest=None,

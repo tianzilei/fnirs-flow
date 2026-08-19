@@ -5,8 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fnirs_flow.compiler.hashing import compute_flow_hash
-from fnirs_flow.history.canonical import compute_commit_id, compute_object_id
+from fnirs_flow.history.canonical import (
+    compute_commit_id,
+    compute_object_id,
+    compute_semantic_flow_id,
+)
 from fnirs_flow.history.diff import compute_flow_diff
 from fnirs_flow.history.errors import (
     BranchAlreadyExists,
@@ -53,7 +56,7 @@ class HistoryService:
             return state.head.commit_id
 
         # Create root design object
-        flow_hash = compute_flow_hash(initial_flow)
+        flow_hash = compute_semantic_flow_id(initial_flow)
         obj = DesignObject(flow=initial_flow, semantic_flow_hash=flow_hash)
         obj_id = compute_object_id(obj.model_dump())
         self._store.put_object(obj, obj_id)
@@ -108,7 +111,7 @@ class HistoryService:
         Raises NoChanges if the flow is identical to HEAD.
         """
         state = self._require_initialized()
-        flow_hash = compute_flow_hash(flow)
+        flow_hash = compute_semantic_flow_id(flow)
 
         # Check if flow is identical to HEAD
         head_commit = self._store.get_commit(state.head.commit_id)
@@ -227,7 +230,7 @@ class HistoryService:
         """Return True if current_flow differs from HEAD."""
         state = self._require_initialized()
         head_commit = self._store.get_commit(state.head.commit_id)
-        current_hash = compute_flow_hash(current_flow)
+        current_hash = compute_semantic_flow_id(current_flow)
         return current_hash != head_commit.semantic_flow_hash
 
     # -- Query --

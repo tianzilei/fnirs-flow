@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -14,15 +15,15 @@ except ImportError:
     jsonschema = None  # type: ignore[assignment]
 
 from fnirs_flow.flow.models import FlowGraph
-
-_SCHEMAS_DIR = Path(__file__).resolve().parent.parent.parent / "schemas"
+from fnirs_flow.flow.serialization import load_canonical_flow, serialize_flow_payload
 
 
 def _load_schema(name: str) -> dict[str, Any]:
-    schema_path = _SCHEMAS_DIR / name
-    if not schema_path.exists():
-        raise FileNotFoundError(f"Schema not found: {schema_path}")
-    with open(schema_path, encoding="utf-8") as f:
+    """Load an authoritative JSON Schema from the installed package."""
+    schema_resource = files("fnirs_flow.resources.schemas").joinpath(name)
+    if not schema_resource.is_file():
+        raise FileNotFoundError(f"Packaged Schema not found: {name}")
+    with schema_resource.open("r", encoding="utf-8") as f:
         result: dict[str, Any] = json.load(f)
         return result
 
@@ -50,20 +51,13 @@ def validate_flow_dict(flow_dict: dict[str, Any]) -> list[str]:
     if "edges" in flow_dict and not isinstance(flow_dict.get("edges"), list):
         errors.append("'edges' must be an array")
 
-    if jsonschema is None:
+    if jsonschema is None:  # pragma: no cover - declared runtime dependency
         try:
-            FlowGraph.model_validate(flow_dict)
+            load_canonical_flow(flow_dict)
         except ValidationError as exc:
             errors.extend(str(err["msg"]) for err in exc.errors())
         return errors  # Fall back to built-in structural checks
-    try:
-        schema = _load_schema("fnirs_flow.schema.json")
-    except FileNotFoundError:
-        try:
-            FlowGraph.model_validate(flow_dict)
-        except ValidationError as exc:
-            errors.extend(str(err["msg"]) for err in exc.errors())
-        return errors
+    schema = _load_schema("fnirs_flow.schema.json")
     validator = jsonschema.Draft202012Validator(schema)
     errors.extend(err.message for err in validator.iter_errors(flow_dict))
     return errors
@@ -71,7 +65,7 @@ def validate_flow_dict(flow_dict: dict[str, Any]) -> list[str]:
 
 def load_flow_from_dict(data: dict[str, Any]) -> FlowGraph:
     """Load a FlowGraph from a dict. Raises ValidationError on invalid data."""
-    return FlowGraph.model_validate(data)
+    return load_canonical_flow(data)
 
 
 def load_flow_from_file(path: str | Path) -> FlowGraph:
@@ -83,4 +77,4 @@ def load_flow_from_file(path: str | Path) -> FlowGraph:
 
 def flow_to_dict(flow: FlowGraph) -> dict[str, Any]:
     """Serialize a FlowGraph to a JSON-compatible dict."""
-    return flow.model_dump(exclude_none=True)
+    return serialize_flow_payload(flow)

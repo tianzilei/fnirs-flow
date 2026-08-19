@@ -6,20 +6,21 @@ import json
 from pathlib import Path
 
 from fnirs_flow.flow.models import FlowEdge, FlowGraph, FlowNode, NodeCategory, NodePort
+from fnirs_flow.flow.serialization import load_canonical_flow
 from fnirs_flow.validation.graph import validate_graph
 
 
 class TestGraphValidation:
     def test_valid_graph(self, minimal_flow_dict):
-        flow = FlowGraph.model_validate(minimal_flow_dict)
+        flow = load_canonical_flow(minimal_flow_dict)
         errors, warnings, risks = validate_graph(flow)
         assert errors == [], f"Unexpected errors: {errors}"
 
     def test_duplicate_node_id(self):
         flow = FlowGraph(
-            nodes=[
-                FlowNode(id="n1", type="a", category=NodeCategory.DATA),
-                FlowNode(id="n1", type="b", category=NodeCategory.DATA),
+            flow_atoms=[
+                FlowNode(id="n1", atom_type="a", category=NodeCategory.DATA),
+                FlowNode(id="n1", atom_type="b", category=NodeCategory.DATA),
             ],
         )
         errors, _, _ = validate_graph(flow)
@@ -27,7 +28,7 @@ class TestGraphValidation:
 
     def test_duplicate_edge_id(self):
         flow = FlowGraph(
-            nodes=[FlowNode(id="n1", type="a", category=NodeCategory.DATA)],
+            flow_atoms=[FlowNode(id="n1", atom_type="a", category=NodeCategory.DATA)],
             edges=[
                 FlowEdge(id="e1", source="n1", target="n1", source_handle="out", target_handle="in"),
                 FlowEdge(id="e1", source="n1", target="n1", source_handle="out", target_handle="in"),
@@ -38,7 +39,7 @@ class TestGraphValidation:
 
     def test_nonexistent_source_node(self):
         flow = FlowGraph(
-            nodes=[FlowNode(id="n1", type="a", category=NodeCategory.DATA)],
+            flow_atoms=[FlowNode(id="n1", atom_type="a", category=NodeCategory.DATA)],
             edges=[
                 FlowEdge(id="e1", source="missing", target="n1", source_handle="out", target_handle="in"),
             ],
@@ -48,7 +49,7 @@ class TestGraphValidation:
 
     def test_nonexistent_target_node(self):
         flow = FlowGraph(
-            nodes=[FlowNode(id="n1", type="a", category=NodeCategory.DATA)],
+            flow_atoms=[FlowNode(id="n1", atom_type="a", category=NodeCategory.DATA)],
             edges=[
                 FlowEdge(id="e1", source="n1", target="missing", source_handle="out", target_handle="in"),
             ],
@@ -58,14 +59,14 @@ class TestGraphValidation:
 
     def test_invalid_source_port(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="out", direction="out", schema="X")],
                 ),
-                FlowNode(id="n2", type="b", category=NodeCategory.DATA),
+                FlowNode(id="n2", atom_type="b", category=NodeCategory.DATA),
             ],
             edges=[
                 FlowEdge(id="e1", source="n1", target="n2", source_handle="wrong", target_handle="in"),
@@ -76,16 +77,16 @@ class TestGraphValidation:
 
     def test_unconnected_required_input_warns(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="n1",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="out", direction="out", schema="X")],
                 ),
                 FlowNode(
                     id="n2",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="in", direction="in", schema="X", required=True)],
                 ),
@@ -97,10 +98,10 @@ class TestGraphValidation:
 
     def test_cycle_detection(self):
         flow = FlowGraph(
-            nodes=[
-                FlowNode(id="a", type="x", category=NodeCategory.DATA),
-                FlowNode(id="b", type="y", category=NodeCategory.DATA),
-                FlowNode(id="c", type="z", category=NodeCategory.DATA),
+            flow_atoms=[
+                FlowNode(id="a", atom_type="x", category=NodeCategory.DATA),
+                FlowNode(id="b", atom_type="y", category=NodeCategory.DATA),
+                FlowNode(id="c", atom_type="z", category=NodeCategory.DATA),
             ],
             edges=[
                 FlowEdge(id="e1", source="a", target="b", source_handle="out", target_handle="in"),
@@ -115,7 +116,7 @@ class TestGraphValidation:
         demo_path = Path(__file__).parent.parent / "configs" / "demo_task_flow.json"
         if demo_path.exists():
             flow_dict = json.loads(demo_path.read_text())
-            flow = FlowGraph.model_validate(flow_dict)
+            flow = load_canonical_flow(flow_dict)
             errors, warnings, risks = validate_graph(flow)
             assert errors == [], f"Demo flow graph errors: {errors}"
 
@@ -125,16 +126,16 @@ class TestAtomSlotContracts:
 
     def test_matching_schemas_pass(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="out", direction="out", schema="RawData")],
                 ),
                 FlowNode(
                     id="tgt",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.PREPROCESSING,
                     ports=[NodePort(name="in", direction="in", schema="RawData")],
                 ),
@@ -149,16 +150,16 @@ class TestAtomSlotContracts:
 
     def test_mismatched_schemas_warn(self):
         flow = FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="out", direction="out", schema="RawData")],
                 ),
                 FlowNode(
                     id="tgt",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.PREPROCESSING,
                     ports=[NodePort(name="in", direction="in", schema="OpticalDensityData")],
                 ),

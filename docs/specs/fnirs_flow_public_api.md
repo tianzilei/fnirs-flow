@@ -1,7 +1,7 @@
 # fnirs-flow Public API Contract
 
-Version: 1.0.0
-Generated: 2026-07-10
+Version: 1.1.0
+Updated: 2026-08-19
 
 This document defines the stable public surface of fnirs-flow. Any breaking change to these surfaces requires a schema version bump and changelog entry.
 
@@ -9,29 +9,31 @@ This document defines the stable public surface of fnirs-flow. Any breaking chan
 
 ### FlowGraph
 
-Top-level flow container. Schema version `0.2.0`.
+Top-level canonical flow container. Current schema version `0.3.0`.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `schema_version` | `string` | yes | Currently `"0.2.0"` |
+| `schema_version` | `string` | yes | Currently `"0.3.0"` |
 | `flow_id` | `string` | yes | Unique flow identifier |
 | `name` | `string` | yes | Human-readable name |
 | `description` | `string` | no | Free-text description |
-| `nodes` | `list[FlowAtom]` | yes | Compatibility field for older flows |
-| `flow_atoms` | `list[FlowAtom] \| null` | no | MethodAtom-first field; new writers should prefer this over `nodes` |
+| `flow_atoms` | `list[FlowAtom]` | yes | Canonical atom collection |
 | `edges` | `list[FlowEdge]` | yes | Directed edges between atoms |
 | `adapter_registry` | `list[AdapterDefinition]` | no | Registered adapters |
 | `metadata` | `FlowMetadata` | no | Author, tags, timestamps |
 
 ### FlowAtom
 
-Business-level flow atom instance. `FlowNode` is a compatibility alias kept for older flows and migration code.
+Business-level flow atom instance. `FlowNode` remains a public class alias, but
+its constructor and in-memory representation use the canonical fields below.
+Historical JSON fields are accepted only through
+`fnirs_flow.flow.serialization.load_canonical_flow()` and the schema loading
+helpers.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `id` | `string` | yes | Unique atom instance ID |
-| `type` | `string` | yes | Legacy atom type field; kept for compatibility |
-| `atom_type` | `string \| null` | no | MethodAtom-first type; new writers should emit this |
+| `atom_type` | `string` | yes | Canonical MethodAtom type |
 | `template_id` | `string \| null` | no | Reference to atom library template |
 | `operation` | `string \| null` | no | Operation name |
 | `evidence_refs` | `list[string]` | no | Literature evidence references |

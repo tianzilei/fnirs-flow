@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fnirs_flow.adapters.cedalion_bindings import (
-    get_cedalion_binding,
-    is_verified_cedalion_atom,
-)
 from fnirs_flow.flow.atoms import AtomPort, BackendBinding, MethodAtomCategory, MethodAtomOrigin
 from fnirs_flow.registry.node_library import MethodAtomTemplate
 
@@ -34,7 +30,7 @@ DOMAIN_CATEGORY_MAP: dict[str, MethodAtomCategory] = {
     "export": MethodAtomCategory.EXPORT,
 }
 
-_LOADED_FINGERPRINT: str | None = None
+_LOADED = False
 LITERATURE_METHOD_ATOM_TEMPLATES: list[MethodAtomTemplate] = []
 
 
@@ -101,47 +97,44 @@ def _count_csv_rows(path: Path) -> int:
         return sum(1 for _ in csv.DictReader(f))
 
 
-def _file_sha256(path: Path) -> str:
-    if not path.exists():
-        return ""
-    digest = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def method_atom_library_fingerprint(
+def method_atom_library_state(
     method_atoms_path: str | Path = METHOD_ATOMS_CSV,
     evidence_links_path: str | Path = ATOM_EVIDENCE_LINKS_CSV,
 ) -> dict[str, Any]:
-    """Return a deterministic fingerprint for bundled MethodAtom library inputs."""
+    """Return simple path, row-count, size, and timestamp metadata."""
     atoms_path = Path(method_atoms_path)
     links_path = Path(evidence_links_path)
-    method_atoms_hash = _file_sha256(atoms_path)
-    evidence_links_hash = _file_sha256(links_path)
-    combined = hashlib.sha256(f"{method_atoms_hash}:{evidence_links_hash}".encode()).hexdigest()
     return {
-        "fingerprint": combined,
         "method_atoms_csv": str(atoms_path),
         "atom_evidence_links_csv": str(links_path),
-        "method_atoms_sha256": method_atoms_hash,
-        "atom_evidence_links_sha256": evidence_links_hash,
         "method_atoms_rows": _count_csv_rows(atoms_path),
         "atom_evidence_links_rows": _count_csv_rows(links_path),
+        "method_atoms_size": atoms_path.stat().st_size if atoms_path.exists() else 0,
+        "atom_evidence_links_size": links_path.stat().st_size if links_path.exists() else 0,
+        "method_atoms_modified": atoms_path.stat().st_mtime_ns if atoms_path.exists() else 0,
+        "atom_evidence_links_modified": links_path.stat().st_mtime_ns if links_path.exists() else 0,
     }
 
 
-def _write_runtime_state(state: dict[str, Any]) -> None:
+def write_runtime_state(state: dict[str, Any], cache_dir: str | Path) -> Path:
+    """Persist registry state atomically outside immutable package resources."""
+    directory = Path(cache_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / "runtime_template_state.json"
+    temporary = target.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    temporary.replace(target)
+    return target
+
+
+@lru_cache(maxsize=1)
+def _cedalion_enrichment() -> tuple[Any, Any]:
+    """Load optional Cedalion enrichment lazily, never during metadata import."""
     try:
-        PACKAGE_LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
-        RUNTIME_TEMPLATE_STATE_JSON.write_text(
-            json.dumps(state, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
-    except OSError:
-        # Installed package directories can be read-only. Loading should still succeed.
-        return
+        from fnirs_flow.adapters.cedalion_bindings import get_cedalion_binding, is_verified_cedalion_atom
+    except ImportError:
+        return (lambda _atom_id: None, lambda _atom_id: False)
+    return get_cedalion_binding, is_verified_cedalion_atom
 
 
 def _ports(row: dict[str, str]) -> list[AtomPort]:
@@ -187,16 +180,22 @@ def load_literature_method_atom_templates(
 
     evidence_refs_by_atom = _load_evidence_link_refs(evidence_links_path)
     templates: list[MethodAtomTemplate] = []
+    seen_ids: set[str] = set()
     with path.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             atom_id = row.get("atom_id", "").strip()
             if not atom_id:
-                continue
+                raise ValueError(f"Invalid MethodAtom resource {path}: atom_id is required")
+            template_id = _template_id(atom_id)
+            if template_id in seen_ids:
+                raise ValueError(f"Duplicate MethodAtom template id in {path}: {template_id}")
+            seen_ids.add(template_id)
             domain = row.get("domain", "").strip()
             category = DOMAIN_CATEGORY_MAP.get(domain, MethodAtomCategory.ANALYSIS)
             operation = row.get("operation", "").strip() or None
             target_atom_type = row.get("target_atom_type", "").strip()
             atom_type = target_atom_type or operation or atom_id.lower()
+            get_cedalion_binding, is_verified_cedalion_atom = _cedalion_enrichment()
             backend_operation = get_cedalion_binding(atom_id)
             default_config = _default_config(row)
             if backend_operation and not is_verified_cedalion_atom(atom_id):
@@ -214,7 +213,7 @@ def load_literature_method_atom_templates(
                     tags.append("experimental")
             templates.append(
                 MethodAtomTemplate(
-                    template_id=_template_id(atom_id),
+                    template_id=template_id,
                     name=_method_name(row),
                     category=category,
                     atom_type=atom_type,
@@ -246,22 +245,22 @@ def ensure_literature_method_atom_templates_current(
     write_state: bool = True,
 ) -> dict[str, Any]:
     """Reload bundled literature templates when their CSV inputs changed."""
-    global _LOADED_FINGERPRINT, LITERATURE_METHOD_ATOM_TEMPLATES
+    global _LOADED, LITERATURE_METHOD_ATOM_TEMPLATES
 
-    fingerprint = method_atom_library_fingerprint()
-    changed = force or fingerprint["fingerprint"] != _LOADED_FINGERPRINT
+    library_state = method_atom_library_state()
+    changed = force or not _LOADED
     if changed:
         LITERATURE_METHOD_ATOM_TEMPLATES = load_literature_method_atom_templates()
-        _LOADED_FINGERPRINT = fingerprint["fingerprint"]
+        _LOADED = True
 
     state = {
-        **fingerprint,
+        **library_state,
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "changed": changed,
         "loaded_templates": len(LITERATURE_METHOD_ATOM_TEMPLATES),
     }
-    if write_state and changed:
-        _write_runtime_state(state)
+    # ``write_state`` is retained for API compatibility. Package resources are
+    # immutable; composition roots persist this state to their configured cache.
     return state
 
 

@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field
 class DataFile(BaseModel):
     path: str
     uri: str = ""
-    sha256: str = ""
     size_bytes: int = 0
+    modified_at: str = ""
     role: str = "raw_snirf"
 
 
@@ -31,7 +31,8 @@ class SubjectSessionRun(BaseModel):
     path: str = ""
     uri: str = ""
     relative_path: str = ""
-    data_sha256: str = ""
+    size_bytes: int = 0
+    modified_at: str = ""
     source_file_role: str = "raw_snirf"
     events_path: str = ""
     events_uri: str = ""
@@ -47,8 +48,8 @@ class MetadataTableReference(BaseModel):
     encoding: str = "utf-8-sig"
     delimiter: str = "auto"
     id_normalization: str = "bids_exact"
-    sha256: str = ""
     size_bytes: int = 0
+    modified_at: str = ""
     columns: list[dict[str, str | int | bool]] = Field(default_factory=list)
 
 

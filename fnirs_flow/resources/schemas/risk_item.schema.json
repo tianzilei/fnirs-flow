@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fnirs-flow RiskItem",
+  "type": "object",
+  "required": ["risk_id", "severity", "domain", "message"],
+  "properties": {
+    "risk_id": { "type": "string" },
+    "rule_id": { "type": "string", "description": "Source risk rule ID" },
+    "severity": { "type": "string", "enum": ["low", "medium", "high", "fatal"] },
+    "domain": { "type": "string", "enum": ["schema", "graph", "adapter", "security", "qc", "design", "analysis", "reproducibility", "reporting", "harmonization", "multi_site"] },
+    "affected_object": { "type": "string" },
+    "subject": { "type": "string" },
+    "session": { "type": "string" },
+    "run": { "type": "string" },
+    "message": { "type": "string" },
+    "rationale": { "type": "string" },
+    "suggested_action": { "type": "string" },
+    "evidence_ids": { "type": "array", "items": { "type": "string" } },
+    "status": { "type": "string", "enum": ["open", "acknowledged", "resolved", "ignored"] }
+  }
+}

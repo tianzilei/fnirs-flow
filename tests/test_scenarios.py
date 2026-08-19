@@ -70,15 +70,15 @@ class TestScenarioDefinitions:
 
 class TestScenarioValidation:
     def _make_flow(self, node_types: list[str]) -> FlowGraph:
-        nodes = [
+        atoms = [
             FlowNode(
                 id=f"n{i}",
-                type=nt,
+                atom_type=nt,
                 category=NodeCategory.ANALYSIS,
             )
             for i, nt in enumerate(node_types)
         ]
-        return FlowGraph(nodes=nodes)
+        return FlowGraph(flow_atoms=atoms)
 
     def test_task_missing_contrast(self):
         flow = self._make_flow(["dataset_discovery", "study_design", "first_level_glm"])
@@ -120,8 +120,8 @@ class TestScenarioValidation:
             ]
         )
         # Set prohibited split strategy
-        for node in flow.nodes:
-            if node.type == "ml_model":
+        for node in flow.flow_atoms:
+            if node.atom_type == "ml_model":
                 node.config = {"split_strategy": "random_trial"}
 
         risks = validate_scenario_constraints(flow, "machine_learning")

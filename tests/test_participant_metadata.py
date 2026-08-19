@@ -5,12 +5,17 @@ import json
 
 import pytest
 
-from fnirs_flow.data.manifest import DataManifest, SubjectSessionRun
-from fnirs_flow.data.participants import (
+from fnirs_flow.data.group_analysis import (
     build_group_design_matrix,
     compile_contrast_expression,
     compile_group_contrasts,
     fit_group_glm,
+    summarize_cluster_inference,
+    validate_site_group_confound,
+    validate_subject_split_no_leakage,
+)
+from fnirs_flow.data.manifest import DataManifest, SubjectSessionRun
+from fnirs_flow.data.participant_tables import (
     join_participant_metadata,
     project_combat_manifest,
     project_dpf_inputs,
@@ -18,10 +23,7 @@ from fnirs_flow.data.participants import (
     project_outcome_vector,
     project_site_metadata,
     read_participant_table,
-    summarize_cluster_inference,
     validate_participant_table,
-    validate_site_group_confound,
-    validate_subject_split_no_leakage,
     write_participant_table_artifacts,
 )
 
@@ -50,7 +52,8 @@ def test_participant_table_read_validate_and_artifacts(tmp_path):
     report = validate_participant_table(table, manifest)
     bundle = write_participant_table_artifacts(table, tmp_path / "compiled", manifest=manifest)
 
-    assert table.source.sha256
+    assert table.source.size_bytes > 0
+    assert table.source.modified_at
     assert report.join_preview.matched_subjects == ["sub-01", "sub-02"]
     assert report.join_preview.unmatched_results == ["sub-04"]
     assert report.join_preview.excluded_subjects == ["sub-03"]
@@ -295,7 +298,25 @@ def test_fit_group_glm_robust_permutation_and_sensitivity():
     assert glm.contrasts[0]["covariance"] == "hc0"
     assert 0.0 < float(glm.contrasts[0]["permutation_p_value"]) <= 1.0
     assert glm.corrected[0]["permutation_count"] == 9
+    assert glm.contrasts[0]["permutation_seed"] == 7
+    assert glm.contrasts[0]["permutation_chunk_size"] == 256
+    assert glm.contrasts[0]["permutation_executed"] == 9
     assert glm.sensitivity and glm.sensitivity[0]["branch_name"] == "site A only"
+
+
+def test_group_permutation_can_cancel_at_chunk_boundary():
+    rows = [
+        {"participant_id": f"sub-{index:02d}", "group": "a" if index < 4 else "b", "beta": float(index)}
+        for index in range(8)
+    ]
+    design = build_group_design_matrix(rows, design_type="two_sample_t")
+    with pytest.raises(RuntimeError, match="cancelled"):
+        fit_group_glm(
+            design,
+            permutation_count=10,
+            permutation_chunk_size=2,
+            cancel_check=lambda: True,
+        )
 
 
 def test_cluster_inference_summary_groups_adjacent_features():
@@ -316,10 +337,10 @@ def test_data_manifest_serializes_metadata_tables(tmp_path):
 
     manifest = DataManifest(
         dataset_id="demo",
-        metadata_tables=[MetadataTableReference(path="participants.tsv", sha256="abc")],
+        metadata_tables=[MetadataTableReference(path="participants.tsv", size_bytes=123)],
     )
     path = write_data_manifest(manifest, tmp_path)
     restored = load_data_manifest(path)
 
     assert restored.metadata_tables[0].path == "participants.tsv"
-    assert json.loads(path.read_text(encoding="utf-8"))["metadata_tables"][0]["sha256"] == "abc"
+    assert json.loads(path.read_text(encoding="utf-8"))["metadata_tables"][0]["size_bytes"] == 123

@@ -15,14 +15,14 @@ Implements §8.2, §8.3, §8.4 of the design document:
 §8.3 - Source and supply chain control:
 - Only install pre-declared dependencies from registry
 - Git deps prefer commit SHA; tag only as readable version
-- Verify hash when available
+- Verify declared package version when available
 - Install commands use parameter arrays (no shell string concatenation)
 - No tokens, credentials in logs
-- Generate frozen requirements and environment fingerprint after install
+- Generate frozen requirements and an explicit environment revision after install
 - MethodAtom parameters cannot override package source/index URL
 
 §8.4 - Concurrency and cancellation:
-- Keyed by (profile_id, lock_fingerprint)
+- Keyed by (profile_id, environment revision)
 - Shared installation task for concurrent requests
 - First request creates task; subsequent subscribe to progress
 - Single subscriber cancel doesn't stop task with other subscribers
@@ -110,7 +110,7 @@ class DependencyInstaller:
     ) -> tuple[bool, list[str]]:
         """Validate an approval record against a plan.
 
-        §8.2: approval validates the plan fingerprint, source policy, and
+        §8.2: approval validates the plan revision, source policy, and
         target environment before creating an installation task.
 
         Returns:
@@ -118,12 +118,8 @@ class DependencyInstaller:
         """
         errors: list[str] = []
 
-        # Verify plan fingerprint
-        if approval.plan_fingerprint != plan.plan_fingerprint:
-            errors.append(
-                f"Plan fingerprint mismatch: approval={approval.plan_fingerprint[:16]}..., "
-                f"plan={plan.plan_fingerprint[:16]}..."
-            )
+        if approval.plan_id != plan.plan_id or approval.plan_revision != plan.revision:
+            errors.append("Plan ID or revision does not match the approval record")
 
         # Verify decision
         if approval.decision != InstallPolicy.APPROVED_ONCE:
@@ -153,7 +149,8 @@ class DependencyInstaller:
 
         # Check policy
         policy_manager = get_policy_manager()
-        if not policy_manager.is_approved(plan.plan_fingerprint):
+        plan_key = f"{plan.plan_id}:{plan.revision}"
+        if not policy_manager.is_approved(plan_key):
             raise ValueError("Plan is not approved for installation")
 
         # Create task
@@ -192,14 +189,14 @@ class DependencyInstaller:
             # Get environment info
             env_info = self._env_manager.get_environment(
                 task.profile_id,
-                plan.plan_fingerprint[:16],
+                f"revision-{plan.revision}",
             )
 
             if env_info is None:
                 # Create environment
                 env_info = self._env_manager.create_environment(
                     task.profile_id,
-                    plan.plan_fingerprint[:16],
+                    f"revision-{plan.revision}",
                 )
 
             env_path = Path(env_info.path)
@@ -237,7 +234,7 @@ class DependencyInstaller:
                     task.error = f"Failed to install {req.package.distribution}"
                     self._env_manager.quarantine_environment(
                         task.profile_id,
-                        plan.plan_fingerprint[:16],
+                        f"revision-{plan.revision}",
                         error=task.error,
                     )
                     return task
@@ -249,7 +246,7 @@ class DependencyInstaller:
             # Publish environment
             published = self._env_manager.publish_environment(
                 task.profile_id,
-                plan.plan_fingerprint[:16],
+                f"revision-{plan.revision}",
             )
 
             if published:
@@ -378,7 +375,7 @@ class DependencyInstaller:
     def _freeze_requirements(self, env_path: Path) -> str:
         """Generate frozen requirements for environment.
 
-        §8.3: Generate frozen requirements and an environment fingerprint after
+        §8.3: Generate frozen requirements and an explicit environment revision after
         installation completes.
         """
         pip_cmd = [
@@ -492,10 +489,10 @@ class InstallationOrchestrator:
     def check_environment(
         self,
         profile_id: str,
-        lock_fingerprint: str,
+        environment_revision: str,
     ) -> dict[str, Any]:
         """Check if an environment exists and is ready."""
-        env_info = self._env_manager.get_environment(profile_id, lock_fingerprint)
+        env_info = self._env_manager.get_environment(profile_id, environment_revision)
         if env_info is None:
             return {
                 "exists": False,
@@ -512,10 +509,10 @@ class InstallationOrchestrator:
     def remove_environment(
         self,
         profile_id: str,
-        lock_fingerprint: str,
+        environment_revision: str,
     ) -> bool:
         """Remove an environment."""
-        return self._env_manager.remove_environment(profile_id, lock_fingerprint)
+        return self._env_manager.remove_environment(profile_id, environment_revision)
 
     def list_environments(self) -> list[dict[str, Any]]:
         """List all environments."""

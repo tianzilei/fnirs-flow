@@ -71,7 +71,7 @@ def validate_node_states(flow: FlowGraph) -> list[RiskItem]:
     """
     risks: list[RiskItem] = []
 
-    for node in flow.nodes:
+    for node in flow.flow_atoms:
         readiness_value = (
             node.readiness_status.value
             if isinstance(node.readiness_status, ReadinessStatus)
@@ -223,10 +223,10 @@ def _validate_post_readiness_transition(
 def validate_state_contracts(flow: FlowGraph) -> list[RiskItem]:
     """Validate atom, adapter, and port ingress/egress state contracts."""
     risks: list[RiskItem] = []
-    node_map = {n.id: n for n in flow.nodes}
+    node_map = {n.id: n for n in flow.flow_atoms}
     adapter_map = {a.adapter_id: a for a in flow.adapter_registry}
 
-    for node in flow.nodes:
+    for node in flow.flow_atoms:
         risks.extend(
             _validate_post_readiness_transition(
                 current_status=node.readiness_status,
@@ -347,7 +347,7 @@ def validate_adapter_tags(flow: FlowGraph) -> list[RiskItem]:
         List of RiskItems for tag/category mismatches
     """
     risks: list[RiskItem] = []
-    node_map = {n.id: n for n in flow.nodes}
+    node_map = {n.id: n for n in flow.flow_atoms}
     adapter_map = {a.adapter_id: a for a in flow.adapter_registry}
 
     for edge in flow.edges:
@@ -438,7 +438,7 @@ def validate_custom_node_safety(node: FlowAtom) -> list[RiskItem]:
     """Validate safety of a custom atom before execution.
 
     Checks capability manifests, dangerous capabilities (network/shell),
-    file access paths, quarantine status, and checksum integrity.
+    file access paths, quarantine status, and explicit project approval.
 
     Args:
         node: FlowAtom to validate
@@ -529,19 +529,6 @@ def validate_custom_node_safety(node: FlowAtom) -> list[RiskItem]:
                         f"Imported custom atom '{node.id}' is not quarantined (security_status: {security_value})"
                     ),
                     suggested_action=("Set security_status to 'quarantined' until trust is confirmed"),
-                )
-            )
-
-        # Check for missing checksum on imported atoms
-        if not manifest.checksum:
-            risks.append(
-                RiskItem(
-                    risk_id=f"safety-no-checksum-{node.id}",
-                    severity="medium",
-                    domain="security",
-                    affected_object=f"atom:{node.id}",
-                    message=f"Imported atom '{node.id}' has no checksum for integrity verification",
-                    suggested_action="Add SHA256 checksum to capability_manifest",
                 )
             )
 

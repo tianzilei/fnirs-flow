@@ -69,7 +69,7 @@ class SourceAllowlist(BaseModel):
         """Extract git tag from source string."""
         if "@" in source:
             ref = source.split("@")[-1]
-            if not ref.startswith("sha256:"):
+            if not (len(ref) >= 7 and all(character in "0123456789abcdef" for character in ref)):
                 return ref
         return None
 
@@ -105,32 +105,32 @@ class InstallPolicyManager(BaseModel):
 
     Enforces:
     - Default policy is "never"
-    - Approval is per-plan and per-fingerprint
+    - Approval is per explicit plan ID and revision
     - No silent auto-installation
     """
 
     default_policy: str = "never"
-    approved_plans: dict[str, str] = Field(default_factory=dict)  # fingerprint -> policy
+    approved_plans: dict[str, str] = Field(default_factory=dict)
 
-    def get_policy(self, plan_fingerprint: str) -> str:
+    def get_policy(self, plan_key: str) -> str:
         """Get the installation policy for a plan.
 
         Returns:
             "never" if not approved, "approved_once" if approved
         """
-        return self.approved_plans.get(plan_fingerprint, self.default_policy)
+        return self.approved_plans.get(plan_key, self.default_policy)
 
-    def approve_plan(self, plan_fingerprint: str) -> None:
+    def approve_plan(self, plan_key: str) -> None:
         """Approve a plan for one-time installation."""
-        self.approved_plans[plan_fingerprint] = "approved_once"
+        self.approved_plans[plan_key] = "approved_once"
 
-    def reject_plan(self, plan_fingerprint: str) -> None:
+    def reject_plan(self, plan_key: str) -> None:
         """Reject a plan (explicit rejection)."""
-        self.approved_plans[plan_fingerprint] = "rejected"
+        self.approved_plans[plan_key] = "rejected"
 
-    def is_approved(self, plan_fingerprint: str) -> bool:
+    def is_approved(self, plan_key: str) -> bool:
         """Check if a plan is approved for installation."""
-        return self.get_policy(plan_fingerprint) == "approved_once"
+        return self.get_policy(plan_key) == "approved_once"
 
 
 # Global policy manager

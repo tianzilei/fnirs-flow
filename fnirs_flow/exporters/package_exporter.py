@@ -12,13 +12,13 @@ from typing import Any, cast
 from pydantic import BaseModel, Field
 
 import fnirs_flow
-from fnirs_flow.api.portability import (
+from fnirs_flow.infrastructure.filesystem import is_macos_metadata_path, is_visible_data_file
+from fnirs_flow.infrastructure.portability import (
     SIGNAL_OR_WORK_EXTENSIONS,
     TRACKABLE_EXTENSIONS,
     find_absolute_path_records,
 )
-from fnirs_flow.api.uri import ProjectURI, create_external_data_uri, create_project_uri
-from fnirs_flow.filesystem import is_macos_metadata_path, is_visible_data_file
+from fnirs_flow.infrastructure.uri import ProjectURI, create_external_data_uri, create_project_uri
 
 MAX_PACKAGE_BYTES = 10 * 1024**2
 

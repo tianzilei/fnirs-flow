@@ -6,8 +6,11 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from fnirs_flow.compiler.hashing import compute_flow_hash
-from fnirs_flow.history.canonical import compute_commit_id, compute_object_id
+from fnirs_flow.history.canonical import (
+    compute_commit_id,
+    compute_object_id,
+    compute_semantic_flow_id,
+)
 from fnirs_flow.history.models import AuthorInfo, DesignCommit, DesignObject
 from fnirs_flow.history.service import HistoryService
 
@@ -82,7 +85,7 @@ def migrate_snapshots_to_history(
             report.warnings.append(f"Snapshot {snap.get('snapshot_id', '?')}: empty or invalid flow, skipped")
             continue
 
-        flow_hash = compute_flow_hash(flow)
+        flow_hash = compute_semantic_flow_id(flow)
 
         # Build DesignObject
         obj = DesignObject(flow=flow, semantic_flow_hash=flow_hash)
@@ -142,7 +145,7 @@ def migrate_snapshots_to_history(
         # If main still points to the root and we have a current flow,
         # create a main commit on top of the legacy chain
         if current_flow is not None:
-            current_hash = compute_flow_hash(current_flow)
+            current_hash = compute_semantic_flow_id(current_flow)
             head_commit = svc.store.get_commit(state.head.commit_id)
             if current_hash != head_commit.semantic_flow_hash:
                 # Create a new commit for the current state

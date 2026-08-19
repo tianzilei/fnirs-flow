@@ -1,4 +1,4 @@
-import { Layers, FileCode2, GitBranch, Hash } from 'lucide-react';
+import { Layers, FileCode2, GitBranch, RotateCw } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store';
@@ -35,14 +35,14 @@ export function CompileSummary() {
         <div className="compile-results">
           <section className="metrics-grid">
             <div className="metric">
-              <Hash size={18} />
+              <RotateCw size={18} />
               <span className="metric-value">{result.flow_id || '-'}</span>
               <span className="metric-label">Flow ID</span>
             </div>
             <div className="metric">
               <GitBranch size={18} />
-              <span className="metric-value">{result.flow_hash?.slice(0, 12) || '-'}</span>
-              <span className="metric-label">Flow Hash</span>
+              <span className="metric-value">{result.revision || '-'}</span>
+              <span className="metric-label">Flow Revision</span>
             </div>
             <div className="metric">
               <Layers size={18} />
@@ -85,7 +85,7 @@ export function CompileSummary() {
               <div className="snapshot-info">
                 <dl>
                   <div><dt>Snapshot ID</dt><dd>{snapshot.snapshot_id}</dd></div>
-                  <div><dt>Flow Hash</dt><dd><code>{snapshot.flow_hash}</code></dd></div>
+                  <div><dt>Flow Revision</dt><dd><code>{snapshot.revision}</code></dd></div>
                   <div><dt>Created At</dt><dd>{new Date(snapshot.created_at).toLocaleString()}</dd></div>
                 </dl>
               </div>

@@ -24,13 +24,13 @@ class TestReports:
             "name": "Test Flow",
             "description": "A test flow",
             "flow_hash": "abc123def456",
-            "preprocessing_chain": [
-                {"step_id": "od", "type": "optical_density", "parameters": {}},
+            "preprocessing_atoms": [
+                {"atom_id": "od", "atom_type": "optical_density", "parameters": {}},
             ],
-            "analysis_chain": [
+            "analysis_atoms": [
                 {
-                    "step_id": "glm",
-                    "type": "first_level_glm",
+                    "atom_id": "glm",
+                    "atom_type": "first_level_glm",
                     "parameters": {"hrf_model": "canonical"},
                 },
             ],

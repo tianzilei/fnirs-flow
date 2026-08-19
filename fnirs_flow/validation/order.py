@@ -48,9 +48,9 @@ def validate_empty_link_policy(flow: FlowGraph) -> list[RiskItem]:
     """Flag flows that are structurally empty or leave required inputs floating."""
     risks: list[RiskItem] = []
     allow_empty_edges = flow.metadata.order_policy.allow_empty_edges
-    empty_markers = [atom for atom in flow.nodes if _is_empty_marker(atom)]
+    empty_markers = [atom for atom in flow.flow_atoms if _is_empty_marker(atom)]
 
-    if len(flow.nodes) > 1 and not flow.edges:
+    if len(flow.flow_atoms) > 1 and not flow.edges:
         if allow_empty_edges and empty_markers:
             risks.append(
                 RiskItem(
@@ -86,7 +86,7 @@ def validate_empty_link_policy(flow: FlowGraph) -> list[RiskItem]:
         )
 
     connected_inputs = {(edge.target, edge.target_handle) for edge in flow.edges}
-    for atom in flow.nodes:
+    for atom in flow.flow_atoms:
         for port in atom.ports:
             if port.direction != "in" or not port.required:
                 continue
@@ -114,7 +114,7 @@ def validate_atom_order_contracts(flow: FlowGraph) -> list[RiskItem]:
     """Validate that edges move forward through MethodAtom stages."""
     risks: list[RiskItem] = []
     allow_order_violations = flow.metadata.order_policy.allow_order_violations
-    node_map = {node.id: node for node in flow.nodes}
+    node_map = {node.id: node for node in flow.flow_atoms}
 
     for edge in flow.edges:
         source = node_map.get(edge.source)

@@ -34,7 +34,7 @@ def validate_scenario_constraints(
         return risks
 
     # Check required atom types (MethodAtom-first)
-    atom_types = {n.type for n in flow.nodes}
+    atom_types = {atom.atom_type for atom in flow.flow_atoms}
     required_types = scenario.required_atom_types or scenario.required_node_types
     for required_type in required_types:
         if required_type not in atom_types:
@@ -129,8 +129,8 @@ def _validate_ml_scenario(
     risks: list[RiskItem] = []
 
     # Check for feature extraction and ML model
-    has_features = any(n.type == "feature_extraction" for n in flow.nodes)
-    has_model = any(n.type == "ml_model" for n in flow.nodes)
+    has_features = any(atom.atom_type == "feature_extraction" for atom in flow.flow_atoms)
+    has_model = any(atom.atom_type == "ml_model" for atom in flow.flow_atoms)
 
     if not has_features:
         risks.append(
@@ -155,9 +155,9 @@ def _validate_ml_scenario(
         )
 
     # Check for prohibited split strategies
-    for node in flow.nodes:
-        if node.type == "ml_model":
-            split = node.config.get("split_strategy", "")
+    for atom in flow.flow_atoms:
+        if atom.atom_type == "ml_model":
+            split = atom.config.get("split_strategy", "")
             # Check against scenario's prohibited list (supports both forms)
             prohibited = scenario.constraints.get("prohibited", [])
             prohibited_expanded = set(prohibited)

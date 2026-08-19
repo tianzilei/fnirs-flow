@@ -93,7 +93,7 @@ class TestDryRunReport:
 
         assert "sub-01_task-tapping" in report_md
         assert "sub-01/nirs/sub-01_task-tapping_nirs.snirf" in report_md
-        assert "abc123def456" in report_md
+        assert "Bytes" in report_md
         assert report_json["planned_runs"][0]["task"] == "tapping"
         assert report_json["planned_runs"][0]["data_path"] == "sub-01/nirs/sub-01_task-tapping_nirs.snirf"
 

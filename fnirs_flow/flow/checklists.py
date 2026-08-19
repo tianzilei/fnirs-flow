@@ -637,7 +637,7 @@ def _atom_matches_step(atom: Any, step: FlowChecklistStep) -> bool:
 
 
 def _step_satisfied(flow: FlowGraph, step: FlowChecklistStep) -> bool:
-    return any(_atom_matches_step(atom, step) for atom in flow.nodes)
+    return any(_atom_matches_step(atom, step) for atom in flow.flow_atoms)
 
 
 def _canonical_schema(schema: str) -> str:
@@ -649,7 +649,7 @@ def _input_requirement_missing(flow: FlowGraph, atom: Any, step: FlowChecklistSt
         return ()
     incoming_schemas = set()
     atom_id = str(getattr(atom, "id", ""))
-    atom_by_id = {str(source.id): source for source in flow.nodes}
+    atom_by_id = {str(source.id): source for source in flow.flow_atoms}
     for edge in flow.edges:
         if str(edge.target) != atom_id:
             continue
@@ -683,7 +683,7 @@ def _step_skipped(flow: FlowGraph, step: FlowChecklistStep) -> bool:
     return any(
         is_empty_marker_atom(atom.model_dump(mode="json"))
         and atom.metadata.get("skipped_processing_category") == step.category
-        for atom in flow.nodes
+        for atom in flow.flow_atoms
     )
 
 
@@ -700,7 +700,7 @@ def validate_checklist_coverage(flow: FlowGraph, scenario_id: str) -> list[RiskI
     for step in checklist.steps:
         satisfied = step.slot_id in completed_slots
         blocked_by = [slot for slot in step.depends_on if slot not in completed_slots]
-        matched_atom = next((atom for atom in flow.nodes if _atom_matches_step(atom, step)), None)
+        matched_atom = next((atom for atom in flow.flow_atoms if _atom_matches_step(atom, step)), None)
         missing_inputs = _input_requirement_missing(flow, matched_atom, step) if matched_atom is not None else ()
         if step.required and not satisfied:
             risks.append(

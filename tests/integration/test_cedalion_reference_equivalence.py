@@ -41,6 +41,8 @@ DEFAULT_SNIRF = (
 def snirf_path() -> Path:
     configured = os.environ.get("FNIRS_TEST_SNIRF")
     path = Path(configured) if configured else DEFAULT_SNIRF
+    if os.environ.get("FNIRS_REQUIRE_REAL_DATA") == "1" and not path.is_file():
+        pytest.fail(f"Required real-data fixture is missing: {path}")
     if not path.is_file():
         pytest.skip("Set FNIRS_TEST_SNIRF to a real SNIRF file")
     return path

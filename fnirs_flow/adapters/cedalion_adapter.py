@@ -61,7 +61,7 @@ class CedalionAdapter:
 
     Each step:
       1. Executes the Cedalion function
-      2. Records provenance (parameters, hashes)
+      2. Records provenance (parameters and versions)
       3. Emits a structured ArtifactRecord
       4. Writes real artifact files (JSON/TSV) to outdir
     """
@@ -82,6 +82,7 @@ class CedalionAdapter:
         self._task = task
         self._run = run
         self._outdir = Path(outdir) if outdir else None
+        self._artifact_sequence = 0
         if self._outdir:
             self._outdir.mkdir(parents=True, exist_ok=True)
 
@@ -135,7 +136,8 @@ class CedalionAdapter:
     ) -> ArtifactRecord:
         """Emit a structured artifact record for a step."""
         checksum = _compute_recording_hash(recording) if recording is not None else ""
-        artifact_id = f"{step_id}-{self._entity_id()}-{checksum[:8]}"
+        self._artifact_sequence += 1
+        artifact_id = f"{step_id}-{self._entity_id()}-{self._artifact_sequence}"
         record = ArtifactRecord(
             artifact_id=artifact_id,
             subject=self._subject,
@@ -209,12 +211,10 @@ class CedalionAdapter:
         nonpositive_policy: str = "nan",
     ) -> Any:
         """Convert intensity to optical density."""
-        input_hash = _compute_recording_hash(recording)
         result = intensity_to_od(
             recording,
             nonpositive_policy=nonpositive_policy,
         )
-        output_hash = _compute_recording_hash(result)
         od = result.get_timeseries("od")
         nonpositive_count = int(od.attrs.get("fnirs_flow_nonpositive_count", 0))
         parameters = {
@@ -225,8 +225,6 @@ class CedalionAdapter:
         self._provenance.log(
             step_id="optical_density",
             parameters=parameters,
-            input_hashes={"raw": input_hash},
-            output_hashes={"od": output_hash},
         )
         self._emit_artifact("OpticalDensity", result, "optical_density", parameters)
 
@@ -236,8 +234,6 @@ class CedalionAdapter:
             "step": "optical_density",
             **parameters,
             **info,
-            "input_hash": input_hash,
-            "output_hash": output_hash,
         }
         self._write_artifact_file("optical_density", "od_summary", summary)
         return result
@@ -249,16 +245,12 @@ class CedalionAdapter:
         spectrum: str = "prahl",
     ) -> Any:
         """Convert OD to haemoglobin concentration."""
-        input_hash = _compute_recording_hash(recording)
         result = od_to_concentration(recording, ppf=ppf, spectrum=spectrum)
-        output_hash = _compute_recording_hash(result)
         parameters = {"ppf": ppf, "spectrum": spectrum}
 
         self._provenance.log(
             step_id="beer_lambert_law",
             parameters=parameters,
-            input_hashes={"od": input_hash},
-            output_hashes={"haemoglobin": output_hash},
         )
         self._emit_artifact("HaemoglobinData", result, "beer_lambert_law", parameters)
 
@@ -269,8 +261,6 @@ class CedalionAdapter:
             "ppf": ppf,
             "spectrum": spectrum,
             **info,
-            "input_hash": input_hash,
-            "output_hash": output_hash,
         }
         self._write_artifact_file("beer_lambert_law", "hb_summary", summary)
         return result

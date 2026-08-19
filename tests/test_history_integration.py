@@ -58,7 +58,7 @@ class TestHistoryIntegration:
 
         # Switch back to main
         main_flow = store.switch_design_branch(pid, "main")
-        assert len(main_flow["nodes"]) == 1
+        assert len(main_flow["flow_atoms"]) == 1
 
         # List branches
         branches = store.list_design_branches(pid)
@@ -245,7 +245,7 @@ class TestHistoryIntegration:
 
         # Checkout experiment branch
         flow = store_b.switch_design_branch(pid, "experiment")
-        assert len(flow["nodes"]) == 3
+        assert len(flow["flow_atoms"]) == 3
 
         # Diff between branches
         main_commits = store_b.list_design_commits(pid, "main")
@@ -270,7 +270,7 @@ class TestHistoryIntegration:
         # Now simulate save failure on next commit
         flow3 = {"nodes": [{"id": "n1"}, {"id": "n2"}, {"id": "n3"}], "edges": []}
         store.update_flow(pid, flow3)
-        with patch("fnirs_flow.api.project_bundle.os.replace", side_effect=OSError("disk full")):
+        with patch("fnirs_flow.infrastructure.project_bundle.os.replace", side_effect=OSError("disk full")):
             with pytest.raises(OSError, match="disk full"):
                 store.commit_design(pid, message="Should fail")
 

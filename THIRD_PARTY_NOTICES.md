@@ -22,22 +22,23 @@ environment. The direct runtime and optional dependencies declared by
 the project include Pydantic, FastAPI, Uvicorn, MNE, MNE-NIRS, MNE-BIDS,
 NumPy, SciPy, scikit-learn, PyWavelets, pytest, React, React DOM,
 React Router, React Flow, Zustand, Axios, Lucide React, TypeScript, Vite, and
-the Vite React plugin. These dependencies are not vendored in this repository
+the Vite React plugin. Cedalion is an optional, independently installed
+scientific backend pinned by the `cedalion` extra/CI profile and remains under
+its upstream license. These dependencies are not vendored in this repository
 and remain under their upstream licenses.
 
-Audit artifacts:
-
-- `docs/audit/python_licenses_2026-07-14.md` and `.json`: 77 installed Python packages.
-- `docs/audit/webui_licenses_2026-07-14.json`: 93 WebUI production packages.
-- `docs/audit/pip_audit_2026-07-14.json`: final Python vulnerability scan, 0 known vulnerabilities.
-- `npm audit --audit-level=moderate`: 0 vulnerabilities on 2026-07-14.
+The release candidate was checked with Python and npm dependency-license and
+vulnerability audits on 2026-07-14. Those detailed audit reports are not part
+of the code-oriented public tree; rerun the checks in the target environment
+before publishing a new release.
 
 No GPL, AGPL, commercial, or proprietary dependency license was found in these
 release environments. The WebUI inventory reports the private root package as
 `UNLICENSED`; this is the project itself, not a third-party dependency. The
 public release remains governed by the repository `LICENSE`.
 
-The public release tag and archived source DOI still need to be added after publication.
+The public release tag and archived source DOI should be added to this notice
+after publication.
 
 ## Referenced External Toolboxes and Repositories
 
@@ -60,6 +61,20 @@ Reference-only materials include:
 | `References/spm/` | GNU GPL version 2 (`LICENCE`) | GPL reference only; not copied into, linked into, or redistributed with `fnirs-flow`. |
 | `References/NIRS-KIT/` | GPL version 3 indicated by `LICENSE` and README; additional academic-use terms appear in `LICENCE` | GPL/academic-use reference only; not copied into, linked into, or redistributed with `fnirs-flow`. |
 | `References/NIRS_SPM_v4_r1/` | No standalone top-level license file found in the local copy; source files include SPM-dependent/modified SPM routines | SPM-dependent reference only; not copied into, linked into, or redistributed with `fnirs-flow`. |
+
+## Adapted Owner Utilities
+
+`fnirs_flow/adapters/private_fnirs_tools.py` adapts small parsing utilities from
+the repository owner's `tianzilei/MainCodeRepo` at commit
+`3d904b444c7965c3aad5dfde82dbbe91dfa4f647`:
+
+- `fnirs_processing/fnirs_sorter.py`
+- `fnirs_processing/nirs_to_snirf.py`
+
+The source repository is licensed under Apache License 2.0. The adaptations
+remove GUI automation, destructive file moves, hard-coded paths and participant
+attributes, and unvalidated SNIRF writing. They add managed parameters,
+deterministic artifacts, privacy-safe defaults, validation, and provenance.
 
 GPL-licensed, academic-use restricted, Apache-2.0 notice-bearing, or
 SPM-dependent reference projects are used only for methodological comparison,

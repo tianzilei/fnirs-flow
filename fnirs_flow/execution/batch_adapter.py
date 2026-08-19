@@ -52,7 +52,7 @@ def execute_run_with_adapter(
             return run_ctx
 
         # Execute preprocessing chain using atom operation dispatch
-        for step in plan.get("preprocessing_chain", plan.get("preprocessing_atoms", [])):
+        for step in plan.get("preprocessing_atoms", []):
             operation = _get_operation(step)
             params = step.get("parameters", {})
 
@@ -139,7 +139,7 @@ def run_batch_with_adapter(
         failure_store.write_json(outdir)
 
     # Write artifact manifest from shared store
-    manifest = shared_artifacts.to_manifest(plan_sha256=plan.get("flow_hash", ""))
+    manifest = shared_artifacts.to_manifest()
     write_artifact_manifest(manifest, outdir)
 
     # Write provenance from shared store

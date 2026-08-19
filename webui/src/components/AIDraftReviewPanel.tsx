@@ -44,14 +44,14 @@ function recordId(item: Record<string, unknown>, index: number): string {
   return typeof item.id === 'string' ? item.id : `item-${index + 1}`;
 }
 
-function flowItems(flow: Record<string, unknown>, key: 'nodes' | 'edges'): Array<Record<string, unknown>> {
+function flowItems(flow: Record<string, unknown>, key: 'flow_atoms' | 'edges'): Array<Record<string, unknown>> {
   const value = flow[key];
   return Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => !!item && typeof item === 'object') : [];
 }
 
 function computeDiff(currentFlow: Record<string, unknown>, draft: AIDraftFlow) {
-  const currentNodes = flowItems(currentFlow, 'nodes');
-  const draftNodes = draft.nodes;
+  const currentNodes = flowItems(currentFlow, 'flow_atoms');
+  const draftNodes = draft.flow_atoms;
   const currentById = new Map(currentNodes.map((node, index) => [recordId(node, index), node]));
   const draftById = new Map(draftNodes.map((node, index) => [recordId(node, index), node]));
   const added = [...draftById.keys()].filter((id) => !currentById.has(id));
@@ -352,7 +352,7 @@ export function AIDraftReviewPanel({
                 <strong>{draft.name}</strong>
                 <p>{draft.description}</p>
                 <div className="draft-metrics">
-                  <span><strong>{draft.nodes.length}</strong> atoms</span>
+                  <span><strong>{draft.flow_atoms.length}</strong> atoms</span>
                   <span><strong>{draft.edges.length}</strong> links</span>
                   <span><strong>{ai.model}</strong> model</span>
                 </div>
@@ -425,7 +425,7 @@ export function AIDraftReviewPanel({
                 <h4>Apply reviewed draft</h4>
                 <p>{canApply ? 'All required confirmations are complete.' : 'Complete every confirmation and reviewer field before applying.'}</p>
                 <div className="draft-metrics">
-                  <span><strong>{draft.nodes.length}</strong> atoms</span>
+                  <span><strong>{draft.flow_atoms.length}</strong> atoms</span>
                   <span><strong>{draft.edges.length}</strong> links</span>
                   <span><strong>{confirmedItems.size}/{required.length}</strong> confirmations</span>
                 </div>

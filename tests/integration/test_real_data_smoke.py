@@ -12,7 +12,7 @@ import pytest
 mne = pytest.importorskip("mne")
 
 from fnirs_flow.adapters.mne_nirs_io import read_raw_snirf  # noqa: E402
-from fnirs_flow.adapters.mne_nirs_steps import (  # noqa: E402
+from fnirs_flow.adapters.mne_nirs_preprocessing import (  # noqa: E402
     beer_lambert_law,
     filter_raw,
     optical_density,
@@ -32,6 +32,8 @@ SNIRF_PATH = (
 @pytest.fixture(scope="module")
 def paired_raw():
     path = Path(os.environ.get("FNIRS_TEST_SNIRF", str(SNIRF_PATH)))
+    if os.environ.get("FNIRS_REQUIRE_REAL_DATA") == "1" and not path.is_file():
+        pytest.fail(f"Required real-data fixture is missing: {path}")
     if not path.is_file():
         pytest.skip("Set FNIRS_TEST_SNIRF to a real SNIRF file")
     with warnings.catch_warnings():

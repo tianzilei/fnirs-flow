@@ -110,12 +110,12 @@ export function asRecords(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
 }
 
-export function atomCollectionKey(flow: Record<string, unknown>): 'flow_atoms' | 'nodes' {
-  return Array.isArray(flow.flow_atoms) ? 'flow_atoms' : 'nodes';
+export function atomCollectionKey(_flow: Record<string, unknown>): 'flow_atoms' {
+  return 'flow_atoms';
 }
 
 export function flowAtoms(flow: Record<string, unknown>): Array<Record<string, unknown>> {
-  return asRecords(flow.flow_atoms).length > 0 ? asRecords(flow.flow_atoms) : asRecords(flow.nodes);
+  return asRecords(flow.flow_atoms);
 }
 
 export function getOrderPolicy(flow: Record<string, unknown>): OrderPolicy {
@@ -175,7 +175,7 @@ export function inferChecklistScenario(flow: Record<string, unknown>): string {
     flowAtoms(flow).flatMap((atom) => [
       atomTemplateId(atom),
       String(atom.operation || ''),
-      String(atom.atom_type || atom.type || ''),
+      String(atom.atom_type || ''),
     ])
   );
   const hasAny = (...ids: string[]) => ids.some((id) => templateIds.has(id));
@@ -280,7 +280,7 @@ export function atomTemplateId(atom: Record<string, unknown>) {
 
 export function atomMatchesChecklistStep(atom: Record<string, unknown>, step: FlowChecklistStep) {
   const templateId = atomTemplateId(atom);
-  const atomType = String(atom.atom_type || atom.type || '');
+  const atomType = String(atom.atom_type || '');
   const operation = String(atom.operation || '');
   const identifiers = new Set([
     templateId,
@@ -503,7 +503,6 @@ export function addAtomToFlow(flow: Record<string, unknown>, atom: Record<string
   return {
     ...flow,
     [atomKey]: nextAtoms,
-    ...(atomKey === 'flow_atoms' && Array.isArray(flow.nodes) ? { nodes: nextAtoms } : {}),
   };
 }
 
@@ -561,7 +560,6 @@ export function removeUnconnectedAutoEmptyMarkerAtoms(flow: Record<string, unkno
   return {
     ...flow,
     [atomKey]: nextAtoms,
-    ...(atomKey === 'flow_atoms' && Array.isArray(flow.nodes) ? { nodes: nextAtoms } : {}),
   };
 }
 
@@ -894,7 +892,6 @@ export function previewEmptyRiskRemoval(flow: Record<string, unknown>): EmptyRis
   const nextFlow = {
     ...flow,
     [atomKey]: nextAtoms,
-    ...(atomKey === 'flow_atoms' && Array.isArray(flow.nodes) ? { nodes: nextAtoms } : {}),
     edges: nextEdges,
     metadata: {
       ...metadata,

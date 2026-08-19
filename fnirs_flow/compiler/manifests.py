@@ -22,11 +22,11 @@ def write_adapter_manifest(flow: FlowGraph, outdir: Path) -> Path:
 
     # Collect backend bindings from atoms
     backend_bindings = []
-    for node in flow.nodes:
+    for node in flow.flow_atoms:
         if node.backend_binding:
             backend_bindings.append({
                 "atom_id": node.id,
-                "atom_type": node.atom_type or node.type,
+                "atom_type": node.atom_type,
                 "backend_id": node.backend_binding.backend_id,
                 "operation": node.backend_binding.operation,
                 "version_spec": node.backend_binding.version_spec,
@@ -87,13 +87,12 @@ def write_artifact_manifest(artifacts: list[dict[str, Any]], outdir: Path) -> Pa
     return path
 
 
-def write_reproducibility_manifest(flow_hash: str, outdir: Path) -> Path:
+def write_reproducibility_manifest(outdir: Path) -> Path:
     """Write reproducibility_manifest.json."""
     import sys
 
     data = {
         "schema_version": "0.2.0",
-        "flow_hash": flow_hash,
         "python_version": sys.version,
         "environment": {},
     }

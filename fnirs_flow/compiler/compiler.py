@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 from fnirs_flow.compiler.execution_dag import DagNode, ExecutionDag
-from fnirs_flow.compiler.hashing import compute_flow_hash
 from fnirs_flow.compiler.manifests import (
     write_adapter_manifest,
     write_artifact_manifest,
@@ -21,9 +20,11 @@ from fnirs_flow.compiler.manifests import (
     write_risk_register,
 )
 from fnirs_flow.dependencies.resolver import resolve_dependencies
-from fnirs_flow.filesystem import remove_macos_metadata_paths
+from fnirs_flow.execution.operations import create_default_registry
 from fnirs_flow.flow.empty_markers import normalize_empty_markers
 from fnirs_flow.flow.models import FlowGraph
+from fnirs_flow.flow.serialization import load_canonical_flow
+from fnirs_flow.infrastructure.filesystem import remove_macos_metadata_paths
 from fnirs_flow.validation.api import validate_flow
 
 GROUP_SCOPE_OPERATIONS = {
@@ -49,21 +50,19 @@ class CompileResult:
         flow_graph: FlowGraph,
         plan: dict[str, Any],
         execution_dag: ExecutionDag,
-        flow_hash: str,
         outdir: Path,
     ):
         self.flow_graph = flow_graph
         self.plan = plan
         self.execution_dag = execution_dag
-        self.flow_hash = flow_hash
         self.outdir = outdir
 
 
 def _topological_layers(flow: FlowGraph) -> list[list[str]]:
     """Compute topological execution layers. Raises ValueError if cycle detected."""
     adjacency: dict[str, list[str]] = defaultdict(list)
-    node_ids = {n.id for n in flow.nodes}
-    in_degree: dict[str, int] = {n.id: 0 for n in flow.nodes}
+    node_ids = {n.id for n in flow.flow_atoms}
+    in_degree: dict[str, int] = {n.id: 0 for n in flow.flow_atoms}
 
     for edge in flow.edges:
         # Skip edges referencing non-existent nodes (ghost edges)
@@ -112,8 +111,8 @@ def _validate_cross_backend_edges(
     node_backend: dict[str, str | None] = {}
     node_adapter: dict[str, str | None] = {}
     for node in dag_nodes:
-        node_backend[node.step_id] = node.backend_id
-        node_adapter[node.step_id] = node.adapter_id
+        node_backend[node.atom_id] = node.backend_id
+        node_adapter[node.atom_id] = node.adapter_id
 
     # Check each edge
     cross_backend_edges: list[dict[str, Any]] = []
@@ -173,8 +172,7 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
     flow_dict = normalize_empty_markers(flow_dict)
 
     # Parse flow
-    flow = FlowGraph.model_validate(flow_dict)
-    flow_hash = compute_flow_hash(flow_dict)
+    flow = load_canonical_flow(flow_dict)
 
     # Validate: errors (schema/graph) = hard fail, fatal risks = hard fail
     report = validate_flow(flow_dict)
@@ -185,9 +183,10 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
 
     # Build execution DAG (will raise ValueError if cycles exist)
     layers = _topological_layers(flow)
-    node_map = {n.id: n for n in flow.nodes}
+    node_map = {n.id: n for n in flow.flow_atoms}
 
     dag_nodes: list[DagNode] = []
+    operation_registry = create_default_registry()
     for layer in layers:
         for nid in layer:
             node = node_map[nid]
@@ -220,7 +219,7 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
             dependency_optional = node.dependency_optional
 
             # MethodAtom-first: populate atom fields
-            atom_type = node.atom_type or node.type
+            atom_type = node.atom_type
             operation = node.operation or node.config.get("operation", atom_type)
             execution_scope = node.execution_scope
             if "execution_scope" in node.config:
@@ -230,10 +229,18 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
             elif operation in PROJECT_SCOPE_OPERATIONS or atom_type in PROJECT_SCOPE_OPERATIONS:
                 execution_scope = "project"
 
+            operation_errors = operation_registry.validate_execution(
+                str(operation),
+                scope=execution_scope,
+                backend_id=backend_id,
+                required_capabilities=set(required_capabilities),
+                require_handler=True,
+            )
+            if operation_errors:
+                raise ValueError("Invalid operation contract: " + "; ".join(operation_errors))
+
             dag_nodes.append(
                 DagNode(
-                    step_id=nid,
-                    node_type=node.type,
                     atom_id=nid,
                     atom_type=atom_type,
                     template_id=node.template_id,
@@ -255,9 +262,7 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
 
     execution_dag = ExecutionDag(
         flow_id=flow.flow_id,
-        flow_hash=flow_hash,
-        nodes=dag_nodes,
-        atoms=dag_nodes,  # MethodAtom-first dual-write
+        atoms=dag_nodes,
         edges=[{"source": e.source, "target": e.target} for e in flow.edges],
         execution_layers=layers,
     )
@@ -274,7 +279,6 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
     plan = {
         "schema_version": "0.2.0",
         "flow_id": flow.flow_id,
-        "flow_hash": flow_hash,
         "name": flow.name,
         "description": flow.description,
         "metadata": flow.metadata.model_dump(exclude_none=True),
@@ -284,17 +288,6 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
         "acquisition": {},
         "conditions": conditions,
         "contrasts": contrasts,
-        "preprocessing_chain": [
-            {"step_id": n.step_id, "type": n.node_type, "parameters": n.parameters}
-            for n in dag_nodes
-            if n.category == "preprocessing"
-        ],
-        "analysis_chain": [
-            {"step_id": n.step_id, "type": n.node_type, "parameters": n.parameters}
-            for n in dag_nodes
-            if n.category == "analysis"
-        ],
-        # MethodAtom-first dual-write chains
         "preprocessing_atoms": [
             {
                 "atom_id": n.atom_id,
@@ -318,11 +311,6 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
             }
             for n in dag_nodes
             if n.category == "analysis"
-        ],
-        "output_chain": [
-            {"step_id": n.step_id, "type": n.node_type, "parameters": n.parameters}
-            for n in dag_nodes
-            if n.category == "output"
         ],
         "output_atoms": [
             {
@@ -363,7 +351,6 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
         ai_generation = flow.metadata.ai_generation
         confirmation_record = {
             "flow_id": flow.flow_id,
-            "flow_hash": flow_hash,
             "required": ai_generation.requires_user_confirmation,
             "confirmed": ai_generation.confirmed_parameters,
             "pending": ai_generation.pending_confirmations,
@@ -388,13 +375,12 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
     write_risk_register(report.risks, compiled_dir)
     write_reporting_checklist(compiled_dir)
     write_artifact_manifest([], compiled_dir)
-    write_reproducibility_manifest(flow_hash, compiled_dir)
+    write_reproducibility_manifest(compiled_dir)
     remove_macos_metadata_paths(compiled_dir)
 
     return CompileResult(
         flow_graph=flow,
         plan=plan,
         execution_dag=execution_dag,
-        flow_hash=flow_hash,
         outdir=compiled_dir,
     )

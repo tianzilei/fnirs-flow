@@ -10,8 +10,6 @@ Implements the data model from the design document:
 
 from __future__ import annotations
 
-import hashlib
-import json
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -104,26 +102,6 @@ class DependencyProfile(BaseModel):
     probe_module: str
     probe_callable: str | None = None
 
-    def fingerprint(self) -> str:
-        """Compute a stable fingerprint for this profile."""
-        data = {
-            "profile_id": self.profile_id,
-            "backend_id": self.backend_id,
-            "packages": [
-                {
-                    "distribution": p.distribution,
-                    "version_specifier": p.version_specifier,
-                    "source": p.source,
-                }
-                for p in self.packages
-            ],
-            "capabilities": sorted(self.capabilities),
-        }
-        return hashlib.sha256(
-            json.dumps(data, sort_keys=True).encode()
-        ).hexdigest()
-
-
 # ============================================================================
 # Resolution Models
 # ============================================================================
@@ -181,26 +159,7 @@ class DependencyPlan(BaseModel):
     network_required: bool = False
     estimated_download_bytes: int | None = None
     warnings: list[str] = Field(default_factory=list)
-    plan_fingerprint: str = ""
-
-    def compute_fingerprint(self) -> str:
-        """Compute plan fingerprint from requirements and affected atoms."""
-        data = {
-            "flow_id": self.flow_id,
-            "requirements": [
-                {
-                    "profile_id": r.profile_id,
-                    "distribution": r.package.distribution,
-                    "version_specifier": r.package.version_specifier,
-                    "source": r.package.source,
-                }
-                for r in self.requirements
-            ],
-            "affected_atoms": self.affected_atoms,
-        }
-        return hashlib.sha256(
-            json.dumps(data, sort_keys=True).encode()
-        ).hexdigest()
+    revision: int = 1
 
     def is_satisfied(self) -> bool:
         """Check if all requirements are satisfied."""
@@ -316,7 +275,7 @@ class ApprovalRecord(BaseModel):
     """Record of a dependency installation approval."""
 
     plan_id: str
-    plan_fingerprint: str
+    plan_revision: int
     decision: InstallPolicy
     approved_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     approved_by: str = "local-user"
@@ -354,7 +313,7 @@ class EnvironmentManifest(BaseModel):
     install_source: str = ""
     install_tag: str = ""
     install_commit: str = ""
-    environment_fingerprint: str = ""
+    environment_revision: int = 1
     loaded_backend_version: str = ""
     capability_probe_results: dict[str, Any] = Field(default_factory=dict)
     atom_mappings: dict[str, str] = Field(default_factory=dict)

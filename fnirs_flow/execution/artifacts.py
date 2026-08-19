@@ -25,7 +25,6 @@ class ArtifactRecord(BaseModel):
 class ArtifactManifest(BaseModel):
     schema_version: str = "0.1.0"
     run_id: str = ""
-    plan_sha256: str = ""
     artifacts: list[ArtifactRecord] = Field(default_factory=list)
 
 
@@ -39,10 +38,9 @@ class ArtifactStore:
     def all(self) -> list[ArtifactRecord]:
         return list(self._artifacts)
 
-    def to_manifest(self, run_id: str = "", plan_sha256: str = "") -> ArtifactManifest:
+    def to_manifest(self, run_id: str = "") -> ArtifactManifest:
         return ArtifactManifest(
             run_id=run_id,
-            plan_sha256=plan_sha256,
             artifacts=self._artifacts,
         )
 

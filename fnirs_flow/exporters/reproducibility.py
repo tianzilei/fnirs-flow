@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 from datetime import datetime, timezone
@@ -68,13 +67,11 @@ def create_config_snapshot(
     """
     snapshot: dict[str, Any] = {
         "flow": flow_dict,
-        "flow_hash": hashlib.sha256(json.dumps(flow_dict, sort_keys=True).encode()).hexdigest(),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     if plan_dict:
         snapshot["plan"] = plan_dict
-        snapshot["plan_hash"] = hashlib.sha256(json.dumps(plan_dict, sort_keys=True).encode()).hexdigest()
 
     return snapshot
 

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fnirs-flow ProjectSnapshot",
+  "description": "Immutable design snapshot. Must NOT contain current_attempt.",
+  "type": "object",
+  "required": ["snapshot_id", "flow", "revision", "created_at"],
+  "properties": {
+    "snapshot_id": { "type": "string" },
+    "flow": { "type": "object", "description": "The complete flow graph at snapshot time" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "description": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

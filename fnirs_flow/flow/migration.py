@@ -16,9 +16,8 @@ def migrate_flow_schema_v0_1_to_v0_2(flow_dict: dict[str, Any]) -> dict[str, Any
 
     Changes:
       - schema_version: "0.1.0" -> "0.2.0"
-      - nodes -> flow_atoms (dual-write, keep nodes for compat)
-      - node_type -> atom_type (dual-write on each atom)
-      - Each atom gets a template_id field
+      - nodes -> flow_atoms
+      - type -> atom_type
 
     Args:
         flow_dict: v0.1 flow dictionary
@@ -26,21 +25,10 @@ def migrate_flow_schema_v0_1_to_v0_2(flow_dict: dict[str, Any]) -> dict[str, Any
     Returns:
         Migrated v0.2 flow dictionary (original is not mutated)
     """
-    result = copy.deepcopy(flow_dict)
+    from fnirs_flow.flow.serialization import normalize_flow_payload
+
+    result = normalize_flow_payload(copy.deepcopy(flow_dict))
     result["schema_version"] = "0.2.0"
-
-    # Dual-write: keep nodes, add flow_atoms
-    nodes = result.get("nodes", [])
-    flow_atoms = []
-    for node in nodes:
-        atom = dict(node)
-        # Add atom_type = node_type
-        if "atom_type" not in atom and "type" in atom:
-            atom["atom_type"] = atom["type"]
-        flow_atoms.append(atom)
-
-    result["flow_atoms"] = flow_atoms
-
     return result
 
 

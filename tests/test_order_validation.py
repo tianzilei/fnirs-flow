@@ -93,7 +93,7 @@ def test_empty_marker_normalization_adds_schema_preserving_atoms(minimal_flow_di
     flow["metadata"]["order_policy"] = {"allow_empty_edges": True}
 
     normalized = normalize_empty_markers(flow)
-    atoms = normalized["nodes"]
+    atoms = normalized["flow_atoms"]
     by_id = {atom["id"]: atom for atom in atoms}
 
     for spec in EMPTY_MARKER_SPECS:
@@ -119,7 +119,7 @@ def test_remove_unconnected_auto_empty_markers_preserves_connected(minimal_flow_
     )
 
     cleaned = remove_unconnected_auto_empty_markers(normalized)
-    ids = {atom["id"] for atom in cleaned["nodes"]}
+    ids = {atom["id"] for atom in cleaned["flow_atoms"]}
 
     assert "empty_preprocessing" in ids
     assert "empty_design" not in ids

@@ -1,6 +1,6 @@
 """MNE-NIRS adapter: wraps MNE-NIRS functions for fnirs-flow execution.
 
-Each adapter step emits a structured ArtifactRecord with checksum,
+Each adapter step emits a structured ArtifactRecord with artifact integrity,
 software versions, parameters, and subject/session/run tracking.
 """
 
@@ -13,24 +13,26 @@ from typing import Any
 
 import numpy as np
 
-from fnirs_flow.adapters.mne_nirs_io import capture_versions, read_raw_snirf
-from fnirs_flow.adapters.mne_nirs_steps import (
-    beer_lambert_law,
+from fnirs_flow.adapters.mne_nirs_analysis import (
     block_averaging,
     build_design_matrix,
-    cbsi_motion_correction,
     channel_output,
+    estimate_contrast,
+    first_level_glm,
+    roi_output,
+)
+from fnirs_flow.adapters.mne_nirs_io import capture_versions, read_raw_snirf
+from fnirs_flow.adapters.mne_nirs_preprocessing import (
+    beer_lambert_law,
+    cbsi_motion_correction,
     compute_coefficient_of_variation,
     compute_snr,
     detect_bad_channels,
-    estimate_contrast,
     filter_raw,
-    first_level_glm,
     ica_motion_correction,
     notch_filter,
     optical_density,
     pca_motion_correction,
-    roi_output,
     scalp_coupling_index,
     short_channel_regression,
     short_channels,
@@ -77,7 +79,7 @@ class MneNirsAdapter:
 
     Each step:
       1. Executes the MNE-NIRS function
-      2. Records provenance (parameters, hashes)
+      2. Records provenance (parameters and versions)
       3. Emits a structured ArtifactRecord
       4. Writes real artifact files (JSON/TSV) to outdir
     """
@@ -98,6 +100,7 @@ class MneNirsAdapter:
         self._task = task
         self._run = run
         self._outdir = Path(outdir) if outdir else None
+        self._artifact_sequence = 0
         if self._outdir:
             self._outdir.mkdir(parents=True, exist_ok=True)
 
@@ -136,7 +139,8 @@ class MneNirsAdapter:
     ) -> ArtifactRecord:
         """Emit a structured artifact record for a step."""
         checksum = _compute_raw_hash(raw) if raw is not None else ""
-        artifact_id = f"{step_id}-{self._entity_id()}-{checksum[:8]}"
+        self._artifact_sequence += 1
+        artifact_id = f"{step_id}-{self._entity_id()}-{self._artifact_sequence}"
         record = ArtifactRecord(
             artifact_id=artifact_id,
             subject=self._subject,
@@ -243,14 +247,10 @@ class MneNirsAdapter:
 
     def to_optical_density(self, raw: Any) -> Any:
         """Convert intensity to optical density."""
-        input_hash = _compute_raw_hash(raw)
         result = optical_density(raw)
-        output_hash = _compute_raw_hash(result)
         self._provenance.log(
             step_id="optical_density",
             parameters={},
-            input_hashes={"raw": input_hash},
-            output_hashes={"od": output_hash},
         )
         self._emit_artifact("OpticalDensity", result, "optical_density", {})
         # Write OD summary
@@ -261,8 +261,6 @@ class MneNirsAdapter:
             "n_times": data.shape[1],
             "od_mean": float(np.mean(data)) if data.size > 0 else 0,
             "od_std": float(np.std(data)) if data.size > 0 else 0,
-            "input_hash": input_hash,
-            "output_hash": output_hash,
         }
         self._write_artifact_file("optical_density", "od_summary", summary)
         return result
@@ -315,7 +313,6 @@ class MneNirsAdapter:
         **kwargs: Any,
     ) -> Any:
         """Apply motion correction."""
-        input_hash = _compute_raw_hash(raw)
         data = raw.get_data()
 
         if method == "tddr":
@@ -355,12 +352,9 @@ class MneNirsAdapter:
                 f"Unknown motion correction method: {method}. Supported: tddr, wavelet, spline, ica, pca, cbsi"
             )
 
-        output_hash = _compute_raw_hash(result)
         self._provenance.log(
             step_id="motion_correction",
             parameters={"method": method, **kwargs},
-            input_hashes={"raw": input_hash},
-            output_hashes={"corrected": output_hash},
         )
         self._emit_artifact(
             "OpticalDensity" if method in ("tddr",) else "RawIntensity",
@@ -373,17 +367,12 @@ class MneNirsAdapter:
             "step": "motion_correction",
             "method": method,
             "parameters": kwargs,
-            "input_hash": input_hash,
-            "output_hash": output_hash,
         }
         self._write_artifact_file("motion_correction", "motion_report", report)
         return result
 
     def apply_cbsi_correction(self, hbo: Any, hbr: Any) -> tuple[Any, Any]:
         """Apply CBSI motion correction to HbO and HbR signals."""
-        input_hash_hbo = _compute_raw_hash(hbo)
-        input_hash_hbr = _compute_raw_hash(hbr)
-
         hbo_data = hbo.get_data()
         hbr_data = hbr.get_data()
         corrected_hbo, corrected_hbr = cbsi_motion_correction(hbo_data, hbr_data)
@@ -394,11 +383,6 @@ class MneNirsAdapter:
         self._provenance.log(
             step_id="cbsi_correction",
             parameters={},
-            input_hashes={"hbo": input_hash_hbo, "hbr": input_hash_hbr},
-            output_hashes={
-                "hbo_corrected": _compute_raw_hash(hbo),
-                "hbr_corrected": _compute_raw_hash(hbr),
-            },
         )
         self._emit_artifact("HaemoglobinData", hbo, "cbsi_correction", {})
         return hbo, hbr
@@ -412,8 +396,6 @@ class MneNirsAdapter:
         **kwargs: Any,
     ) -> Any:
         """Apply filter to raw data."""
-        input_hash = _compute_raw_hash(raw)
-
         if method == "bandpass":
             result = filter_raw(raw, l_freq=l_freq, h_freq=h_freq, method="iir", **kwargs)
         elif method == "notch":
@@ -424,12 +406,9 @@ class MneNirsAdapter:
         else:
             raise ValueError(f"Unknown filter method: {method}. Supported: bandpass, notch, lowpass")
 
-        output_hash = _compute_raw_hash(result)
         self._provenance.log(
             step_id="filtering",
             parameters={"l_freq": l_freq, "h_freq": h_freq, "method": method},
-            input_hashes={"raw": input_hash},
-            output_hashes={"filtered": output_hash},
         )
         self._emit_artifact("OpticalDensity", result, "filtering", {"method": method})
         # Write filter summary
@@ -438,8 +417,6 @@ class MneNirsAdapter:
             "method": method,
             "l_freq": l_freq,
             "h_freq": h_freq,
-            "input_hash": input_hash,
-            "output_hash": output_hash,
         }
         self._write_artifact_file("filtering", "filter_summary", summary)
         return result
@@ -516,8 +493,6 @@ class MneNirsAdapter:
         method: str = "linear",
     ) -> Any:
         """Apply short-channel regression to remove systemic physiological noise."""
-        input_hash = _compute_raw_hash(raw)
-
         data = raw.get_data()
         short_ch_mask = short_channels(raw.info, threshold=short_channel_threshold)
 
@@ -525,23 +500,18 @@ class MneNirsAdapter:
             self._provenance.log(
                 step_id="short_channel_regression",
                 parameters={"method": method, "n_short_channels": 0},
-                input_hashes={"raw": input_hash},
-                output_hashes={"cleaned": input_hash},
             )
             return raw
 
         cleaned_data = short_channel_regression(data, short_ch_mask, method=method)
         raw = _copy_raw_with_data(raw, cleaned_data)
 
-        output_hash = _compute_raw_hash(raw)
         self._provenance.log(
             step_id="short_channel_regression",
             parameters={
                 "method": method,
                 "n_short_channels": int(short_ch_mask.sum()),
             },
-            input_hashes={"raw": input_hash},
-            output_hashes={"cleaned": output_hash},
         )
         self._emit_artifact("HaemoglobinData", raw, "short_channel_regression", {"method": method})
         return raw
@@ -593,14 +563,10 @@ class MneNirsAdapter:
 
     def to_haemoglobin(self, raw: Any, ppf: float = 6.0) -> Any:
         """Convert OD to haemoglobin concentration."""
-        input_hash = _compute_raw_hash(raw)
         result = beer_lambert_law(raw, ppf=ppf)
-        output_hash = _compute_raw_hash(result)
         self._provenance.log(
             step_id="beer_lambert_law",
             parameters={"ppf": ppf},
-            input_hashes={"od": input_hash},
-            output_hashes={"haemoglobin": output_hash},
         )
         self._emit_artifact("HaemoglobinData", result, "beer_lambert_law", {"ppf": ppf})
         # Write HB summary
@@ -614,8 +580,6 @@ class MneNirsAdapter:
             "ch_names": ch_names[:20],
             "hbo_mean": float(np.mean(data[::2])) if data.size > 0 else 0,
             "hbr_mean": float(np.mean(data[1::2])) if data.size > 1 else 0,
-            "input_hash": input_hash,
-            "output_hash": output_hash,
         }
         self._write_artifact_file("beer_lambert_law", "hb_summary", summary)
         return result

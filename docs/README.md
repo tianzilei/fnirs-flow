@@ -1,6 +1,6 @@
 # Documentation Index
 
-> Last updated: 2026-08-15
+> Last updated: 2026-08-19
 
 This page indexes the public documentation shipped with the release tree.
 Private research notes, literature worktables, generated outputs, caches, and
@@ -33,22 +33,17 @@ remain available only for older flows and migration code.
 
 ## Validation Baseline
 
-The clean public release tree baseline is:
+The public tree is validated with the synchronization tests and the release
+commands listed below. Detailed development status reports are intentionally
+kept outside this code-oriented release tree.
+
+The primary local reproduction commands are:
 
 ```text
-pytest -q                                  # 1149 passed, 11 skipped
-npm run test:unit                          # 22 passed
-npm run build                              # passed with existing Vite chunk-size warning
-```
-
-The development tree baseline is 1158 passed and 2 skipped. Its nine additional
-passes use local real-data and sample-data fixtures that are intentionally
-excluded from the public release tree.
-
-For a public-tree lint pass, run:
-
-```text
-ruff check cli.py fnirs_flow tests scripts
+python -m pytest --tb=short -q -p no:cacheprovider
+python -m ruff check cli.py fnirs_flow tests scripts
+npm --prefix webui run test:unit
+npm --prefix webui run build
 ```
 
 ## Public Release Contents

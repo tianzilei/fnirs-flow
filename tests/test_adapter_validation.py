@@ -16,16 +16,16 @@ from fnirs_flow.validation.adapters import validate_adapters
 class TestAdapterValidation:
     def _make_flow(self, source_schema, target_schema, adapter_id=None, registry=None):
         return FlowGraph(
-            nodes=[
+            flow_atoms=[
                 FlowNode(
                     id="src",
-                    type="a",
+                    atom_type="a",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="out", direction="out", schema=source_schema)],
                 ),
                 FlowNode(
                     id="tgt",
-                    type="b",
+                    atom_type="b",
                     category=NodeCategory.DATA,
                     ports=[NodePort(name="in", direction="in", schema=target_schema)],
                 ),

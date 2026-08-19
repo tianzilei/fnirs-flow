@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 import pytest
 
-from fnirs_flow.api import project_bundle
-from fnirs_flow.api.project_bundle import ProjectBundleError, ProjectBundleManager
 from fnirs_flow.api.projects import ProjectStore
+from fnirs_flow.infrastructure import project_bundle
+from fnirs_flow.infrastructure.project_bundle import ProjectBundleError, ProjectBundleManager
 
 
 class TestProjectPersistence:
@@ -258,8 +258,8 @@ class TestProjectPersistence:
                 results = list(pool.map(lambda _: store2.get_flow(project.id), range(2)))
 
         assert results == [
-            {"flow_id": "concurrent-flow", "nodes": [], "edges": []},
-            {"flow_id": "concurrent-flow", "nodes": [], "edges": []},
+            {"flow_id": "concurrent-flow", "flow_atoms": [], "edges": [], "schema_version": "0.3.0"},
+            {"flow_id": "concurrent-flow", "flow_atoms": [], "edges": [], "schema_version": "0.3.0"},
         ]
         assert calls == 1
 
@@ -444,7 +444,7 @@ class TestProjectPersistence:
         original_bundle = tmp_path / f"{project.id}.fnirsflow"
         original_size = original_bundle.stat().st_size
         # Mock os.replace to fail during the next save
-        with patch("fnirs_flow.api.project_bundle.os.replace", side_effect=OSError("disk full")):
+        with patch("fnirs_flow.infrastructure.project_bundle.os.replace", side_effect=OSError("disk full")):
             with pytest.raises(OSError, match="disk full"):
                 store.update_flow(project.id, {"flow_id": "fail", "nodes": [], "edges": []})
         # Original bundle should be intact
@@ -471,7 +471,8 @@ class TestProjectPersistence:
         assert loaded.integrity_status == "verified"
         flow = store2.get_flow(project.id)
         assert flow["flow_id"] == "moved"
-        assert len(flow["nodes"]) == 1
+        assert len(flow["flow_atoms"]) == 1
+        assert "nodes" not in flow
 
     def test_cross_directory_with_uri_rebinding(self, tmp_path):
         # Create a project with URI bindings

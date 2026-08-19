@@ -29,7 +29,7 @@ class TestFlowNode:
     def test_create_node(self):
         node = FlowNode(
             id="n1",
-            type="optical_density",
+            atom_type="optical_density",
             category=NodeCategory.PREPROCESSING,
             position=Position(x=100, y=200),
         )
@@ -40,7 +40,7 @@ class TestFlowNode:
     def test_node_serialization(self):
         node = FlowNode(
             id="n1",
-            type="test",
+            atom_type="test",
             category=NodeCategory.DATA,
             ports=[NodePort(name="out", direction="out", schema="TestData")],
         )
@@ -81,28 +81,28 @@ class TestFlowGraph:
         graph = FlowGraph(
             flow_id="test-001",
             name="Test Flow",
-            nodes=[
-                FlowNode(id="n1", type="a", category=NodeCategory.DATA),
-                FlowNode(id="n2", type="b", category=NodeCategory.ANALYSIS),
+            flow_atoms=[
+                FlowNode(id="n1", atom_type="a", category=NodeCategory.DATA),
+                FlowNode(id="n2", atom_type="b", category=NodeCategory.ANALYSIS),
             ],
             edges=[
                 FlowEdge(id="e1", source="n1", target="n2", source_handle="out", target_handle="in"),
             ],
         )
-        assert len(graph.nodes) == 2
+        assert len(graph.flow_atoms) == 2
         assert len(graph.edges) == 1
 
     def test_node_map(self):
         graph = FlowGraph(
-            nodes=[FlowNode(id="a", type="x", category=NodeCategory.DATA)],
+            flow_atoms=[FlowNode(id="a", atom_type="x", category=NodeCategory.DATA)],
         )
         nm = graph.node_map()
         assert "a" in nm
-        assert nm["a"].type == "x"
+        assert nm["a"].atom_type == "x"
 
     def test_get_node(self):
         graph = FlowGraph(
-            nodes=[FlowNode(id="a", type="x", category=NodeCategory.DATA)],
+            flow_atoms=[FlowNode(id="a", atom_type="x", category=NodeCategory.DATA)],
         )
         assert graph.get_node("a") is not None
         assert graph.get_node("missing") is None
@@ -110,12 +110,12 @@ class TestFlowGraph:
     def test_serialization_roundtrip(self):
         graph = FlowGraph(
             flow_id="rt-001",
-            nodes=[FlowNode(id="n1", type="test", category=NodeCategory.DATA)],
+            flow_atoms=[FlowNode(id="n1", atom_type="test", category=NodeCategory.DATA)],
         )
         d = flow_to_dict(graph)
         restored = load_flow_from_dict(d)
         assert restored.flow_id == "rt-001"
-        assert len(restored.nodes) == 1
+        assert len(restored.flow_atoms) == 1
 
 
 class TestSchemaValidation:

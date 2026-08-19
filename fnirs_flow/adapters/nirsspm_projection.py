@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 import math
 import re
@@ -75,7 +74,7 @@ def run_nirsspm_surface_projection_csv(
         if any(value is None for value in head_xyz):
             skipped_missing_head += 1
             continue
-        input_points.append([float(value) for value in head_xyz])
+        input_points.append([float(value) for value in head_xyz if value is not None])
         source_row_indexes.append(source_row_index)
         input_metadata.append(row)
 
@@ -85,7 +84,7 @@ def run_nirsspm_surface_projection_csv(
     projector = NirsspmSurfaceProjector.from_reference_dir(reference_dir or DEFAULT_REFERENCE_DIR)
     projected_points = projector.project_head_to_cortex(input_points)
 
-    source_sha256 = _sha256(source)
+    source_stat = source.stat()
     coordinate_set = coordinate_set_id or _first_nonempty(rows, "group_id") or source.stem
     normalized_rows: list[dict[str, Any]] = []
     distances: list[float] = []
@@ -108,19 +107,20 @@ def run_nirsspm_surface_projection_csv(
             "projected_mni_z": float(projected_xyz[2]),
             "projection_algorithm": "NIRS-SPM_v4_r1_projection_CS_python_rewrite",
             "projection_stage": DEFAULT_STAGE,
-            "source_file_sha256": source_sha256,
+            "source_file_size": source_stat.st_size,
         }
         if ref_cols is not None:
             ref_xyz = [_parse_float(source_row.get(column, "")) for column in ref_cols]
             if not any(value is None for value in ref_xyz):
-                diff = [float(projected_xyz[i]) - float(ref_xyz[i]) for i in range(3)]
+                complete_ref = [float(value) for value in ref_xyz if value is not None]
+                diff = [float(projected_xyz[i]) - complete_ref[i] for i in range(3)]
                 distance = math.sqrt(sum(value * value for value in diff))
                 distances.append(distance)
                 output_row.update(
                     {
-                        "reference_mni_x": float(ref_xyz[0]),
-                        "reference_mni_y": float(ref_xyz[1]),
-                        "reference_mni_z": float(ref_xyz[2]),
+                        "reference_mni_x": complete_ref[0],
+                        "reference_mni_y": complete_ref[1],
+                        "reference_mni_z": complete_ref[2],
                         "diff_x_atom_minus_reference": diff[0],
                         "diff_y_atom_minus_reference": diff[1],
                         "diff_z_atom_minus_reference": diff[2],
@@ -143,7 +143,8 @@ def run_nirsspm_surface_projection_csv(
         "coordinate_set_id": coordinate_set,
         "atom_id": atom_id,
         "source_file": str(source),
-        "source_file_sha256": source_sha256,
+        "source_file_size": source_stat.st_size,
+        "source_file_modified": source_stat.st_mtime_ns,
         "reference_dir": str(projector.reference_dir),
         "source_rows": len(rows),
         "projected_rows": len(normalized_rows),
@@ -193,7 +194,8 @@ def run_nirsspm_surface_projection_csv(
         "warnings": warnings,
         "provenance": {
             "source_file": str(source),
-            "source_file_sha256": source_sha256,
+            "source_file_size": source_stat.st_size,
+            "source_file_modified": source_stat.st_mtime_ns,
             "reference_dir": str(projector.reference_dir),
             "projection_algorithm": "NIRS-SPM_v4_r1_projection_CS_python_rewrite",
             "projection_stage": DEFAULT_STAGE,
@@ -414,14 +416,6 @@ def _summarize_distances(distances: list[float]) -> dict[str, Any]:
         "within_10mm_count": sum(value <= 10 for value in sorted_distances),
         "within_15mm_count": sum(value <= 15 for value in sorted_distances),
     }
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _safe_stem(value: str) -> str:

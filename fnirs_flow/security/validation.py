@@ -14,6 +14,6 @@ def validate_security(flow: FlowGraph) -> list[RiskItem]:
     Returns list of RiskItems.
     """
     risks: list[RiskItem] = []
-    for node in flow.nodes:
-        risks.extend(validate_custom_node_safety(node))
+    for atom in flow.flow_atoms:
+        risks.extend(validate_custom_node_safety(atom))
     return risks

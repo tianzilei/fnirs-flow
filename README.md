@@ -4,7 +4,23 @@ GUI-enabled fNIRS analysis toolbox and reproducibility framework. fnirs-flow
 uses Flow graphs to orchestrate preprocessing, validation, execution, and
 reproducibility workflows with an MNE-NIRS execution backend.
 
-**v1.2.0** | Public release baseline: `pytest -q` 1149 passed, 11 skipped | Python 3.10+
+Run execution remains serial by default. For independent, CPU-bound multi-run
+workloads, the opt-in process backend is configured with environment variables:
+
+```text
+FNIRS_PARALLEL_BACKEND=process
+FNIRS_RUN_WORKERS=4
+FNIRS_BLAS_THREADS=1
+FNIRS_MEMORY_BUDGET_MB=4096
+```
+
+The runtime records requested and effective worker/thread budgets in execution
+summary and provenance files. Single-run and resource-constrained attempts
+fall back to serial before execution starts. Benchmark both modes on the target
+machine with `tools/benchmark/run_execution_benchmark.py`; Windows process
+startup can make small workloads slower.
+
+**v1.2.1** | Python 3.10+
 
 ---
 
@@ -68,7 +84,7 @@ python cli.py run outputs/demo --outdir outputs/demo
 ```bash
 # Option 1: production mode (recommended)
 python cli.py webui
-# The first run builds the frontend; later runs serve static files from FastAPI
+# Production mode serves the prebuilt WebUI bundled in the wheel
 # Visit http://127.0.0.1:8000
 
 # Option 2: development mode with frontend hot reload
@@ -158,9 +174,7 @@ Related documents:
 ## Documentation
 
 - `docs/README.md` is the public documentation index.
-- `docs/architecture/CURRENT_DOCUMENTATION_MAP.md` records the current document priorities and historical notes.
 - `docs/specs/` contains the stable public contracts.
-- `docs/audit/` contains audit outputs and validation artifacts.
 - Compatibility aliases such as `FlowNode`, `NodeTemplate`, and `NodeLibrary` are kept only for older flows and migration paths.
 
 ---

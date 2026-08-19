@@ -246,6 +246,137 @@ NIRS_SPM_SURFACE_PROJECTION = MethodAtomTemplate(
     tags=["data", "localization", "projection", "mni", "nirsspm", "group", "experimental"],
 )
 
+FNIRS_FILENAME_INVENTORY = MethodAtomTemplate(
+    template_id="fnirs_filename_inventory",
+    name="fNIRS Filename Inventory",
+    category=MethodAtomCategory.DATA,
+    atom_type="fnirs_filename_inventory",
+    operation="fnirs_filename_inventory",
+    description="Inventory fNIRS files and validate study-specific filename components without moving data",
+    default_config={
+        "path": "",
+        "filename_pattern": r"(\d{8})(\d{3})([A-Za-z]{4})(N|E|A|C|P|B|T)",
+        "extensions": [".snirf", ".nirs", ".txt", ".csv", ".omm"],
+        "recursive": True,
+        "execution_scope": "group",
+        "readiness_status": "needs_attention",
+    },
+    parameter_specs={
+        "path": COMMON_PARAMETER_SPECS["path"],
+        "filename_pattern": {"type": "text", "control": "text"},
+        "extensions": {"type": "text-list", "control": "text"},
+        "recursive": {"type": "boolean", "control": "checkbox"},
+    },
+    metadata={
+        "source_project": "tianzilei/MainCodeRepo",
+        "source_file": "fnirs_processing/fnirs_sorter.py",
+        "source_commit": "3d904b444c7965c3aad5dfde82dbbe91dfa4f647",
+        "source_license": "Apache-2.0",
+        "reuse_mode": "adapt",
+        "divergence_reason": "Removed pandas and console side effects; added deterministic, non-destructive artifacts.",
+    },
+    ports=[
+        AtomPort(name="source_directory", direction="in", schema="FilePath"),
+        AtomPort(name="filename_inventory", direction="out", schema="FnirsFilenameInventory"),
+        AtomPort(name="validation_tables", direction="out", schema="CSVFile"),
+    ],
+    reference="MainCodeRepo: fnirs_processing/fnirs_sorter.py (Apache-2.0)",
+    tags=["data", "fnirs", "filename", "inventory", "private_script_adaptation", "group"],
+)
+
+NIRS_SPM_HEADER_INSPECTION = MethodAtomTemplate(
+    template_id="nirs_spm_header_inspection",
+    name="NIRS-SPM Header Inspection",
+    category=MethodAtomCategory.VALIDATION,
+    atom_type="nirs_spm_header_inspection",
+    operation="nirs_spm_header_inspection",
+    description="Inspect NIRS-SPM-style text headers and report structural metadata without loading signals",
+    default_config={
+        "path": "",
+        "glob_pattern": "*.TXT",
+        "recursive": True,
+        "encoding": "utf-8-sig",
+        "include_subject_id": False,
+        "execution_scope": "group",
+        "readiness_status": "needs_attention",
+    },
+    parameter_specs={
+        "path": COMMON_PARAMETER_SPECS["path"],
+        "glob_pattern": {"type": "text", "control": "text"},
+        "recursive": {"type": "boolean", "control": "checkbox"},
+        "encoding": {"type": "text", "control": "text"},
+        "include_subject_id": {
+            "type": "boolean",
+            "control": "checkbox",
+            "description": "Off by default to keep direct identifiers out of derivatives.",
+        },
+    },
+    metadata={
+        "source_project": "tianzilei/MainCodeRepo",
+        "source_file": "fnirs_processing/nirs_to_snirf.py",
+        "source_commit": "3d904b444c7965c3aad5dfde82dbbe91dfa4f647",
+        "source_license": "Apache-2.0",
+        "reuse_mode": "adapt",
+        "divergence_reason": (
+            "Retained header inspection only; removed hard-coded demographic values and unvalidated SNIRF writing."
+        ),
+    },
+    ports=[
+        AtomPort(name="nirs_spm_text", direction="in", schema="FilePath"),
+        AtomPort(name="header_report", direction="out", schema="NirsspmHeaderInspection"),
+    ],
+    reference="MainCodeRepo: fnirs_processing/nirs_to_snirf.py (Apache-2.0)",
+    tags=["validation", "fnirs", "nirs_spm", "header", "private_script_adaptation", "group"],
+)
+
+PROBE_LAYOUT_SPLIT = MethodAtomTemplate(
+    template_id="probe_layout_split",
+    name="Probe Layout Split",
+    category=MethodAtomCategory.DATA,
+    atom_type="probe_layout_split",
+    operation="probe_layout_split",
+    description="Split a probe layout CSV into normalized source, detector, and channel coordinate tables",
+    default_config={
+        "path": "",
+        "label_column": "layout",
+        "coordinate_columns": ["x", "y", "z"],
+        "source_prefixes": ["T", "S"],
+        "detector_prefixes": ["R", "D"],
+        "channel_prefixes": ["CH"],
+        "coordinate_set_id": "probe_layout",
+        "execution_scope": "group",
+        "readiness_status": "needs_attention",
+    },
+    parameter_specs={
+        "path": COMMON_PARAMETER_SPECS["path"],
+        "label_column": {"type": "text", "control": "text"},
+        "coordinate_columns": {"type": "text-list", "control": "text"},
+        "source_prefixes": {"type": "text-list", "control": "text"},
+        "detector_prefixes": {"type": "text-list", "control": "text"},
+        "channel_prefixes": {"type": "text-list", "control": "text"},
+        "coordinate_set_id": {"type": "text", "control": "text"},
+    },
+    metadata={
+        "source_project": "tianzilei/MainCodeRepo",
+        "source_file": "fnirs_processing/nirs_to_snirf.py",
+        "source_commit": "3d904b444c7965c3aad5dfde82dbbe91dfa4f647",
+        "source_license": "Apache-2.0",
+        "reuse_mode": "adapt",
+        "divergence_reason": (
+            "Made output paths explicit and parameterized column names and prefixes."
+        ),
+    },
+    ports=[
+        AtomPort(name="probe_layout", direction="in", schema="ProbeLayoutCSV"),
+        AtomPort(name="source_coordinates", direction="out", schema="SourceCoordinates"),
+        AtomPort(name="detector_coordinates", direction="out", schema="DetectorCoordinates"),
+        AtomPort(name="channel_coordinates", direction="out", schema="ChannelCoordinates"),
+        AtomPort(name="layout_manifest", direction="out", schema="ProbeLayoutManifest"),
+    ],
+    reference="MainCodeRepo: fnirs_processing/nirs_to_snirf.py (Apache-2.0)",
+    tags=["data", "fnirs", "probe", "coordinates", "private_script_adaptation", "group"],
+)
+
 NIRX_READER = MethodAtomTemplate(
     template_id="nirx_reader",
     name="NIRx Reader",
@@ -1587,6 +1718,9 @@ ALL_NODE_TEMPLATES: list[MethodAtomTemplate] = [
     KERNEL_READER,
     LOCALIZATION_PROJECTION_IMPORT,
     NIRS_SPM_SURFACE_PROJECTION,
+    FNIRS_FILENAME_INVENTORY,
+    NIRS_SPM_HEADER_INSPECTION,
+    PROBE_LAYOUT_SPLIT,
     # Design
     STUDY_DESIGN,
     EVENT_EXTRACTION,

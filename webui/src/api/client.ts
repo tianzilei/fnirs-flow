@@ -1,4 +1,8 @@
 import axios from 'axios';
+import { normalizeFlowPayload } from '../features/flow/normalization';
+import type * as Generated from './generated';
+
+export { createGeneratedApiClient } from './generated';
 
 const API_BASE = '/api';
 
@@ -24,104 +28,46 @@ export function formatApiError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  data_root?: string;
+export type Project = Omit<Generated.ProjectRead, 'flow_id' | 'package_path' | 'storage_format' | 'revision' | 'integrity_status' | 'integrity_error'> & {
   flow_id: string;
   package_path: string;
-  storage_format: 'fnirsflow_bundle';
+  storage_format: string;
   revision: number;
-  integrity_status: 'unknown' | 'verified' | 'failed';
-  last_verified_at?: string | null;
+  integrity_status: string;
   integrity_error?: string | null;
-}
-
-export interface ProjectStatus {
-  flow_saved: boolean;
-  validated: boolean;
-  compiled: boolean;
-  data_discovered: boolean;
-  runnable_runs: number;
-  executed: boolean;
-  flow_hash: string;
-  compiled_flow_hash: string;
-  last_attempt_id: string;
-  last_execution_status: string;
-  read_only: boolean;
-  quarantined_atoms: string[];
-}
+};
+export type ProjectStatus = Generated.ProjectStatus & {
+  flow_saved: boolean; validated: boolean; compiled: boolean; data_discovered: boolean; executed: boolean;
+  flow_revision: number; compiled_revision: number; last_attempt_id: string; last_execution_status: string;
+};
 
 export async function getProjectStatus(projectId: string): Promise<ProjectStatus> {
   const { data } = await api.get(`/projects/${projectId}/status`);
   return data;
 }
 
-export interface ValidationResult {
-  is_valid: boolean;
+export type ValidationResult = Generated.ValidationResult & {
   errors: string[];
   warnings: string[];
-  risks: Record<string, unknown>[];
-}
+  risks: Array<Record<string, unknown>>;
+};
+export type CompileResult = Omit<Generated.CompileResult, 'dag_layers'> & {
+  dag_layers?: Array<Array<{ id: string; atom_type?: string; operation?: string }>>;
+};
+export type DiscoverResult = Generated.DiscoverResult & { source_url: string; metadata_tables: number };
 
-export interface CompileResult {
-  flow_id: string;
-  flow_hash: string;
-  steps: number;
-  layers: number;
-  output_files: string[];
-  dag_layers?: Array<Array<{
-    id: string;
-    atom_type?: string;
-    node_type?: string;
-    operation?: string;
-  }>>;
-}
-
-export interface DiscoverResult {
-  dataset_id: string;
-  files: number;
-  runs: number;
-  local_root: string;
-  source_url: string;
-  metadata_tables: number;
-}
-
-export interface ProjectDataFolder {
-  name: string;
-  path: string;
-  has_children: boolean;
-}
-
-export interface ProjectDataFolderList {
+export type ProjectDataFolder = Generated.FolderEntry;
+export type ProjectDataFolderList = Generated.ProjectDataFolderList & {
   parent: string;
   folders: ProjectDataFolder[];
-}
-
-export interface LocalFolder {
-  name: string;
-  path: string;
-  has_children: boolean;
-}
-
-export interface LocalFolderList {
+};
+export type LocalFolder = Generated.FolderEntry;
+export type LocalFolderList = Generated.LocalFolderList & {
   current: string;
   parent: string;
   folders: LocalFolder[];
-}
-
-export interface DatasetEntry {
-  dataset_id: string;
-  name: string;
-  source_kind: string;
-  url: string;
-  doi: string;
-  citation: string;
-  license: string;
-  description: string;
-  folder_name: string;
-}
+};
+export type DatasetEntry = Required<Generated.DatasetRead>;
 
 export async function listDatasets(): Promise<DatasetEntry[]> {
   const { data } = await api.get('/datasets');
@@ -194,10 +140,7 @@ export async function getDiscoverResult(projectId: string): Promise<DiscoverResu
   return data;
 }
 
-export interface ExampleFlowSummary {
-  id: string;
-  label: string;
-}
+export type ExampleFlowSummary = Generated.ExampleFlowSummary;
 
 export async function listExampleFlows(): Promise<ExampleFlowSummary[]> {
   const { data } = await api.get('/example-flows');
@@ -209,9 +152,7 @@ export async function getExampleFlow(exampleId: string): Promise<Record<string, 
   return data;
 }
 
-export interface ParticipantTableImportResult {
-  table_kind: string;
-  rows: number;
+export type ParticipantTableImportResult = Omit<Generated.ParticipantTableImportResult, 'columns' | 'validation_report'> & {
   columns: Array<{ name: string; inferred_type: string; missing_count: number; unique_count: number; possible_sensitive: boolean }>;
   manifest: Record<string, unknown>;
   column_role_map: Record<string, unknown>;
@@ -229,7 +170,7 @@ export interface ParticipantTableImportResult {
     };
   };
   preview_rows: Array<Record<string, unknown>>;
-}
+};
 
 export async function importParticipantTable(
   projectId: string,
@@ -256,22 +197,18 @@ export async function importParticipantTable(
   return data;
 }
 
-export interface DryRunResult {
-  total_runs: number;
+export type DryRunResult = Generated.DryRunResult & {
   planned_runs: Array<{ run_id: string; status: string; subject: string; session: string; run: string; started_at: string; completed_at: string }>;
   summary: Record<string, unknown>;
-}
+};
 
 export async function dryRun(projectId: string): Promise<DryRunResult> {
   const { data } = await api.post(`/projects/${projectId}/dry-run`);
   return data;
 }
 
-export interface ExecuteResult {
+export type ExecuteResult = Generated.ExecuteResult & {
   attempt_id: string;
-  total_runs: number;
-  successful: number;
-  failed: number;
   runs: Array<{
     run_id: string;
     status: string;
@@ -284,11 +221,10 @@ export interface ExecuteResult {
     artifacts: ArtifactSummary[];
   }>;
   failure_ids: string[];
-}
+};
 
-export interface ArtifactSummary {
+export type ArtifactSummary = Omit<Generated.ArtifactSummary, 'artifact_id'> & {
   artifact_id: string;
-  type: string;
   uri: string;
   path: string;
   resolved_path: string;
@@ -297,31 +233,24 @@ export interface ArtifactSummary {
   exists: boolean;
   atom_id: string;
   step_id: string;
-}
+};
 
-export interface AtomExecutionSummary {
-  atom_id: string;
-  status: string;
+export type AtomExecutionSummary = Omit<Generated.AtomResultSummary, 'artifacts' | 'error'> & {
   output_handles: Record<string, unknown>;
   artifacts: ArtifactSummary[];
   warnings: string[];
   error?: string;
-}
+};
 
 export type ExecutionJobStatus = 'queued' | 'running' | 'cancelling' | 'completed' | 'failed' | 'cancelled';
 
-export interface ExecutionJob {
-  attempt_id: string;
-  project_id: string;
+export type ExecutionJob = Omit<Generated.ExecutionJobRead, 'status' | 'result' | 'error'> & {
   status: ExecutionJobStatus;
-  created_at: string;
   started_at: string;
   completed_at: string;
-  recovery_count: number;
-  cancel_requested: boolean;
   result?: ExecuteResult;
   error?: string;
-}
+};
 
 export async function executeProject(projectId: string): Promise<ExecutionJob> {
   const { data } = await api.post(`/projects/${projectId}/execute`);
@@ -343,13 +272,7 @@ export async function cancelExecutionAttempt(projectId: string, attemptId: strin
   return data;
 }
 
-export interface ImportStatus {
-  imported: boolean;
-  read_only: boolean;
-  quarantined_atoms: string[];
-  relinked?: boolean;
-  data_root?: string;
-}
+export type ImportStatus = Generated.ImportStatus & { quarantined_atoms: string[] };
 
 export async function getImportStatus(projectId: string): Promise<ImportStatus> {
   const { data } = await api.get(`/projects/${projectId}/import-status`);
@@ -382,12 +305,7 @@ export async function relinkData(projectId: string, dataRoot: string): Promise<R
   return data;
 }
 
-export interface ProjectResults {
-  kind: 'qc' | 'channel' | 'roi' | 'group';
-  file_count: number;
-  files: Array<{ path: string; data: unknown }>;
-  figures?: Array<{ path: string; svg: string }>;
-}
+export type ProjectResults = Generated.ProjectResults & { files: Generated.ResultFile[] };
 
 export async function getProjectResults(
   projectId: string,
@@ -422,19 +340,12 @@ export function subscribeProgress(
   return () => eventSource.close();
 }
 
-export interface ExportResult {
-  package_path: string;
-  size_bytes: number;
+export type ExportResult = Generated.ExportResult & {
   profile: string;
   contents: string[];
-}
+};
 
-export interface PackageProfile {
-  profile_id: string;
-  name: string;
-  description: string;
-  include_patterns: string[];
-}
+export type PackageProfile = Generated.PackageProfile & { include_patterns: string[] };
 
 export async function listPackageProfiles(): Promise<PackageProfile[]> {
   const { data } = await api.get('/package-profiles');
@@ -453,73 +364,30 @@ export async function exportPackage(projectId: string, options?: ExportOptions):
   return data;
 }
 
-export interface AtomTemplate {
-  id: string;
-  atom_type: string;
-  display_name: string;
-  category: string;
-  operation: string;
-  description: string;
-  default_config?: Record<string, unknown>;
+export type AtomTemplate = Generated.AtomTemplate & {
+  input_ports: Generated.PortDescription[];
+  output_ports: Generated.PortDescription[];
+  evidence_refs: string[];
   parameter_options?: Record<string, unknown[]>;
   parameter_specs?: Record<string, Record<string, unknown>>;
-  default_readiness_status?: string;
-  default_execution_scope?: string;
-  input_ports: Array<{ name: string; schema: string; required: boolean }>;
-  output_ports: Array<{ name: string; schema: string; required: boolean }>;
-  ports?: Array<{ name: string; direction: 'in' | 'out'; schema: string; required: boolean }>;
-  evidence_refs: string[];
-}
+  ports?: Array<Generated.PortDescription & { direction: 'in' | 'out' }>;
+};
 
 export async function listAtomTemplates(): Promise<AtomTemplate[]> {
   const { data } = await api.get('/atom-templates');
   return data;
 }
 
-export interface EmptyMarkerSpec {
-  category: string;
-  input_schema: string;
-  output_schema: string;
-  label: string;
-  atom_id: string;
-  template_id: string;
-}
+export type EmptyMarkerSpec = Generated.EmptyMarkerSpec;
 
 export async function listEmptyMarkerSpecs(): Promise<EmptyMarkerSpec[]> {
   const { data } = await api.get('/empty-marker-specs');
   return data;
 }
 
-export interface FlowChecklistSummary {
-  scenario_id: string;
-  label: string;
-  description: string;
-  version: string;
-  step_count: number;
-}
-
-export interface FlowChecklistStep {
-  slot_id: string;
-  label: string;
-  required: boolean;
-  recommended_template_ids: string[];
-  recommended_atom_types: string[];
-  default_template_id: string;
-  alternative_template_ids: string[];
-  input_requirements: string[];
-  depends_on: string[];
-  allow_empty_marker: boolean;
-  category: string;
-  guidance: string;
-}
-
-export interface FlowChecklist {
-  scenario_id: string;
-  label: string;
-  description: string;
-  version: string;
-  steps: FlowChecklistStep[];
-}
+export type FlowChecklistSummary = Generated.FlowChecklistSummary;
+export type FlowChecklistStep = Required<Generated.FlowChecklistStep>;
+export type FlowChecklist = Omit<Generated.FlowChecklist, 'steps'> & { steps: FlowChecklistStep[] };
 
 export async function listFlowChecklists(): Promise<FlowChecklistSummary[]> {
   const { data } = await api.get('/flow-checklists');
@@ -531,50 +399,31 @@ export async function getFlowChecklist(scenarioId: string): Promise<FlowChecklis
   return data;
 }
 
-export interface HealthStatus {
-  status: string;
-  version: string;
-  [key: string]: unknown;
-}
+export type HealthStatus = Generated.HealthStatus;
 
 export async function getHealth(): Promise<HealthStatus> {
   const { data } = await api.get('/health');
   return data;
 }
 
-export interface BackendDescription {
-  backend_id: string;
-  class_path: string;
-  dependency_profile_id?: string;
-  display_name: string;
+export type BackendDescription = Omit<Generated.BackendDescription, 'description' | 'dependency_profile_id'> & {
   description: string;
-  is_available: boolean;
-  is_loaded: boolean;
-}
+  dependency_profile_id?: string;
+};
 
 export async function getBackends(): Promise<BackendDescription[]> {
   const { data } = await api.get('/backends');
   return data;
 }
 
-export interface SnapshotResult {
-  snapshot_id: string;
-  flow_hash: string;
-  created_at: string;
-}
+export type SnapshotResult = Generated.ProjectSnapshot;
 
 export async function createSnapshot(projectId: string): Promise<SnapshotResult> {
   const { data } = await api.post(`/projects/${projectId}/snapshots`);
   return data;
 }
 
-export interface VersionHistoryEntry {
-  revision: number;
-  saved_at: string;
-  reason: string;
-  current: boolean;
-  path: string;
-}
+export type VersionHistoryEntry = Generated.VersionHistoryEntry;
 
 export async function getVersionHistory(projectId: string): Promise<VersionHistoryEntry[]> {
   const { data } = await api.get(`/projects/${projectId}/version-history`);
@@ -588,49 +437,29 @@ export async function restoreProjectRevision(projectId: string, revision: number
 
 // --- Design History (FlowVCS) ---
 
-export interface AuthorInfo {
-  id: string;
-  display_name: string;
-}
-
-export interface DesignCommitLogEntry {
-  commit_id: string;
+export type AuthorInfo = Required<Generated.AuthorInfo>;
+export type DesignCommitLogEntry = Omit<Generated.CommitLogEntry, 'parents' | 'author'> & {
   parents: string[];
+  author: AuthorInfo;
   semantic_flow_hash: string;
   message: string;
-  author: AuthorInfo;
   created_at: string;
   reason: string;
-}
+};
+export type BranchInfo = Generated.BranchInfo & { is_current: boolean };
 
-export interface BranchInfo {
-  name: string;
-  commit_id: string;
-  is_current: boolean;
-}
-
-export interface DesignHistoryStatus {
+export type DesignHistoryStatus = Omit<Generated.DesignHistoryStatus, 'head' | 'branches'> & {
   head: DesignCommitLogEntry | null;
   branches: BranchInfo[];
   dirty: boolean;
-}
+};
 
-export interface DiffChange {
-  kind: 'node_added' | 'node_removed' | 'node_changed' | 'edge_added' | 'edge_removed' | 'edge_changed' | 'flow_hash_changed';
+export type DiffChange = Omit<Generated.DiffChange, 'node_id' | 'edge_id' | 'path'> & {
   node_id?: string;
   edge_id?: string;
   path?: string;
-  before?: unknown;
-  after?: unknown;
-}
-
-export interface DiffResult {
-  from_commit: string;
-  to_commit: string;
-  from_flow_hash: string;
-  to_flow_hash: string;
-  changes: DiffChange[];
-}
+};
+export type DiffResult = Omit<Generated.DiffResult, 'changes'> & { changes: DiffChange[] };
 
 export async function initializeDesignHistory(projectId: string): Promise<{ commit_id: string }> {
   const { data } = await api.post(`/projects/${projectId}/history/initialize`);
@@ -698,16 +527,7 @@ export async function checkoutDesignBranch(
   return data;
 }
 
-export interface MigrationReport {
-  snapshots_imported: number;
-  snapshots_skipped: number;
-  revisions_imported: number;
-  revisions_skipped: number;
-  objects_deduplicated: number;
-  warnings: string[];
-  errors: string[];
-  success: boolean;
-}
+export type MigrationReport = Required<Generated.HistoryMigrationReport>;
 
 export async function migrateDesignHistory(projectId: string): Promise<MigrationReport> {
   const { data } = await api.post(`/projects/${projectId}/history/migrate`);
@@ -753,47 +573,24 @@ export interface AIGenerationMetadata {
   };
 }
 
-export interface AIDraftFlow extends Record<string, unknown> {
-  flow_id: string;
-  name: string;
+export type AIDraftFlow = Generated.AIDraftFlow & Record<string, unknown> & {
   description: string;
-  nodes: Array<Record<string, unknown>>;
+  flow_atoms: Array<Record<string, unknown>>;
   edges: Array<Record<string, unknown>>;
-  metadata: {
-    ai_generation: AIGenerationMetadata;
-    [key: string]: unknown;
-  };
-}
-
-export interface GenerateAIDraftRequest {
+  metadata: { ai_generation: AIGenerationMetadata; [key: string]: unknown };
+};
+export type GenerateAIDraftRequest = Omit<Generated.GenerateAIDraftRequest, 'scenario' | 'ai_settings'> & {
   scenario: AIDraftScenario;
-  study_name?: string;
-  data_format?: string;
-  conditions?: string[];
-  ai_settings?: {
-    mode: 'template' | 'openai-compatible';
-    provider: string;
-    base_url: string;
-    model: string;
-    organization?: string;
-    project?: string;
-    temperature: number;
-    max_tokens: number;
-    timeout_seconds: number;
-  };
-}
+  ai_settings?: Generated.AIDraftSettings & { mode: 'template' | 'openai-compatible' };
+};
 
 export interface DraftReadiness {
   status: 'Ready' | 'Needs Attention' | 'Blocked';
   checks: Array<{ name: string; status: 'pass' | 'warn' | 'fail' | 'skip'; message: string }>;
 }
 
-export interface AIDraftValidation {
-  status: 'draft_validated';
-  flow_id: string;
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
+export type AIDraftValidation = Omit<Generated.AIDraftValidation, 'status' | 'errors' | 'warnings' | 'risks' | 'readiness'> & {
+  status: 'draft_validated'; errors: string[]; warnings: string[];
   risks: Array<{
     risk_id: string;
     code: string;
@@ -803,7 +600,7 @@ export interface AIDraftValidation {
     suggested_action: string;
   }>;
   readiness: DraftReadiness;
-}
+};
 
 export async function generateProjectAIDraft(
   projectId: string,
@@ -818,7 +615,7 @@ export async function generateProjectAIDraft(
 export async function getProjectAIDraft(projectId: string): Promise<AIDraftFlow | null> {
   try {
     const { data } = await api.get(`/projects/${projectId}/ai/draft`);
-    return data.draft;
+    return normalizeFlowPayload(data.draft) as AIDraftFlow;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) return null;
     throw error;

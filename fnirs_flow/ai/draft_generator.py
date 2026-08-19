@@ -198,7 +198,7 @@ def generate_draft_flow(
         node["readiness_status"] = "configured"
 
         # Mark high-impact atoms
-        if atom_type in HIGH_IMPACT_TYPES or node.get("type") in HIGH_IMPACT_TYPES:
+        if atom_type in HIGH_IMPACT_TYPES or node.get("atom_type") in HIGH_IMPACT_TYPES:
             node["readiness_status"] = "needs_attention"
             node["requires_review"] = True
         if atom_type == "design_matrix":
@@ -236,7 +236,7 @@ def generate_draft_flow(
     # Build flow
     now = datetime.now(timezone.utc).isoformat()
     flow: dict[str, Any] = {
-        "schema_version": "0.2.0",
+        "schema_version": "0.3.0",
         "flow_id": f"draft-{scenario_id}-{uuid.uuid4().hex[:8]}",
         "name": study_name or f"AI Draft: {scenario.name}",
         "description": (
@@ -256,7 +256,7 @@ def generate_draft_flow(
                 "not_used_for_execution": True,
             },
         },
-        "nodes": nodes,
+        "flow_atoms": nodes,
         "edges": edges,
     }
 

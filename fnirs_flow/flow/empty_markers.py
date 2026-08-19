@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import asdict, dataclass
 from typing import Any
+
+from fnirs_flow.flow.serialization import normalize_flow_payload
 
 
 @dataclass(frozen=True)
@@ -38,10 +39,6 @@ def empty_marker_specs_json() -> list[dict[str, str]]:
     return [asdict(spec) | {"atom_id": spec.atom_id, "template_id": spec.template_id} for spec in EMPTY_MARKER_SPECS]
 
 
-def _atom_collection_key(flow: dict[str, Any]) -> str:
-    return "flow_atoms" if isinstance(flow.get("flow_atoms"), list) else "nodes"
-
-
 def _order_policy(flow: dict[str, Any]) -> dict[str, Any]:
     metadata = flow.get("metadata")
     if not isinstance(metadata, dict):
@@ -51,7 +48,8 @@ def _order_policy(flow: dict[str, Any]) -> dict[str, Any]:
 
 
 def is_empty_marker_atom(atom: dict[str, Any]) -> bool:
-    metadata = atom.get("metadata") if isinstance(atom.get("metadata"), dict) else {}
+    raw_metadata = atom.get("metadata")
+    metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
     return (
         atom.get("operation") == "empty_marker"
         or atom.get("atom_type") == "empty_marker"
@@ -79,7 +77,6 @@ def create_empty_marker_atom(spec: EmptyMarkerSpec, index: int = 0) -> dict[str,
         "id": spec.atom_id,
         "atom_id": spec.atom_id,
         "atom_type": "empty_marker",
-        "type": "empty_marker",
         "template_id": spec.template_id,
         "category": spec.category,
         "origin": "builtin",
@@ -117,9 +114,8 @@ def normalize_empty_markers(flow: dict[str, Any]) -> dict[str, Any]:
     if policy.get("allow_empty_edges") is not True:
         return flow
 
-    result = deepcopy(flow)
-    atom_key = _atom_collection_key(result)
-    atoms = list(result.get(atom_key) or [])
+    result = normalize_flow_payload(flow)
+    atoms = list(result.get("flow_atoms") or [])
     existing_ids = {str(atom.get("id", "")) for atom in atoms if isinstance(atom, dict)}
     missing = [
         create_empty_marker_atom(spec, index)
@@ -130,17 +126,14 @@ def normalize_empty_markers(flow: dict[str, Any]) -> dict[str, Any]:
         return result
 
     next_atoms = [*atoms, *missing]
-    result[atom_key] = next_atoms
-    if atom_key == "flow_atoms" and isinstance(result.get("nodes"), list):
-        result["nodes"] = next_atoms
+    result["flow_atoms"] = next_atoms
     return result
 
 
 def remove_unconnected_auto_empty_markers(flow: dict[str, Any]) -> dict[str, Any]:
     """Remove only unconnected auto-generated empty markers."""
-    result = deepcopy(flow)
-    atom_key = _atom_collection_key(result)
-    atoms = list(result.get(atom_key) or [])
+    result = normalize_flow_payload(flow)
+    atoms = list(result.get("flow_atoms") or [])
     connected_ids = {
         str(edge.get(endpoint, ""))
         for edge in result.get("edges", [])
@@ -153,13 +146,12 @@ def remove_unconnected_auto_empty_markers(flow: dict[str, Any]) -> dict[str, Any
         if not isinstance(atom, dict):
             next_atoms.append(atom)
             continue
-        metadata = atom.get("metadata") if isinstance(atom.get("metadata"), dict) else {}
+        raw_metadata = atom.get("metadata")
+        metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
         auto_empty = metadata.get("auto_generated_empty_atom") is True and is_empty_marker_atom(atom)
         if auto_empty and str(atom.get("id", "")) not in connected_ids:
             continue
         next_atoms.append(atom)
 
-    result[atom_key] = next_atoms
-    if atom_key == "flow_atoms" and isinstance(result.get("nodes"), list):
-        result["nodes"] = next_atoms
+    result["flow_atoms"] = next_atoms
     return result

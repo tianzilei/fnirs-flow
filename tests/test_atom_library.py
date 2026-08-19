@@ -1,5 +1,7 @@
 """Tests for MethodAtomTemplate and MethodAtomLibrary aliases."""
 
+import pytest
+
 from fnirs_flow.flow.atoms import ReadinessStatus
 from fnirs_flow.flow.models import NodeCategory, NodeOrigin
 from fnirs_flow.registry.atom_templates import (
@@ -9,7 +11,9 @@ from fnirs_flow.registry.atom_templates import (
     refresh_method_atom_templates,
 )
 from fnirs_flow.registry.methodatom_library import (
-    method_atom_library_fingerprint,
+    load_literature_method_atom_templates,
+    method_atom_library_state,
+    write_runtime_state,
 )
 from fnirs_flow.registry.node_library import (
     MethodAtomLibrary,
@@ -75,9 +79,9 @@ class TestLiteratureDerivedMethodAtoms:
     """Verify synthesized MethodAtom records are bundled as built-in templates."""
 
     def test_literature_templates_are_loaded(self):
-        fingerprint = method_atom_library_fingerprint()
-        assert len(LITERATURE_METHOD_ATOM_TEMPLATES) == fingerprint["method_atoms_rows"]
-        assert len(ALL_METHOD_ATOM_TEMPLATES) == len(HANDWRITTEN_ATOM_TEMPLATES) + fingerprint["method_atoms_rows"]
+        state = method_atom_library_state()
+        assert len(LITERATURE_METHOD_ATOM_TEMPLATES) == state["method_atoms_rows"]
+        assert len(ALL_METHOD_ATOM_TEMPLATES) == len(HANDWRITTEN_ATOM_TEMPLATES) + state["method_atoms_rows"]
 
     def test_literature_template_is_in_builtin_library(self):
         library = create_builtin_library()
@@ -137,17 +141,39 @@ class TestLiteratureDerivedMethodAtoms:
         assert atom.execution_scope == "group"
         assert atom.readiness_status == ReadinessStatus.NEEDS_ATTENTION
 
-    def test_runtime_fingerprint_reports_library_inputs(self):
-        fingerprint = method_atom_library_fingerprint()
-        assert fingerprint["method_atoms_rows"] > 0
-        assert fingerprint["atom_evidence_links_rows"] >= 0
-        assert fingerprint["fingerprint"]
+    def test_runtime_state_reports_library_inputs(self):
+        state = method_atom_library_state()
+        assert state["method_atoms_rows"] > 0
+        assert state["atom_evidence_links_rows"] >= 0
+        assert state["method_atoms_size"] > 0
 
     def test_refresh_keeps_literature_templates_current(self):
-        fingerprint = method_atom_library_fingerprint()
+        library_state = method_atom_library_state()
         state = refresh_method_atom_templates(force=True, write_state=False)
-        assert state["loaded_templates"] == fingerprint["method_atoms_rows"]
-        assert state["total_templates"] == len(HANDWRITTEN_ATOM_TEMPLATES) + fingerprint["method_atoms_rows"]
+        assert state["loaded_templates"] == library_state["method_atoms_rows"]
+        assert state["total_templates"] == len(HANDWRITTEN_ATOM_TEMPLATES) + library_state["method_atoms_rows"]
+
+    def test_runtime_state_is_written_to_external_cache(self, tmp_path):
+        state = refresh_method_atom_templates(force=True, write_state=False)
+        path = write_runtime_state(state, tmp_path / "registry-cache")
+        assert path.parent == tmp_path / "registry-cache"
+        assert path.is_file()
+        assert str(state["method_atoms_rows"]) in path.read_text(encoding="utf-8")
+
+    def test_duplicate_resource_ids_are_rejected(self, tmp_path):
+        atoms = tmp_path / "atoms.csv"
+        atoms.write_text(
+            "atom_id,operation,domain\natom_x,one,analysis\natom_x,two,analysis\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="Duplicate MethodAtom template id"):
+            load_literature_method_atom_templates(atoms, tmp_path / "missing-links.csv")
+
+    def test_missing_resource_ids_are_rejected(self, tmp_path):
+        atoms = tmp_path / "atoms.csv"
+        atoms.write_text("atom_id,operation,domain\n,one,analysis\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="atom_id is required"):
+            load_literature_method_atom_templates(atoms, tmp_path / "missing-links.csv")
 
     def test_cedalion_method_atoms_have_explicit_backend_bindings(self):
         library = create_builtin_library()

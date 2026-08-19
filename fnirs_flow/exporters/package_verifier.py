@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, Field
 
-from fnirs_flow.filesystem import is_macos_metadata_path
+from fnirs_flow.infrastructure.filesystem import is_macos_metadata_path
 
 MAX_PACKAGE_BYTES = 10 * 1024**2
 MAX_UNCOMPRESSED_BYTES = 10 * 1024**2

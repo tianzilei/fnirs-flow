@@ -196,8 +196,8 @@ test('parameter edits persist across save and browser refresh', async ({ page })
   await input.fill('0.02');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Flow saved')).toBeVisible();
-  expect(((flowState.value.nodes as Array<Record<string, unknown>>)[0].config as Record<string, unknown>).high_pass).toBe(0.02);
-  expect(((flowState.value.nodes as Array<Record<string, unknown>>)[0].config as Record<string, unknown>).method).toBe('iir');
+  expect(((flowState.value.flow_atoms as Array<Record<string, unknown>>)[0].config as Record<string, unknown>).high_pass).toBe(0.02);
+  expect(((flowState.value.flow_atoms as Array<Record<string, unknown>>)[0].config as Record<string, unknown>).method).toBe('iir');
 
   await page.reload();
   await page.getByText('filtering', { exact: true }).click();
@@ -285,7 +285,7 @@ test('selected canvas node can be deleted with keyboard', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Flow saved')).toBeVisible();
-  expect((flowState.value.nodes as Array<Record<string, unknown>>).map((node) => node.id)).toEqual(['loader-1']);
+  expect((flowState.value.flow_atoms as Array<Record<string, unknown>>).map((node) => node.id)).toEqual(['loader-1']);
   expect(flowState.value.edges).toEqual([]);
 });
 
@@ -928,7 +928,7 @@ test('flow checklist recommends, builds, skips, persists, and links validation r
   expect(savedFlow.metadata.checklist.choices.filtering.skipped).toBe(true);
   expect(savedFlow.metadata.checklist.choices.filtering.skip_reason).toBe('method_not_needed');
   expect(savedFlow.metadata.order_policy.allow_empty_edges).toBe(true);
-  const emptyAtom = savedFlow.nodes.find((node: Record<string, unknown>) => node.id === 'empty_preprocessing');
+  const emptyAtom = savedFlow.flow_atoms.find((node: Record<string, unknown>) => node.id === 'empty_preprocessing');
   expect(emptyAtom).toBeTruthy();
   expect(emptyAtom.metadata.skip_reason).toBe('method_not_needed');
   expect(savedFlow.edges.some((edge: Record<string, unknown>) => edge.source === 'dataset_discovery_2' && edge.target === 'read_run_3')).toBe(true);
@@ -951,5 +951,5 @@ test('flow checklist recommends, builds, skips, persists, and links validation r
   await expect(page.getByText('Flow saved')).toBeVisible();
   expect((flowState.value as Record<string, any>).metadata.order_policy.allow_empty_edges).toBe(false);
   expect((flowState.value as Record<string, any>).metadata.checklist.choices.filtering.skipped).toBeUndefined();
-  expect((flowState.value as Record<string, any>).nodes.some((node: Record<string, unknown>) => node.id === 'empty_preprocessing')).toBe(false);
+  expect((flowState.value as Record<string, any>).flow_atoms.some((node: Record<string, unknown>) => node.id === 'empty_preprocessing')).toBe(false);
 });

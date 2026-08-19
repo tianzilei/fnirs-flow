@@ -12,10 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fnirs_flow.api.models import ExecuteResult, ExecutionJobRead
-from fnirs_flow.api.portability import portable_json_value
-from fnirs_flow.api.projects import ProjectStore, execute_project_runs
-from fnirs_flow.api.uri import create_project_uri
+from fnirs_flow.application.project_use_cases import ProjectStore, execute_project_runs
 from fnirs_flow.execution.service import ExecutionCancelledError
+from fnirs_flow.infrastructure.portability import portable_json_value
+from fnirs_flow.infrastructure.uri import create_project_uri
 
 logger = logging.getLogger(__name__)
 

@@ -28,10 +28,19 @@ def canonical_json_bytes(value: Any) -> bytes:
 def compute_object_id(design_object: dict[str, Any]) -> str:
     """Compute the content-addressed ID for a DesignObject.
 
-    This hashes the *entire* object (including flow and semantic_flow_hash),
-    unlike compute_flow_hash which excludes mutable metadata.
+    This hashes the entire stored history object.
     """
     return hashlib.sha256(canonical_json_bytes(design_object)).hexdigest()
+
+
+def compute_semantic_flow_id(flow: dict[str, Any]) -> str:
+    """Compute the History-only stable identifier for a Flow revision."""
+    filtered = {
+        key: value
+        for key, value in flow.items()
+        if key not in {"metadata", "created_at", "updated_at", "author", "tags", "notes"}
+    }
+    return hashlib.sha256(canonical_json_bytes(filtered)).hexdigest()
 
 
 def compute_commit_id(commit_payload: dict[str, Any]) -> str:

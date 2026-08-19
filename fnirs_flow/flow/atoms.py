@@ -177,7 +177,6 @@ class CapabilityManifest(BaseModel):
     network: bool = False
     shell: bool = False
     dependencies: list[str] = Field(default_factory=list)
-    checksum: str = ""
 
 
 class AIGenerationMetadata(BaseModel):
@@ -245,8 +244,7 @@ class FlowAtom(BaseModel):
     """
 
     id: str
-    type: str
-    atom_type: str | None = None
+    atom_type: str
     template_id: str | None = None
     operation: str | None = None
     evidence_refs: list[str] = Field(default_factory=list)
@@ -278,14 +276,6 @@ class FlowAtom(BaseModel):
         if not isinstance(data, dict):
             return data
         result = dict(data)
-        if "type" not in result and "atom_type" in result:
-            result["type"] = result["atom_type"]
-        if "atom_type" not in result and "type" in result:
-            result["atom_type"] = result["type"]
-        # Legacy status field migration: map old NodeStatus to split statuses
-        if "status" in result and "readiness_status" not in result:
-            old_status = result.pop("status")
-            result["readiness_status"] = old_status
         config = result.get("config")
         if isinstance(config, dict):
             clean_config = dict(config)
@@ -309,8 +299,6 @@ class FlowAtom(BaseModel):
 
     @model_validator(mode="after")
     def _sync_method_atom_metadata(self) -> FlowAtom:
-        if self.atom_type is None:
-            self.atom_type = self.type
         if self.template_id is None and "template_id" in self.metadata:
             self.template_id = self.metadata.get("template_id")
         elif self.template_id is not None:
@@ -322,3 +310,8 @@ class FlowAtom(BaseModel):
         elif self.evidence_refs:
             self.metadata.setdefault("evidence_refs", list(self.evidence_refs))
         return self
+
+    @property
+    def type(self) -> str:
+        """Deprecated read-only alias for legacy Python callers."""
+        return self.atom_type

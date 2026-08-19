@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Boxes, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, CopyCheck, FileJson, GitFork, Play, Radar, ShieldCheck, XCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store';
+import {
+  selectCurrentAttempt,
+  selectExecuteInfo,
+  selectProgressEvents,
+  selectRuns,
+} from '../features/execution/store';
+import { selectImportStatus } from '../features/packages/store';
 import type { AtomExecutionSummary } from '../api/client';
 
 const statusIcons: Record<string, typeof Clock3> = {
@@ -15,11 +22,11 @@ const statusIcons: Record<string, typeof Clock3> = {
 export function RunMonitor() {
   const navigate = useNavigate();
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
-  const runs = useStore((s) => s.runs);
-  const executeInfo = useStore((s) => s.executeInfo);
-  const currentAttempt = useStore((s) => s.currentAttempt);
-  const importStatus = useStore((s) => s.importStatus);
-  const progressEvents = useStore((s) => s.progressEvents);
+  const runs = useStore(selectRuns);
+  const executeInfo = useStore(selectExecuteInfo);
+  const currentAttempt = useStore(selectCurrentAttempt);
+  const importStatus = useStore(selectImportStatus);
+  const progressEvents = useStore(selectProgressEvents);
   const loading = useStore((s) => s.loading);
   const validation = useStore((s) => s.validation);
   const dryRun = useStore((s) => s.dryRun);
