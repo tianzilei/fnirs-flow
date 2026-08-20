@@ -7,11 +7,26 @@ from pathlib import Path
 from typing import Any
 
 
-def dry_run_compiled_project(plan_dir: str | Path, *, outdir: str | Path | None = None) -> Any:
+def dry_run_compiled_project(
+    plan_dir: str | Path,
+    *,
+    outdir: str | Path | None = None,
+    participant_labels: list[str] | None = None,
+    session_labels: list[str] | None = None,
+    task_labels: list[str] | None = None,
+    run_labels: list[str] | None = None,
+) -> Any:
     """Dry-run compiled artifacts independently of an interface adapter."""
     from fnirs_flow.execution.engine import dry_run
 
-    return dry_run(plan_dir, outdir=outdir)
+    return dry_run(
+        plan_dir,
+        outdir=outdir,
+        participant_labels=participant_labels,
+        session_labels=session_labels,
+        task_labels=task_labels,
+        run_labels=run_labels,
+    )
 
 
 def execute_compiled_project(request: Any) -> Any:

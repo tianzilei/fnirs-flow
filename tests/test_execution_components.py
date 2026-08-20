@@ -16,6 +16,44 @@ from fnirs_flow.execution.operations import (
 from fnirs_flow.execution.run_executor import RunExecutor
 
 
+def test_run_executor_projects_atom_failure_into_run_summary(tmp_path):
+    from fnirs_flow.execution.models import AtomExecutionResult
+
+    class FakeService:
+        def _check_cancelled(self):
+            return None
+
+        def _execute_dag(self, _run_ctx, _dag, _outdir, result, continue_on_failure=True):
+            assert continue_on_failure
+            result.status = "failed"
+            result.atom_results.append(
+                AtomExecutionResult(
+                    atom_id="glm",
+                    status="failed",
+                    error_code="GLM_INPUT_NONFINITE",
+                    error="GLM input contains non-finite values",
+                )
+            )
+
+        def _write_run_outputs(self, _result, _outdir):
+            raise AssertionError("failed runs must not write result tables")
+
+    data_path = tmp_path / "run.snirf"
+    data_path.write_bytes(b"fixture")
+    dag = {
+        "atoms": [{"atom_id": "glm", "execution_scope": "run"}],
+        "execution_layers": [["glm"]],
+    }
+    result = RunExecutor(FakeService()).execute(
+        RunContext(run_id="sub-01", data_path=str(data_path)), {}, dag, tmp_path
+    )
+
+    assert result.planned_steps == ["glm"]
+    assert result.failed_step == "glm"
+    assert result.failed_error_code == "GLM_INPUT_NONFINITE"
+    assert result.failed_error == "GLM input contains non-finite values"
+
+
 def test_dag_scheduler_splits_intra_layer_dependencies():
     layers = DAGScheduler.normalize_layers([["b", "a"]], [{"source": "a", "target": "b"}])
     assert layers == [["a"], ["b"]]

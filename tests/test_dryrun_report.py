@@ -96,6 +96,25 @@ class TestDryRunReport:
         assert "Bytes" in report_md
         assert report_json["planned_runs"][0]["task"] == "tapping"
         assert report_json["planned_runs"][0]["data_path"] == "sub-01/nirs/sub-01_task-tapping_nirs.snirf"
+        assert report_json["planned_runs"][0]["planned_steps"] == ["s1"]
+        assert report_json["planned_runs"][0]["completed_steps"] == []
+        assert report_json["planned_runs"][0]["steps_completed"] == []
+
+    def test_per_run_steps_exclude_group_and_project_scopes(self, tmp_path):
+        dag = {
+            "atoms": [
+                {"atom_id": "run-step", "execution_scope": "run"},
+                {"atom_id": "group-step", "execution_scope": "group"},
+                {"atom_id": "project-step", "execution_scope": "project"},
+            ],
+            "execution_layers": [["run-step"], ["group-step"], ["project-step"]],
+        }
+        (tmp_path / "execution_dag.json").write_text(json.dumps(dag), encoding="utf-8")
+
+        result = dry_run(tmp_path)
+
+        assert result.summary["dag_nodes"] == 3
+        assert result.planned_runs[0].planned_steps == ["run-step"]
 
     def test_creates_derivatives_layout(self, tmp_path):
         compiled = _compile_demo(tmp_path)

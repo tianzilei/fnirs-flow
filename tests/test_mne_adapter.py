@@ -141,3 +141,81 @@ class TestMneNirsStepsMocked:
         assert matrix[:, 1].sum() > matrix[:, 0].sum()
         assert abs(matrix[-1, 0]) < 1e-6
         assert not np.allclose(matrix[:, 0], matrix[:, 1])
+
+    def test_glm_keeps_condition_and_regressor_counts_distinct(self):
+        import numpy as np
+
+        from fnirs_flow.adapters.mne_nirs_analysis import first_level_glm
+
+        raw = MagicMock()
+        raw.get_data.return_value = np.arange(80, dtype=float).reshape(2, 40)
+        design = {
+            "design_matrix": np.column_stack(
+                [np.linspace(0, 1, 40), np.linspace(1, 0, 40), np.ones(40)]
+            ),
+            "conditions": ["Left", "Right"],
+            "regressor_names": ["Left", "Right", "constant"],
+        }
+
+        result = first_level_glm(raw, design, noise_model="ols")
+
+        assert result["n_conditions"] == 2
+        assert result["n_regressors"] == 3
+
+    def test_named_contrast_is_invariant_to_condition_order(self):
+        import numpy as np
+
+        from fnirs_flow.adapters.mne_nirs_analysis import estimate_contrast
+
+        contrast = [{"name": "left-right", "weights": [1, -1], "conditions": ["Left", "Right"]}]
+        left_first = {
+            "betas": np.array([[5.0, 2.0, 99.0]]),
+            "n_channels": 1,
+            "n_conditions": 2,
+            "n_regressors": 3,
+            "conditions": ["Left", "Right"],
+            "regressor_names": ["Left", "Right", "constant"],
+        }
+        right_first = {
+            **left_first,
+            "betas": np.array([[2.0, 5.0, 99.0]]),
+            "conditions": ["Right", "Left"],
+            "regressor_names": ["Right", "Left", "constant"],
+        }
+
+        assert estimate_contrast(left_first, contrast)["contrasts"][0]["contrast_values"].item() == 3.0
+        assert estimate_contrast(right_first, contrast)["contrasts"][0]["contrast_values"].item() == 3.0
+
+    def test_nonfinite_policy_can_drop_channels_explicitly(self):
+        import numpy as np
+
+        from fnirs_flow.adapters.mne_nirs_analysis import first_level_glm
+
+        raw = MagicMock()
+        raw.get_data.return_value = np.array([[1.0, 2.0, 3.0, 4.0], [1.0, np.nan, 3.0, 4.0]])
+        design = {
+            "design_matrix": np.column_stack([np.arange(4, dtype=float), np.ones(4)]),
+            "conditions": ["task"],
+            "regressor_names": ["task", "constant"],
+        }
+
+        result = first_level_glm(raw, design, noise_model="ols", nonfinite_policy="drop_channels")
+
+        assert result["n_channels"] == 1
+        assert result["channel_indices"] == [0]
+        assert result["data_quality"]["excluded_channel_indices"] == [1]
+
+    def test_roi_mapping_uses_original_channel_indices_after_exclusion(self):
+        from fnirs_flow.adapters.mne_nirs_analysis import roi_output
+
+        channel_results = {
+            "channels": [
+                {"channel_idx": 0, "effect_beta": 1.0},
+                {"channel_idx": 2, "effect_beta": 3.0},
+            ]
+        }
+
+        result = roi_output(channel_results, roi_mapping={"roi": [1, 2]})
+
+        assert result["rois"][0]["n_channels"] == 1
+        assert result["rois"][0]["effect_beta_mean"] == 3.0

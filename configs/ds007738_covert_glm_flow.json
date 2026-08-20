@@ -87,7 +87,7 @@
     },
     {
       "id": "first_level_glm", "type": "first_level_glm", "atom_type": "first_level_glm", "operation": "first_level_glm", "category": "analysis", "position": {"x": 1120, "y": 40},
-      "config": {"hrf_model": "glover", "noise_model": "ols"},
+      "config": {"hrf_model": "glover", "noise_model": "ols", "nonfinite_policy": "error"},
       "ports": [
         {"name": "hb_data", "direction": "in", "schema": "HaemoglobinData", "required": true},
         {"name": "design_matrix", "direction": "in", "schema": "DesignMatrix", "required": true},

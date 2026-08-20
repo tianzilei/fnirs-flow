@@ -231,6 +231,9 @@ class TestPackageExportImport:
         (outdir / "compiled" / "execution_dag.json").write_text("{}", encoding="utf-8")
         (outdir / "compiled" / "artifact_manifest.json").write_text('{"scope":"compile"}', encoding="utf-8")
         (outdir / "logs" / "artifact_manifest.json").write_text('{"scope":"runtime"}', encoding="utf-8")
+        (outdir / "logs" / "execution_summary.json").write_text(
+            '{"successful_runs":1,"failed_runs":0}', encoding="utf-8"
+        )
         result_path = outdir / "derivatives" / "channel" / "result.csv"
         result_path.write_text("beta\n1.0\n", encoding="utf-8")
         package = tmp_path / "runtime.fnirsflow.zip"
@@ -239,6 +242,7 @@ class TestPackageExportImport:
 
         with zipfile.ZipFile(package) as archive:
             assert json.loads(archive.read("artifact_manifest.json"))["scope"] == "runtime"
+            assert json.loads(archive.read("execution_summary.json"))["successful_runs"] == 1
             assert "derivatives/channel/result.csv" in archive.namelist()
 
     def test_reproducibility_package_includes_group_metadata_artifacts(self, tmp_path):

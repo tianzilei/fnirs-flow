@@ -91,6 +91,37 @@ class TestParseBidsEventsTsv:
         with pytest.raises(ValueError, match="No 'onset' column"):
             service._parse_bids_events_tsv(str(path), sfreq=10.0)
 
+    def test_declared_condition_order_is_stable(self, tmp_path):
+        path = self._write_events_tsv(tmp_path, [[0.0, "Right"], [5.0, "Left"]])
+
+        events, event_id = ExecutionService()._parse_bids_events_tsv(
+            str(path), sfreq=10.0, expected_conditions=["Left", "Right"]
+        )
+
+        assert event_id == {"Left": 1, "Right": 2}
+        assert events[:, 2].tolist() == [2, 1]
+
+    def test_condition_contract_fails_closed_on_mismatch(self, tmp_path):
+        path = self._write_events_tsv(tmp_path, [[0.0, "Left"], [5.0, "Unexpected"]])
+
+        with pytest.raises(ValueError, match="EVENT_CONDITION_MISMATCH"):
+            ExecutionService()._parse_bids_events_tsv(
+                str(path), sfreq=10.0, expected_conditions=["Left", "Right"]
+            )
+
+    def test_explicit_excluded_event_label_is_removed_before_validation(self, tmp_path):
+        path = self._write_events_tsv(tmp_path, [[0.0, "15.0"], [5.0, "Left"], [10.0, "Right"]])
+
+        events, event_id = ExecutionService()._parse_bids_events_tsv(
+            str(path),
+            sfreq=10.0,
+            expected_conditions=["Left", "Right"],
+            excluded_conditions=["15.0"],
+        )
+
+        assert event_id == {"Left": 1, "Right": 2}
+        assert events.tolist() == [[50, 1, 1], [100, 1, 2]]
+
 
 # ============================================================================
 # _inject_dependencies tests
@@ -710,6 +741,10 @@ class TestExecutionFailureAggregation:
         assert result.status == "failed"
         assert len(result.atom_results) == 1
         assert result.atom_results[0].status == "failed"
+        assert result.planned_steps == ["bad-atom"]
+        assert result.failed_step == "bad-atom"
+        assert result.failed_error_code == "UNREGISTERED_OPERATION"
+        assert result.failed_error == "Unregistered operation: unsupported-operation"
 
     def test_stop_on_failure_records_atom_once(self, tmp_path):
         from fnirs_flow.execution.engine import RunContext
@@ -1341,6 +1376,11 @@ class TestGroupScopeExecution:
         summary = json.loads((tmp_path / "logs" / "execution_summary.json").read_text(encoding="utf-8"))
         assert summary["total_runs"] == 1
         assert summary["successful_runs"] == 1
+        run_summary = next(item for item in summary["run_results"] if item["run_id"] != "group")
+        assert run_summary["planned_steps"] == ["run-design"]
+        assert run_summary["completed_steps"] == ["run-design"]
+        assert run_summary["failed_error_code"] == ""
+        assert run_summary["failed_error"] == ""
         assert (compiled / "participant_table_manifest.json").exists()
 
     def test_localization_projection_import_runs_as_group_atom(self, tmp_path):

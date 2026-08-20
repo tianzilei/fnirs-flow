@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 
 from fnirs_flow.adapters.mne_nirs_analysis import (
+    GLMInputDataError,
     block_averaging,
     build_design_matrix,
     channel_output,
@@ -685,17 +686,31 @@ class MneNirsAdapter:
         design_matrix: dict[str, Any],
         hrf_model: str = "glover",
         noise_model: str = "ar1",
+        nonfinite_policy: str = "error",
     ) -> dict[str, Any]:
         """Fit first-level GLM."""
-        result = first_level_glm(
-            raw,
-            design_matrix,
-            hrf_model=hrf_model,
-            noise_model=noise_model,
-        )
+        try:
+            result = first_level_glm(
+                raw,
+                design_matrix,
+                hrf_model=hrf_model,
+                noise_model=noise_model,
+                nonfinite_policy=nonfinite_policy,
+            )
+        except GLMInputDataError as exc:
+            self._write_artifact_file(
+                "first_level_glm",
+                "glm_input_quality_summary",
+                {"step": "first_level_glm", **exc.details},
+            )
+            raise
         self._provenance.log(
             step_id="first_level_glm",
-            parameters={"hrf_model": hrf_model, "noise_model": noise_model},
+            parameters={
+                "hrf_model": hrf_model,
+                "noise_model": noise_model,
+                "nonfinite_policy": nonfinite_policy,
+            },
         )
         self._emit_artifact(
             "GLMResult",
@@ -710,7 +725,12 @@ class MneNirsAdapter:
             "step": "first_level_glm",
             "n_channels": result.get("n_channels", 0),
             "n_conditions": result.get("n_conditions", 0),
+            "conditions": result.get("conditions", []),
+            "n_regressors": result.get("n_regressors", 0),
+            "regressor_names": result.get("regressor_names", []),
             "df": result.get("df", 0),
+            "data_quality_status": result.get("data_quality", {}).get("status", "passed"),
+            "data_quality": result.get("data_quality", {}),
         }
         self._write_artifact_file("first_level_glm", "glm_summary", summary)
         return result

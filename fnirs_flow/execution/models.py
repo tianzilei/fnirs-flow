@@ -39,10 +39,22 @@ class AtomExecutionResult(BaseModel):
 
 
 class RunExecutionResult(BaseModel):
-    """Result of executing all atoms for a single run."""
+    """Result of executing all atoms for a single run.
+
+    ``planned_steps`` describes the run-scoped DAG contract, while the
+    completed/failed/skipped fields describe what actually happened.  The
+    failure fields are intentionally separate from ``status`` so archived
+    execution summaries remain diagnosable without opening atom manifests.
+    """
 
     run_id: str
     status: str = "pending"
+    planned_steps: list[str] = Field(default_factory=list)
+    completed_steps: list[str] = Field(default_factory=list)
+    failed_step: str = ""
+    failed_error_code: str = ""
+    failed_error: str = ""
+    skipped_steps: list[str] = Field(default_factory=list)
     atom_results: list[AtomExecutionResult] = Field(default_factory=list)
     artifacts: list[dict[str, Any]] = Field(default_factory=list)
     roi_results: list[dict[str, Any]] = Field(default_factory=list)

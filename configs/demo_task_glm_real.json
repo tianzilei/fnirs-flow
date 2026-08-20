@@ -114,7 +114,8 @@
       "position": {"x": 1200, "y": 100},
       "config": {
         "hrf_model": "glover",
-        "conditions": ["tapping", "rest"],
+        "conditions": ["Tapping/Left", "Tapping/Right", "Control"],
+        "excluded_event_conditions": ["15.0"],
         "drift_order": 1,
         "high_pass": 0.01
       },
@@ -133,7 +134,8 @@
       "position": {"x": 1400, "y": 100},
       "config": {
         "hrf_model": "glover",
-        "noise_model": "ar1"
+        "noise_model": "ar1",
+        "nonfinite_policy": "error"
       },
       "ports": [
         {"name": "haemoglobin", "direction": "in", "schema": "HaemoglobinData", "required": true},
@@ -151,7 +153,12 @@
       "position": {"x": 1600, "y": 100},
       "config": {
         "contrasts": [
-          {"name": "tapping_vs_rest", "type": "contrast", "weights": [1, -1]}
+          {
+            "name": "bilateral_tapping_vs_control",
+            "type": "contrast",
+            "weights": [0.5, 0.5, -1.0],
+            "conditions": ["Tapping/Left", "Tapping/Right", "Control"]
+          }
         ]
       },
       "ports": [
@@ -206,11 +213,18 @@
   "study_design": {
     "type": "task",
     "conditions": [
-      {"name": "tapping", "onset_field": "onset", "duration_field": "duration"},
-      {"name": "rest", "onset_field": "onset", "duration_field": "duration"}
+      {"name": "Tapping/Left", "onset_field": "onset", "duration_field": "duration"},
+      {"name": "Tapping/Right", "onset_field": "onset", "duration_field": "duration"},
+      {"name": "Control", "onset_field": "onset", "duration_field": "duration"}
     ],
+    "excluded_event_conditions": ["15.0"],
     "contrasts": [
-      {"name": "tapping_vs_rest", "type": "contrast", "weights": [1, -1], "conditions": ["tapping", "rest"]}
+      {
+        "name": "bilateral_tapping_vs_control",
+        "type": "contrast",
+        "weights": [0.5, 0.5, -1.0],
+        "conditions": ["Tapping/Left", "Tapping/Right", "Control"]
+      }
     ]
   },
   "adapter_registry": [

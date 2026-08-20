@@ -153,7 +153,14 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
     from fnirs_flow.application.execution_use_cases import dry_run_compiled_project
 
     try:
-        result = dry_run_compiled_project(args.plan_dir, outdir=args.outdir)
+        result = dry_run_compiled_project(
+            args.plan_dir,
+            outdir=args.outdir,
+            participant_labels=getattr(args, "participant_label", []) or [],
+            session_labels=getattr(args, "session_label", []) or [],
+            task_labels=getattr(args, "task_label", []) or [],
+            run_labels=getattr(args, "run_label", []) or [],
+        )
         report_path = Path(args.outdir) / "derivatives" / "reports" / "run_report.md"
         print(f"Dry-run complete for '{args.plan_dir}'")
         print(f"  Planned runs: {result.total_runs}")
@@ -851,6 +858,10 @@ def main(argv: list[str] | None = None) -> int:
     p_dryrun = subparsers.add_parser("dry-run", help="Dry-run a compiled plan")
     p_dryrun.add_argument("plan_dir", help="Directory with compiled plan (or parent dir)")
     p_dryrun.add_argument("--outdir", required=True, help="Output directory")
+    p_dryrun.add_argument("--participant-label", nargs="*", help="Filter by participant label")
+    p_dryrun.add_argument("--session-label", nargs="*", help="Filter by session label")
+    p_dryrun.add_argument("--task-label", nargs="*", help="Filter by task label")
+    p_dryrun.add_argument("--run-label", nargs="*", help="Filter by run label")
     p_dryrun.set_defaults(func=cmd_dry_run)
 
     p_run = subparsers.add_parser("run", help="Execute analysis runs via adapter")

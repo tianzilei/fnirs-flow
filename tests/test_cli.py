@@ -52,6 +52,36 @@ class TestCLI:
         result = main(["dry-run", str(tmp_path), "--outdir", str(tmp_path / "dry")])
         assert result == 1
 
+    def test_dry_run_accepts_execution_entity_filters(self, tmp_path):
+        dag = {"nodes": [{"step_id": "s1"}], "execution_layers": [["s1"]]}
+        (tmp_path / "execution_dag.json").write_text(json.dumps(dag))
+        (tmp_path / "data_manifest.json").write_text(
+            json.dumps(
+                {
+                    "subject_session_runs": [
+                        {"subject": "01", "task": "covert", "path": "a.snirf"},
+                        {"subject": "01", "task": "overt", "path": "b.snirf"},
+                    ]
+                }
+            )
+        )
+
+        result = main(
+            [
+                "dry-run",
+                str(tmp_path),
+                "--outdir",
+                str(tmp_path / "dry"),
+                "--task-label",
+                "covert",
+            ]
+        )
+
+        assert result == 0
+        report = json.loads((tmp_path / "dry" / "derivatives" / "reports" / "run_report.json").read_text())
+        assert report["total_runs"] == 1
+        assert report["planned_runs"][0]["task"] == "covert"
+
     def test_generate_flow_draft_cli(self, tmp_path):
         out = tmp_path / "draft.json"
         result = main(["generate-flow-draft", "task", "--output", str(out)])

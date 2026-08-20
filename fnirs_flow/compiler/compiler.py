@@ -171,6 +171,23 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
 
     flow_dict = normalize_empty_markers(flow_dict)
 
+    # The study design is the authoritative condition/contrast contract.  Copy
+    # it into the executable atoms so runtime event parsing does not silently
+    # fall back to per-run first-occurrence ordering.
+    study_design = flow_dict.get("study_design", {})
+    conditions = study_design.get("conditions", [])
+    contrasts = study_design.get("contrasts", [])
+    declared_condition_names = [
+        str(condition.get("name", "")).strip()
+        for condition in conditions
+        if isinstance(condition, dict) and str(condition.get("name", "")).strip()
+    ]
+    excluded_event_conditions = [
+        str(value).strip()
+        for value in study_design.get("excluded_event_conditions", [])
+        if str(value).strip()
+    ]
+
     # Parse flow
     flow = load_canonical_flow(flow_dict)
 
@@ -239,6 +256,31 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
             if operation_errors:
                 raise ValueError("Invalid operation contract: " + "; ".join(operation_errors))
 
+            parameters = dict(node.config)
+            if operation == "build_design_matrix" and declared_condition_names:
+                parameters["conditions"] = declared_condition_names
+                if excluded_event_conditions:
+                    parameters["excluded_event_conditions"] = excluded_event_conditions
+            elif operation == "estimate_contrast" and contrasts:
+                # Preserve an explicit atom-level selection when present, but
+                # enrich matching contrasts with their condition-name order.
+                atom_contrasts = parameters.get("contrasts")
+                selected = atom_contrasts if isinstance(atom_contrasts, list) else contrasts
+                contract_by_name = {
+                    str(item.get("name", "")): item for item in contrasts if isinstance(item, dict)
+                }
+                enriched_contrasts = []
+                for item in selected:
+                    if not isinstance(item, dict):
+                        enriched_contrasts.append(item)
+                        continue
+                    enriched = dict(item)
+                    contract = contract_by_name.get(str(item.get("name", "")), {})
+                    if "conditions" not in enriched and isinstance(contract, dict):
+                        enriched["conditions"] = contract.get("conditions", declared_condition_names)
+                    enriched_contrasts.append(enriched)
+                parameters["contrasts"] = enriched_contrasts
+
             dag_nodes.append(
                 DagNode(
                     atom_id=nid,
@@ -254,7 +296,7 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
                     dependency_profile_id=dependency_profile_id,
                     required_capabilities=required_capabilities,
                     dependency_optional=dependency_optional,
-                    parameters=node.config,
+                    parameters=parameters,
                     evidence_refs=list(node.evidence_refs),
                     dependencies=deps,
                 )
@@ -271,11 +313,6 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
     _validate_cross_backend_edges(dag_nodes, flow.edges)
 
     # Build plan.json
-    # Extract study_design from original flow dict (not parsed model)
-    study_design = flow_dict.get("study_design", {})
-    conditions = study_design.get("conditions", [])
-    contrasts = study_design.get("contrasts", [])
-
     plan = {
         "schema_version": "0.2.0",
         "flow_id": flow.flow_id,

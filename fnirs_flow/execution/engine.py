@@ -28,6 +28,11 @@ class RunContext(BaseModel):
     source_file_role: str = ""
     events_path: str = ""
     status: str = "pending"
+    planned_steps: list[str] = Field(default_factory=list)
+    completed_steps: list[str] = Field(default_factory=list)
+    failed_step: str = ""
+    skipped_steps: list[str] = Field(default_factory=list)
+    # Deprecated compatibility field. Dry-run never completes real steps.
     steps_completed: list[str] = Field(default_factory=list)
     artifacts: list[dict[str, Any]] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
@@ -110,6 +115,11 @@ def dry_run(
     plan_dir: str | Path,
     data_manifest_path: str | Path | None = None,
     outdir: str | Path | None = None,
+    *,
+    participant_labels: list[str] | None = None,
+    session_labels: list[str] | None = None,
+    task_labels: list[str] | None = None,
+    run_labels: list[str] | None = None,
 ) -> DryRunResult:
     """Execute a dry-run: enumerate planned runs without running algorithms.
 
@@ -129,6 +139,11 @@ def dry_run(
             raise FileNotFoundError(f"execution_dag.json not found in {plan_dir}")
     dag = json.loads(dag_path.read_text(encoding="utf-8"))
     atoms = execution_atoms(dag)
+    run_scoped_steps = [
+        str(atom.get("atom_id", ""))
+        for atom in atoms
+        if atom.get("execution_scope", "run") == "run" and str(atom.get("atom_id", ""))
+    ]
 
     # Load data manifest if available (from compiled/ subdirectory)
     runs: list[RunContext] = []
@@ -138,12 +153,19 @@ def dry_run(
             # Fallback: check plan_dir root
             data_manifest_path = plan_dir / "data_manifest.json"
 
+    selection_filters = {
+        "subject": participant_labels or [],
+        "session": session_labels or [],
+        "task": task_labels or [],
+        "run": run_labels or [],
+    }
     if Path(data_manifest_path).exists():
         manifest = json.loads(Path(data_manifest_path).read_text(encoding="utf-8"))
         seen_run_ids: set[str] = set()
         for sr in manifest.get("subject_session_runs", []):
+            if any(labels and sr.get(field) not in labels for field, labels in selection_filters.items()):
+                continue
             run_id = _build_run_id(sr, _seen=seen_run_ids)
-            steps = [atom["atom_id"] for atom in atoms]
             runs.append(
                 RunContext(
                     run_id=run_id,
@@ -158,18 +180,17 @@ def dry_run(
                     source_file_role=sr.get("source_file_role", ""),
                     events_path=sr.get("events_path", ""),
                     status="planned",
-                    steps_completed=steps,
+                    planned_steps=run_scoped_steps,
                     started_at=datetime.now(timezone.utc).isoformat(),
                 )
             )
     else:
         # No data manifest: create a single placeholder run
-        steps = [atom["atom_id"] for atom in atoms]
         runs.append(
             RunContext(
                 run_id="dry-run-placeholder",
                 status="planned",
-                steps_completed=steps,
+                planned_steps=run_scoped_steps,
                 started_at=datetime.now(timezone.utc).isoformat(),
             )
         )
@@ -181,6 +202,7 @@ def dry_run(
             "dag_nodes": len(atoms),
             "dag_atoms": len(atoms),
             "execution_layers": len(dag.get("execution_layers", [])),
+            "selection_filters": selection_filters,
         },
     )
 
@@ -217,7 +239,7 @@ def _write_run_report(outdir: Path, result: DryRunResult, plan_dir: Path) -> Non
         "",
         "## Planned Runs",
         "",
-        "| Run ID | Subject | Session | Task | Run | Source | Bytes | Modified | Status | Steps |",
+        "| Run ID | Subject | Session | Task | Run | Source | Bytes | Modified | Status | Planned Steps |",
         "|--------|---------|---------|------|-----|--------|-------|----------|--------|-------|",
     ]
     for run in result.planned_runs:
@@ -225,7 +247,7 @@ def _write_run_report(outdir: Path, result: DryRunResult, plan_dir: Path) -> Non
             f"| `{run.run_id}` | {run.subject} | {run.session} | "
             f"{run.task} | {run.run} | {run.relative_path} | "
             f"{run.size_bytes} | {run.modified_at} | {run.status} | "
-            f"{len(run.steps_completed)} |"
+            f"{len(run.planned_steps)} |"
         )
     lines.append("")
 

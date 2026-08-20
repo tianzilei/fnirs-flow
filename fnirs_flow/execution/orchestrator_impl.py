@@ -863,7 +863,13 @@ class ExecutionService:
                 except (ValueError, TypeError) as exc:
                     atom_result.status = "failed"
                     atom_result.error = str(exc)
-                    atom_result.error_code = "EXECUTION_VALIDATION_ERROR"
+                    if type(exc).__name__ == "GLMInputDataError":
+                        atom_result.error_code = "GLM_INPUT_NONFINITE"
+                        atom_result.provenance["data_quality"] = getattr(exc, "details", {})
+                    elif str(exc).startswith("EVENT_CONDITION_MISMATCH"):
+                        atom_result.error_code = "EVENT_CONDITION_MISMATCH"
+                    else:
+                        atom_result.error_code = "EXECUTION_VALIDATION_ERROR"
                     if not continue_on_failure:
                         run_result.status = "failed"
                 except TimeoutError as exc:
@@ -1002,6 +1008,8 @@ class ExecutionService:
                 events, event_id = self._parse_bids_events_tsv(
                     events_path,
                     sfreq,
+                    expected_conditions=atom.get("parameters", {}).get("conditions"),
+                    excluded_conditions=atom.get("parameters", {}).get("excluded_event_conditions"),
                 )
                 params["events"] = events
                 params["event_id"] = event_id
@@ -1079,14 +1087,18 @@ class ExecutionService:
         if not isinstance(glm_result, dict):
             return contrasts
         n_conditions = int(glm_result.get("n_conditions", 0) or 0)
+        n_regressors = int(glm_result.get("n_regressors", n_conditions) or n_conditions)
         conditions = [str(item) for item in glm_result.get("conditions", [])]
         normalized: list[dict[str, Any]] = []
         for item in contrasts:
             if isinstance(item, dict):
-                normalized.append(item)
+                normalized_item = dict(item)
+                if "conditions" not in normalized_item and len(normalized_item.get("weights", [])) == len(conditions):
+                    normalized_item["conditions"] = conditions
+                normalized.append(normalized_item)
                 continue
             label = str(item)
-            weights = [0.0] * n_conditions
+            weights = [0.0] * n_regressors
             if ">" in label and conditions:
                 left, right = [part.strip() for part in label.split(">", 1)]
                 if left in conditions:
@@ -1098,7 +1110,14 @@ class ExecutionService:
             normalized.append({"name": label.replace(" ", "_") or "contrast", "weights": weights})
         return normalized
 
-    def _parse_bids_events_tsv(self, events_path: str, sfreq: float) -> tuple[np.ndarray, dict[str, int]]:
+    def _parse_bids_events_tsv(
+        self,
+        events_path: str,
+        sfreq: float,
+        *,
+        expected_conditions: Any = None,
+        excluded_conditions: Any = None,
+    ) -> tuple[np.ndarray, dict[str, int]]:
         """Parse a BIDS events TSV into MNE events array and event_id dict.
 
         Returns:
@@ -1138,17 +1157,35 @@ class ExecutionService:
         if not rows:
             raise ValueError(f"No included events in {events_path}")
 
-        # Build event_id mapping from unique non-empty conditions.
+        excluded = {
+            str(value).strip()
+            for value in (excluded_conditions or [])
+            if str(value).strip()
+        }
+
+        # Build the observed condition set after explicit trial exclusions.
         conditions_seen: list[str] = []
         for row in rows:
             cond = str(row.get(cond_key, "unknown") if cond_key else "unknown").strip()
-            if not cond or cond.lower() == "nan":
+            if not cond or cond.lower() == "nan" or cond in excluded:
                 continue
             if cond not in conditions_seen:
                 conditions_seen.append(cond)
         if not conditions_seen:
             raise ValueError(f"No task events after filtering {events_path}")
-        event_id = {name: i + 1 for i, name in enumerate(conditions_seen)}
+        declared = [str(value).strip() for value in (expected_conditions or []) if str(value).strip()]
+        if declared:
+            missing = [condition for condition in declared if condition not in conditions_seen]
+            unexpected = [condition for condition in conditions_seen if condition not in declared]
+            if missing or unexpected:
+                raise ValueError(
+                    "EVENT_CONDITION_MISMATCH: declared and observed event conditions differ; "
+                    f"missing={missing}, unexpected={unexpected}, excluded={sorted(excluded)}"
+                )
+            ordered_conditions = declared
+        else:
+            ordered_conditions = conditions_seen
+        event_id = {name: i + 1 for i, name in enumerate(ordered_conditions)}
 
         # Build events array [sample, duration_samples, event_id_int].
         events = []
@@ -1158,7 +1195,7 @@ class ExecutionService:
             duration = float(row.get("duration", 0) or 0)
             duration_samples = max(1, int(round(duration * sfreq)))
             cond = str(row.get(cond_key, "unknown") if cond_key else "unknown").strip()
-            eid = event_id.get(cond, 0)
+            eid = 0 if cond in excluded else event_id.get(cond, 0)
             if eid:
                 events.append([sample, duration_samples, eid])
 
@@ -1182,6 +1219,20 @@ class ExecutionService:
             "started_at": result.started_at,
             "completed_at": result.completed_at,
             "concurrency": result.concurrency,
+            "run_results": [
+                {
+                    "run_id": run.run_id,
+                    "status": run.status,
+                    "planned_steps": run.planned_steps,
+                    "completed_steps": run.completed_steps,
+                    "failed_step": run.failed_step,
+                    "failed_error_code": run.failed_error_code,
+                    "failed_error": run.failed_error,
+                    "skipped_steps": run.skipped_steps,
+                    "atom_statuses": {atom.atom_id: atom.status for atom in run.atom_results},
+                }
+                for run in result.run_results
+            ],
         }
         (logdir / "execution_summary.json").write_text(
             json.dumps(summary, indent=2),

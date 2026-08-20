@@ -6,6 +6,15 @@ from typing import Any
 
 import numpy as np
 
+
+class GLMInputDataError(ValueError):
+    """Raised when first-level GLM input contains non-finite values."""
+
+    def __init__(self, message: str, details: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.details = details
+
+
 __all__ = [
     "block_averaging",
     "build_design_matrix",
@@ -14,6 +23,7 @@ __all__ = [
     "first_level_glm",
     "roi_output",
 ]
+
 
 def block_averaging(
     data: np.ndarray,
@@ -212,6 +222,7 @@ def first_level_glm(
     design_matrix: dict[str, Any],
     hrf_model: str = "glover",
     noise_model: str = "ar1",
+    nonfinite_policy: str = "error",
 ) -> dict[str, Any]:
     """Fit a first-level GLM.
 
@@ -220,16 +231,64 @@ def first_level_glm(
         design_matrix: Output from build_design_matrix
         hrf_model: HRF model type
         noise_model: Noise model ('ols' or 'ar1')
+        nonfinite_policy: ``error`` fails closed and records input quality;
+            ``drop_channels`` explicitly excludes affected channels while
+            retaining their original channel indices in downstream outputs.
 
     Returns:
         Dictionary with GLM results (beta maps, statistics)
     """
     data = raw.get_data()
-    n_channels = data.shape[0]
+    channel_indices = list(range(data.shape[0]))
     X = design_matrix["design_matrix"]
 
-    if not np.isfinite(data).all():
-        raise ValueError("GLM input data contains non-finite values")
+    finite_mask = np.isfinite(data)
+    data_quality: dict[str, Any] = {
+        "status": "passed",
+        "nonfinite_policy": nonfinite_policy,
+        "nonfinite_value_count": 0,
+        "affected_channel_count": 0,
+        "affected_channel_indices": [],
+        "excluded_channel_indices": [],
+    }
+    if not finite_mask.all():
+        affected_channels = np.flatnonzero(~finite_mask.all(axis=1)).astype(int).tolist()
+        details = {
+            "status": "failed",
+            "reason": "non_finite_haemoglobin_data",
+            "nonfinite_value_count": int((~finite_mask).sum()),
+            "affected_channel_count": len(affected_channels),
+            "affected_channel_indices": affected_channels,
+            "n_channels": int(data.shape[0]),
+            "n_samples": int(data.shape[1]),
+            "nonfinite_policy": nonfinite_policy,
+        }
+        if nonfinite_policy == "drop_channels":
+            keep = finite_mask.all(axis=1)
+            if not keep.any():
+                details["reason"] = "no_finite_haemoglobin_channels"
+                raise GLMInputDataError("GLM input has no fully finite channels", details)
+            channel_indices = np.flatnonzero(keep).astype(int).tolist()
+            data = data[keep]
+            data_quality = {
+                **details,
+                "status": "adjusted",
+                "reason": "non_finite_channels_dropped",
+                "excluded_channel_indices": affected_channels,
+                "included_channel_count": len(channel_indices),
+            }
+        elif nonfinite_policy == "error":
+            raise GLMInputDataError(
+                "GLM input data contains non-finite values "
+                f"(count={details['nonfinite_value_count']}, "
+                f"affected_channels={details['affected_channel_count']})",
+                details,
+            )
+        else:
+            raise ValueError("nonfinite_policy must be 'error' or 'drop_channels'")
+    elif nonfinite_policy not in {"error", "drop_channels"}:
+        raise ValueError("nonfinite_policy must be 'error' or 'drop_channels'")
+    n_channels = data.shape[0]
     if not np.isfinite(X).all():
         raise ValueError("GLM design matrix contains non-finite values")
     if X.shape[0] <= X.shape[1]:
@@ -262,13 +321,15 @@ def first_level_glm(
         "t_stats": t_stats,
         "residuals": residuals,
         "n_channels": n_channels,
-        "n_conditions": X.shape[1],
+        "channel_indices": channel_indices,
+        "n_conditions": len(design_matrix.get("conditions", [])),
         "n_regressors": X.shape[1],
         "conditions": design_matrix["conditions"],
         "regressor_names": design_matrix.get("regressor_names", []),
         "df": X.shape[0] - X.shape[1],
         "hrf_model": hrf_model,
         "noise_model": noise_model,
+        "data_quality": data_quality,
     }
 
 
@@ -287,21 +348,44 @@ def estimate_contrast(
     """
     betas = glm_result["betas"]
     n_channels = glm_result["n_channels"]
-    n_conditions = glm_result["n_conditions"]
+    channel_indices = list(glm_result.get("channel_indices", range(n_channels)))
+    n_conditions = int(glm_result.get("n_conditions", len(glm_result.get("conditions", []))))
+    n_regressors = int(glm_result.get("n_regressors", betas.shape[1]))
+    model_conditions = [str(value) for value in glm_result.get("conditions", [])]
+    regressor_names = [str(value) for value in glm_result.get("regressor_names", [])]
 
     contrast_results = []
 
     for contrast in contrasts:
         name = contrast.get("name", "unknown")
-        weights = contrast.get("weights", [])
+        source_weights = list(contrast.get("weights", []))
+        source_conditions = [str(value) for value in contrast.get("conditions", [])]
+        if source_conditions:
+            if len(source_weights) != len(source_conditions):
+                raise ValueError(
+                    f"Contrast '{name}' has {len(source_weights)} weights for "
+                    f"{len(source_conditions)} named conditions"
+                )
+            missing = [condition for condition in source_conditions if condition not in regressor_names]
+            if missing:
+                raise ValueError(f"Contrast '{name}' references unknown conditions: {missing}")
+            weights = np.zeros(n_regressors, dtype=float)
+            for condition, weight in zip(source_conditions, source_weights, strict=True):
+                weights[regressor_names.index(condition)] = float(weight)
+        elif len(source_weights) == n_conditions and model_conditions:
+            weights = np.zeros(n_regressors, dtype=float)
+            for condition, weight in zip(model_conditions, source_weights, strict=True):
+                if condition not in regressor_names:
+                    raise ValueError(f"GLM condition '{condition}' is absent from regressor_names")
+                weights[regressor_names.index(condition)] = float(weight)
+        elif len(source_weights) == n_regressors:
+            weights = np.asarray(source_weights, dtype=float)
+        else:
+            raise ValueError(
+                f"Contrast '{name}' has {len(source_weights)} weights; expected "
+                f"{n_conditions} condition weights or {n_regressors} regressor weights"
+            )
 
-        if len(weights) != n_conditions:
-            # Pad or truncate weights
-            padded = np.zeros(n_conditions)
-            padded[: min(len(weights), n_conditions)] = weights[: min(len(weights), n_conditions)]
-            weights = padded
-
-        weights = np.array(weights)
         c_betas = betas @ weights
 
         contrast_results.append(
@@ -310,6 +394,7 @@ def estimate_contrast(
                 "weights": weights.tolist(),
                 "contrast_values": c_betas,
                 "n_channels": n_channels,
+                "channel_indices": channel_indices,
             }
         )
 
@@ -317,6 +402,7 @@ def estimate_contrast(
         "contrasts": contrast_results,
         "n_contrasts": len(contrasts),
         "n_channels": n_channels,
+        "channel_indices": channel_indices,
         "conditions": glm_result.get("conditions", []),
     }
 
@@ -331,8 +417,9 @@ def channel_output(contrast_result: dict[str, Any]) -> dict[str, Any]:
         Dictionary with channel-level results table
     """
     channels = []
-    for i in range(contrast_result["n_channels"]):
-        ch_data: dict[str, Any] = {"channel_idx": i}
+    channel_indices = list(contrast_result.get("channel_indices", range(contrast_result["n_channels"])))
+    for i, original_index in enumerate(channel_indices):
+        ch_data: dict[str, Any] = {"channel_idx": original_index}
         for contrast in contrast_result["contrasts"]:
             ch_data[f"{contrast['name']}_beta"] = float(contrast["contrast_values"][i])
         channels.append(ch_data)
@@ -370,14 +457,19 @@ def roi_output(
 
     rois = []
     for roi_name, channel_indices in roi_mapping.items():
-        roi_data = {"roi_name": roi_name, "n_channels": len(channel_indices)}
+        selected_channels = [
+            channel
+            for channel in channel_results["channels"]
+            if int(channel.get("channel_idx", -1)) in channel_indices
+        ]
+        roi_data = {"roi_name": roi_name, "n_channels": len(selected_channels)}
         for key in channel_results["channels"][0]:
             if key == "channel_idx":
                 continue
             values = [
-                channel_results["channels"][i][key]
-                for i in channel_indices
-                if i < len(channel_results["channels"]) and key in channel_results["channels"][i]
+                channel[key]
+                for channel in selected_channels
+                if key in channel
             ]
             roi_data[f"{key}_mean"] = float(np.mean(values)) if values else 0.0
         rois.append(roi_data)

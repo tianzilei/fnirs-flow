@@ -130,12 +130,13 @@ class BuiltinOperationHandler(OperationHandler):
         design_matrix = context.parameters.get("design_matrix")
         if design_matrix is None:
             raise ValueError("first_level_glm requires 'design_matrix' in params. Run build_design_matrix first.")
-        return context.adapter.fit_first_level_glm(
-            context.raw,
-            design_matrix,
-            hrf_model=context.service._normalize_hrf_model(context.parameters.get("hrf_model", "glover")),
-            noise_model=context.parameters.get("noise_model", "ar1"),
-        )
+        kwargs = {
+            "hrf_model": context.service._normalize_hrf_model(context.parameters.get("hrf_model", "glover")),
+            "noise_model": context.parameters.get("noise_model", "ar1"),
+        }
+        if "nonfinite_policy" in context.parameters:
+            kwargs["nonfinite_policy"] = context.parameters["nonfinite_policy"]
+        return context.adapter.fit_first_level_glm(context.raw, design_matrix, **kwargs)
 
     @staticmethod
     def _execute_estimate_contrast(context: OperationContext) -> Any:

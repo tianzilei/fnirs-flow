@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
+from fnirs_flow.execution.dag_payload import execution_atoms
 from fnirs_flow.execution.engine import RunContext
 from fnirs_flow.execution.models import AtomExecutionResult, RunExecutionResult
 
@@ -46,6 +47,11 @@ class RunExecutor:
         run_result = RunExecutionResult(
             run_id=run_ctx.run_id,
             status="running",
+            planned_steps=[
+                str(atom.get("atom_id", ""))
+                for atom in execution_atoms(dag)
+                if atom.get("execution_scope", "run") == "run" and str(atom.get("atom_id", ""))
+            ],
             started_at=datetime.now(timezone.utc).isoformat(),
         )
 
@@ -53,6 +59,7 @@ class RunExecutor:
             self.host._check_cancelled()
             if not run_ctx.data_path or not Path(run_ctx.data_path).exists():
                 run_result.status = "skipped"
+                run_result.skipped_steps = list(run_result.planned_steps)
                 run_result.completed_at = datetime.now(timezone.utc).isoformat()
                 return run_result
 
@@ -88,5 +95,14 @@ class RunExecutor:
                 AtomExecutionResult(atom_id=atom_id, status="failed", error=message, error_code=code)
             )
 
+        run_result.completed_steps = [item.atom_id for item in run_result.atom_results if item.status == "completed"]
+        run_result.failed_step = next(
+            (item.atom_id for item in run_result.atom_results if item.status == "failed"), ""
+        )
+        failed_atom = next((item for item in run_result.atom_results if item.status == "failed"), None)
+        if failed_atom is not None:
+            run_result.failed_error_code = failed_atom.error_code or ""
+            run_result.failed_error = failed_atom.error or ""
+        run_result.skipped_steps = [item.atom_id for item in run_result.atom_results if item.status == "skipped"]
         run_result.completed_at = datetime.now(timezone.utc).isoformat()
         return run_result

@@ -75,6 +75,23 @@ class TestDryRun:
         assert run.size_bytes == 0
         assert run.source_file_role == "raw_snirf"
 
+    def test_dry_run_applies_the_same_entity_filters_as_execution(self, tmp_path):
+        dag = {"nodes": [{"step_id": "s1"}], "execution_layers": [["s1"]]}
+        (tmp_path / "execution_dag.json").write_text(json.dumps(dag))
+        manifest = {
+            "subject_session_runs": [
+                {"subject": "01", "task": "covert", "run": "01", "path": "covert.snirf"},
+                {"subject": "01", "task": "overt", "run": "01", "path": "overt.snirf"},
+            ]
+        }
+        (tmp_path / "data_manifest.json").write_text(json.dumps(manifest))
+
+        result = dry_run(tmp_path, task_labels=["covert"])
+
+        assert result.total_runs == 1
+        assert result.planned_runs[0].task == "covert"
+        assert result.summary["selection_filters"]["task"] == ["covert"]
+
     def test_dry_run_missing_dag_raises(self, tmp_path):
         try:
             dry_run(tmp_path)

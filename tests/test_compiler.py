@@ -31,6 +31,23 @@ class TestFlowMatching:
 
 
 class TestCompiler:
+    def test_study_design_contract_is_copied_into_executable_atoms(self, tmp_path):
+        path = Path(__file__).parent.parent / "configs" / "demo_task_glm_real.json"
+        result = compile_flow(json.loads(path.read_text(encoding="utf-8")), tmp_path / "output")
+        atoms = {atom.atom_id: atom for atom in result.execution_dag.atoms}
+
+        assert atoms["design_matrix"].parameters["conditions"] == [
+            "Tapping/Left",
+            "Tapping/Right",
+            "Control",
+        ]
+        assert atoms["design_matrix"].parameters["excluded_event_conditions"] == ["15.0"]
+        assert atoms["estimate_contrast"].parameters["contrasts"][0]["conditions"] == [
+            "Tapping/Left",
+            "Tapping/Right",
+            "Control",
+        ]
+
     def test_compile_demo_flow(self, tmp_path):
         demo_path = Path(__file__).parent.parent / "configs" / "demo_task_flow.json"
         flow_dict = json.loads(demo_path.read_text())
