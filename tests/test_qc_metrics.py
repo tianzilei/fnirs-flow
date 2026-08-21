@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
+import numpy as np
 import pytest
 
 from fnirs_flow.adapters.qc_metrics import (
@@ -100,7 +103,7 @@ class TestChannelQCReport:
     def test_update_overall_empty(self):
         report = ChannelQCReport(channel="S1_D1")
         report.update_overall()
-        assert report.overall_status == "pass"
+        assert report.overall_status == "not_evaluated"
 
 
 class TestQCThresholds:
@@ -117,6 +120,12 @@ class TestQCThresholds:
         t = QCThresholds(sci_min=0.7, cv_max=0.2)
         assert t.sci_min == 0.7
         assert t.cv_max == 0.2
+
+    def test_rejects_invalid_threshold_ranges(self):
+        with pytest.raises(ValueError):
+            QCThresholds(sci_min=1.1)
+        with pytest.raises(ValueError, match="sd_distance_min"):
+            QCThresholds(sd_distance_min=0.09, sd_distance_max=0.08)
 
 
 class TestQCMetricsCalculator:
@@ -193,9 +202,41 @@ class TestQCMetricsCalculator:
 
     def test_evaluate_unknown_metric(self):
         calc = QCMetricsCalculator()
-        result = calc.evaluate_metric("unknown", 1.0)
-        assert result.status == "pass"
-        assert result.metric_name == "unknown"
+        with pytest.raises(ValueError, match="Unknown QC metric"):
+            calc.evaluate_metric("unknown", 1.0)
+
+    @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+    def test_nonfinite_metric_fails_without_serializing_nonfinite_number(self, value):
+        result = QCMetricsCalculator().evaluate_metric("sci", value)
+        assert result.status == "fail"
+        assert result.value is None
+
+    def test_compute_sci_maps_each_channel_and_does_not_mutate_raw(self):
+        raw = MagicMock()
+        picked = MagicMock()
+        picked.ch_names = ["S1_D1 760", "S1_D1 850", "S2_D1 760", "S2_D1 850"]
+        picked.pick.return_value = picked
+        raw.copy.return_value = picked
+
+        with patch("mne.preprocessing.nirs.scalp_coupling_index", return_value=np.array([0.9, 0.9, 0.4, 0.4])):
+            result = QCMetricsCalculator().compute_sci(raw)
+
+        assert result == dict(zip(picked.ch_names, [0.9, 0.9, 0.4, 0.4], strict=True))
+        raw.pick.assert_not_called()
+        raw.copy.assert_called_once()
+        picked.pick.assert_called_once_with("fnirs_od", exclude=[])
+
+    def test_nonfinite_and_short_signals_produce_failed_metrics(self):
+        raw = MagicMock()
+        raw.ch_names = ["nan", "short"]
+        raw.get_data.return_value = np.array([[1.0, np.nan], [1.0, 1.0]])
+        calc = QCMetricsCalculator()
+
+        cv = calc.compute_cv(raw)
+        snr = calc.compute_snr(raw)
+
+        assert calc.evaluate_metric("cv", cv["nan"]).status == "fail"
+        assert calc.evaluate_metric("snr", snr["short"]).status == "fail"
 
     def test_custom_thresholds(self):
         thresholds = QCThresholds(sci_min=0.7)

@@ -16,6 +16,10 @@ from fnirs_flow.infrastructure.filesystem import (
     macos_metadata_ignore,
     remove_macos_metadata_paths,
 )
+from fnirs_flow.infrastructure.portability import (
+    find_archive_absolute_path_records,
+    format_archive_portability_error,
+)
 from fnirs_flow.infrastructure.uri import ProjectURI, URIBindingStore, create_external_data_uri
 
 MAX_PACKAGE_BYTES = 10 * 1024**2
@@ -213,6 +217,10 @@ def _validate_zip_for_import(package_path: Path, zf: zipfile.ZipFile, extract_di
         if info.compress_size and info.file_size / info.compress_size > MAX_COMPRESSION_RATIO:
             raise ValueError(f"Package member compression ratio is too high: {member}")
         file_infos.append(info)
+
+    path_findings = find_archive_absolute_path_records(zf)
+    if path_findings:
+        raise ValueError(format_archive_portability_error(path_findings))
 
     _verify_declared_manifest(zf, set(names))
     return file_infos

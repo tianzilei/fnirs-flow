@@ -138,6 +138,24 @@ class TestQCMetrics:
         assert "n_bad" in result
         assert result["n_bad"] >= 0
 
+    def test_detect_bad_channels_marks_nonfinite_and_short_signals(self):
+        import numpy as np
+
+        from fnirs_flow.adapters.mne_nirs_steps import detect_bad_channels
+
+        result = detect_bad_channels(np.array([[1.0, np.nan], [1.0, 1.0]]))
+        assert result["bad_mask"].tolist() == [True, True]
+        assert result["n_bad"] == 2
+
+    def test_detect_bad_channels_validates_sci_shape(self):
+        import numpy as np
+        import pytest
+
+        from fnirs_flow.adapters.mne_nirs_steps import detect_bad_channels
+
+        with pytest.raises(ValueError, match="one value per channel"):
+            detect_bad_channels(np.ones((2, 40)), sci_values=np.array([0.9]))
+
 
 # ============================================================================
 # Package profile + artifact integration

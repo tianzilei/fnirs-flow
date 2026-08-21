@@ -7,7 +7,7 @@ import warnings
 import zipfile
 from pathlib import Path
 
-from fnirs_flow.exporters.package_verifier import verify_package
+from fnirs_flow.exporters.package_verifier import verify_and_print, verify_package
 
 
 class TestPackageVerifier:
@@ -185,6 +185,38 @@ class TestPackageVerifier:
         result = verify_package(pkg_path)
         assert not result.valid
         assert any("Unsafe zip entry" in e for e in result.errors)
+
+    def test_verify_rejects_machine_local_paths(self, tmp_path: Path) -> None:
+        pkg_path = tmp_path / "local-path.fnirsflow.zip"
+        with zipfile.ZipFile(pkg_path, "w") as zf:
+            zf.writestr("plan.json", "{}")
+            zf.writestr("data_manifest.json", json.dumps({"local_root": "/Volumes/data"}))
+            zf.writestr(
+                "manifest.json",
+                json.dumps(
+                    {
+                        "schema_version": "1.0.0",
+                        "files": {"plan.json": {"sha256": ""}},
+                    }
+                ),
+            )
+
+        result = verify_package(pkg_path)
+
+        assert not result.valid
+        assert result.errors == [
+            "Machine-local absolute path in data_manifest.json: $.local_root"
+        ]
+
+    def test_verify_and_print_uses_ascii_status_labels(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        exit_code = verify_and_print(tmp_path / "missing.fnirsflow.zip")
+
+        output = capsys.readouterr().out
+        assert exit_code == 1
+        assert "[ERROR] Package file not found" in output
+        assert output.isascii()
 
     def _compute_hash(self, data: dict) -> str:
         """Compute hash of JSON data."""

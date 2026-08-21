@@ -220,11 +220,17 @@ def compute_coefficient_of_variation(
     Returns:
         Array of CV values per channel
     """
+    data = np.asarray(data, dtype=float)
+    if data.ndim != 2:
+        raise ValueError("QC data must be a 2D channels-by-samples array")
     n_channels = data.shape[0]
     cv_values = np.zeros(n_channels)
 
     for ch in range(n_channels):
         signal = data[ch, :]
+        if signal.size == 0 or not np.isfinite(signal).all():
+            cv_values[ch] = np.inf
+            continue
         mean_val = np.mean(signal)
         if mean_val != 0:
             cv_values[ch] = np.std(signal) / abs(mean_val)
@@ -253,24 +259,36 @@ def compute_snr(
     """
     from scipy.signal import butter, filtfilt
 
+    data = np.asarray(data, dtype=float)
+    if data.ndim != 2:
+        raise ValueError("QC data must be a 2D channels-by-samples array")
+    if not np.isfinite(fs) or fs <= 0:
+        raise ValueError("Sampling frequency must be finite and positive")
     n_channels = data.shape[0]
-    snr_values = np.zeros(n_channels)
+    snr_values = np.full(n_channels, -np.inf)
+
+    nyquist = fs / 2.0
+    signal_high = min(float(signal_band[1]), np.nextafter(nyquist, 0.0))
+    noise_high = min(float(noise_band[1]), np.nextafter(nyquist, 0.0))
+    if not 0 < signal_band[0] < signal_high or not 0 < noise_band[0] < noise_high:
+        return snr_values
 
     # Design filters
-    b_signal, a_signal = butter(4, [signal_band[0], signal_band[1]], btype="band", fs=fs)
-    b_noise, a_noise = butter(4, [noise_band[0], noise_band[1]], btype="band", fs=fs)
+    b_signal, a_signal = butter(4, [signal_band[0], signal_high], btype="band", fs=fs)
+    b_noise, a_noise = butter(4, [noise_band[0], noise_high], btype="band", fs=fs)
+    min_samples = 3 * max(len(a_signal), len(b_signal), len(a_noise), len(b_noise))
 
     for ch in range(n_channels):
+        if data.shape[1] <= min_samples or not np.isfinite(data[ch, :]).all():
+            continue
         signal_filtered = filtfilt(b_signal, a_signal, data[ch, :])
         noise_filtered = filtfilt(b_noise, a_noise, data[ch, :])
 
         signal_power = np.mean(signal_filtered**2)
         noise_power = np.mean(noise_filtered**2)
 
-        if noise_power > 0:
+        if np.isfinite(signal_power) and np.isfinite(noise_power) and signal_power > 0 and noise_power > 0:
             snr_values[ch] = 10 * np.log10(signal_power / noise_power)
-        else:
-            snr_values[ch] = np.inf
 
     return snr_values
 
@@ -294,23 +312,32 @@ def detect_bad_channels(
     Returns:
         Dictionary with bad channel masks and QC metrics
     """
+    data = np.asarray(data, dtype=float)
+    if data.ndim != 2:
+        raise ValueError("QC data must be a 2D channels-by-samples array")
     n_channels = data.shape[0]
 
     # Compute CV
     cv_values = compute_coefficient_of_variation(data)
-    cv_bad = cv_values > cv_threshold
+    invalid_data = ~np.isfinite(data).all(axis=1) if data.shape[1] else np.ones(n_channels, dtype=bool)
+    cv_bad = ~np.isfinite(cv_values) | (cv_values > cv_threshold)
 
     # Compute SNR
     snr_values = compute_snr(data)
-    snr_bad = snr_values < snr_threshold
+    snr_bad = ~np.isfinite(snr_values) | (snr_values < snr_threshold)
 
     # SCI-based detection
     sci_bad = np.zeros(n_channels, dtype=bool)
     if sci_values is not None:
-        sci_bad = sci_values < sci_threshold
+        sci_values = np.asarray(sci_values, dtype=float)
+        if sci_values.shape != (n_channels,):
+            raise ValueError(
+                f"SCI values must contain one value per channel: expected {n_channels}, got {sci_values.size}"
+            )
+        sci_bad = ~np.isfinite(sci_values) | (sci_values < sci_threshold)
 
     # Combine bad channel masks
-    bad_mask = cv_bad | snr_bad | sci_bad
+    bad_mask = invalid_data | cv_bad | snr_bad | sci_bad
 
     return {
         "bad_mask": bad_mask,
@@ -321,7 +348,7 @@ def detect_bad_channels(
         "snr_bad": snr_bad,
         "sci_bad": sci_bad,
         "n_bad": int(bad_mask.sum()),
-        "bad_percentage": float(bad_mask.sum() / n_channels * 100),
+        "bad_percentage": float(bad_mask.sum() / n_channels * 100) if n_channels else 0.0,
     }
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import re
+import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -151,6 +152,29 @@ def find_absolute_path_records(path: Path, *, content: bytes | None = None) -> l
             csv.field_size_limit(_original_limit)
         return findings
     return ["text"] if _EMBEDDED_LOCAL_PATH.search(text) else []
+
+
+def find_archive_absolute_path_records(zf: zipfile.ZipFile) -> list[str]:
+    """Return text archive members and locations containing local paths."""
+    findings: list[str] = []
+    for info in zf.infolist():
+        member_path = Path(info.filename)
+        if info.is_dir() or member_path.suffix.lower() not in TEXT_EXTENSIONS:
+            continue
+        findings.extend(
+            f"{info.filename}: {location}"
+            for location in find_absolute_path_records(member_path, content=zf.read(info))
+        )
+    return findings
+
+
+def format_archive_portability_error(findings: list[str]) -> str:
+    """Summarize archive portability findings for CLI and API errors."""
+    if not findings:
+        return ""
+    additional = len(findings) - 1
+    suffix = f" ({additional} additional path records)" if additional else ""
+    return f"Machine-local absolute path in {findings[0]}{suffix}"
 
 
 def is_trackable_bundle_path(relative: PurePosixPath) -> bool:

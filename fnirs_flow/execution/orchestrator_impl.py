@@ -281,6 +281,12 @@ class ExecutionService:
                     "lineage": atom.provenance,
                 },
             )
+            if atom.status == "failed":
+                failure_store.register(
+                    run="group",
+                    atom_id=atom.atom_id,
+                    message=atom.error or "Unknown group execution error",
+                )
 
         # Summarize
         successful = sum(1 for r in run_results if r.status == "completed")
@@ -329,24 +335,6 @@ class ExecutionService:
             concurrency=concurrency.as_dict(),
         )
 
-        # Write summary
-        self._write_execution_summary(result, dirs["logs"])
-
-        # Write structured manifests
-        write_artifact_manifest(
-            artifact_store.to_manifest(run_id=attempt_id),
-            dirs["logs"],
-        )
-        provenance.write(dirs["logs"], project_root=outdir)
-        # Always replace the manifests so a successful retry cannot retain
-        # failures from a previous attempt in the same output directory.
-        failure_store.write_json(dirs["logs"])
-        failure_store.write_csv(dirs["logs"])
-
-        # Write dependency provenance.
-        # §16 MVP: runtime artifacts record actual dependency and backend versions.
-        self._write_dependency_provenance(compiled_dir, dirs["logs"], dag)
-
         # Generate group summary across subjects
         group_path = self.group_executor.generate_summary(
             run_results,
@@ -369,6 +357,34 @@ class ExecutionService:
                         if artifact_atom_id in {atom_result.atom_id, operation}:
                             matching.append({**artifact, "atom_id": atom_result.atom_id})
                     atom_result.artifacts.extend(matching)
+
+        # Persist after all derivatives have been generated so the returned
+        # result and on-disk manifests describe the same attempt.
+        for artifact in group_artifacts:
+            artifact_store.register(
+                ArtifactRecord(
+                    artifact_id=str(artifact.get("artifact_id", "")),
+                    step_id=str(artifact.get("step_id", "")),
+                    artifact_type=str(artifact.get("type", "")),
+                    uri=str(artifact.get("uri", artifact.get("path", ""))),
+                    path=str(artifact.get("uri", artifact.get("path", ""))),
+                    sha256=str(artifact.get("checksum", "")),
+                )
+            )
+
+        self._write_execution_summary(result, dirs["logs"])
+        write_artifact_manifest(
+            artifact_store.to_manifest(run_id=attempt_id),
+            dirs["logs"],
+        )
+        provenance.write(dirs["logs"], project_root=outdir)
+        # Always replace the manifests so a successful retry cannot retain
+        # failures from a previous attempt in the same output directory.
+        failure_store.write_json(dirs["logs"])
+        failure_store.write_csv(dirs["logs"])
+
+        # Runtime artifacts record actual dependency and backend versions.
+        self._write_dependency_provenance(compiled_dir, dirs["logs"], dag)
 
         self._emit_progress(
             "execution_completed",
@@ -521,15 +537,27 @@ class ExecutionService:
         registry = get_registry()
         adapter_pool = LazyAdapterPool(registry)
 
-        # Determine the default backend for data reading
+        # Determine the default backend for data reading from run-scope atoms.
+        # Group operations commonly use core, which cannot read SNIRF data.
         atoms_list = execution_atoms(dag)
-        default_backend_id = "mne_nirs"  # Default backend
-
-        # Check if any atom specifies a backend
-        for atom in atoms_list:
-            if atom.get("backend_id"):
-                default_backend_id = atom["backend_id"]
-                break
+        run_atoms = [atom for atom in atoms_list if atom.get("execution_scope", "run") == "run"]
+        if not run_atoms:
+            run_result.status = "completed"
+            return
+        read_atom = next(
+            (
+                atom
+                for atom in run_atoms
+                if canonical_operation(str(atom.get("operation") or atom.get("atom_type", ""))) == "read_run"
+                and atom.get("backend_id")
+            ),
+            None,
+        )
+        fallback_atom = next(
+            (atom for atom in run_atoms if atom.get("backend_id") not in {None, "", "core"}),
+            None,
+        )
+        default_backend_id = str((read_atom or fallback_atom or {}).get("backend_id") or "mne_nirs")
 
         # Create run output directory
         run_outdir = outdir / run_ctx.run_id
@@ -549,23 +577,35 @@ class ExecutionService:
         raw = default_adapter.read_run(run_ctx.data_path)
         initial_artifacts = default_adapter.artifacts.all() if hasattr(default_adapter, "artifacts") else []
 
-        # Build atom map from DAG (reuse atoms_list from above)
-        atom_map = {str(atom["atom_id"]): atom for atom in atoms_list}
+        # Validate scheduling declarations before execution. A malformed layer
+        # must not silently skip work or refer to an atom that cannot execute.
+        atom_ids = [str(atom["atom_id"]) for atom in atoms_list]
+        duplicate_atom_ids = sorted({atom_id for atom_id in atom_ids if atom_ids.count(atom_id) > 1})
+        if duplicate_atom_ids:
+            raise ValueError(f"Duplicate atom declarations in execution DAG: {duplicate_atom_ids}")
+        atom_map = dict(zip(atom_ids, atoms_list, strict=True))
+        run_atom_ids = [str(atom["atom_id"]) for atom in run_atoms]
+        run_atom_id_set = set(run_atom_ids)
 
-        # Get execution layers
-        layers = dag.get("execution_layers", [])
+        declared_layers = [[str(atom_id) for atom_id in layer] for layer in dag.get("execution_layers", [])]
+        declared_layer_ids = [atom_id for layer in declared_layers for atom_id in layer]
+        unknown_layer_ids = sorted(set(declared_layer_ids) - set(atom_map))
+        if unknown_layer_ids:
+            raise ValueError(f"Unknown atoms in execution DAG layers: {unknown_layer_ids}")
+        layers = [[atom_id for atom_id in layer if atom_id in run_atom_id_set] for layer in declared_layers]
+        layers = [layer for layer in layers if layer]
+        covered_run_ids = {atom_id for layer in layers for atom_id in layer}
+        missing_run_ids = [atom_id for atom_id in run_atom_ids if atom_id not in covered_run_ids]
+        if missing_run_ids:
+            layers.append(missing_run_ids)
+        if not layers and run_atom_ids:
+            layers = [run_atom_ids]
 
-        # If no layers, fall back to simple sequential execution
-        if not layers:
-            layers = [[str(atom["atom_id"]) for atom in atoms_list]]
-
-        # Fix layer ordering: if two atoms share a layer but have a DAG edge
-        # between them, split so the dependency executes first.
         edges_list = dag.get("edges", [])
         dep_map: dict[str, set[str]] = {}
         for edge in edges_list:
-            src = edge.get("source", "")
-            tgt = edge.get("target", "")
+            src = str(edge.get("source", ""))
+            tgt = str(edge.get("target", ""))
             dep_map.setdefault(tgt, set()).add(src)
 
         fixed_layers = []
@@ -616,7 +656,13 @@ class ExecutionService:
                     placed |= set(batch)
             else:
                 fixed_layers.append(layer)
-        layers = DAGScheduler.normalize_layers(fixed_layers, edges_list)
+        run_edges = [
+            edge
+            for edge in edges_list
+            if str(edge.get("source", "")) in run_atom_id_set
+            and str(edge.get("target", "")) in run_atom_id_set
+        ]
+        layers = DAGScheduler.normalize_layers(fixed_layers, run_edges)
 
         # Track intermediate results: atom_id -> result
         intermediate_state: dict[str, Any] = {
@@ -665,7 +711,33 @@ class ExecutionService:
                     )
                     continue
 
-                raw_candidates = [raw_outputs[pred] for pred in predecessors if pred in raw_outputs]
+                raw_candidate_ids = [pred for pred in sorted(predecessors) if pred in raw_outputs]
+                raw_candidates = [raw_outputs[pred] for pred in raw_candidate_ids]
+                if raw_candidates and any(candidate is not raw_candidates[0] for candidate in raw_candidates[1:]):
+                    message = (
+                        f"Atom '{atom_id}' has ambiguous Raw inputs from: {raw_candidate_ids}; "
+                        "add an explicit merge atom"
+                    )
+                    run_result.atom_results.append(
+                        AtomExecutionResult(
+                            atom_id=atom_id,
+                            status="failed",
+                            error=message,
+                            error_code="EXECUTION_VALIDATION_ERROR",
+                            provenance={"predecessor_atom_ids": raw_candidate_ids},
+                        )
+                    )
+                    unavailable_atoms.add(atom_id)
+                    self._emit_progress(
+                        "atom_completed",
+                        run_id=run_ctx.run_id,
+                        atom_id=atom_id,
+                        status="failed",
+                        error=message,
+                    )
+                    if not continue_on_failure:
+                        return
+                    continue
                 raw_input = raw_candidates[0] if raw_candidates else raw
                 intermediate_state["raw"] = raw_input
 
@@ -811,6 +883,8 @@ class ExecutionService:
                                 else result
                             )
                             intermediate_state[atom_id] = result
+                            if operation == "compute_qc" and isinstance(result, dict):
+                                run_result.qc_summary[atom_id] = result
                         elif category in ("analysis", "output"):
                             result = self._dispatch_analysis(
                                 adapter,
@@ -849,7 +923,7 @@ class ExecutionService:
                         caught_warnings = list(caught)
 
                     atom_result.status = "completed"
-                    result_type = type(result).__name__ if result else "None"
+                    result_type = type(result).__name__ if result is not None else "None"
                     atom_result.output_handles["data"] = result_type
 
                 except ExecutionCancelledError:

@@ -54,17 +54,35 @@ class DAGScheduler:
 
     @staticmethod
     def normalize_layers(layers: Iterable[Iterable[str]], edges: Iterable[dict[str, str]]) -> list[list[str]]:
-        normalized = [list(layer) for layer in layers]
-        dependencies: dict[str, set[str]] = {}
+        normalized = [[str(item) for item in layer] for layer in layers]
+        positions: dict[str, tuple[int, int]] = {}
+        for layer_index, layer in enumerate(normalized):
+            for item_index, item in enumerate(layer):
+                if item in positions:
+                    raise ValueError(f"Duplicate atom '{item}' in execution DAG layers")
+                positions[item] = (layer_index, item_index)
+
+        dependencies: dict[str, set[str]] = {item: set() for item in positions}
         for edge in edges:
-            dependencies.setdefault(str(edge.get("target", "")), set()).add(str(edge.get("source", "")))
+            source = str(edge.get("source", ""))
+            target = str(edge.get("target", ""))
+            if source in positions and target in positions:
+                dependencies[target].add(source)
+
         result: list[list[str]] = []
-        for layer in normalized:
-            remaining = set(layer)
-            while remaining:
-                ready = sorted(item for item in remaining if not (dependencies.get(item, set()) & remaining))
-                if not ready:
-                    raise ValueError("Cycle detected in execution DAG layer")
-                result.append(ready)
-                remaining.difference_update(ready)
+        remaining = set(positions)
+        while remaining:
+            ready = [item for item in remaining if not (dependencies[item] & remaining)]
+            if not ready:
+                raise ValueError("Cycle detected in execution DAG")
+
+            # Preserve compiler layer boundaries for independent atoms while
+            # repairing dependencies that cross malformed or legacy layers.
+            next_layer = min(positions[item][0] for item in ready)
+            batch = sorted(
+                (item for item in ready if positions[item][0] == next_layer),
+                key=lambda item: positions[item][1],
+            )
+            result.append(batch)
+            remaining.difference_update(batch)
         return result

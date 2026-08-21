@@ -11,6 +11,10 @@ from pathlib import Path, PurePosixPath
 from pydantic import BaseModel, Field
 
 from fnirs_flow.infrastructure.filesystem import is_macos_metadata_path
+from fnirs_flow.infrastructure.portability import (
+    find_archive_absolute_path_records,
+    format_archive_portability_error,
+)
 
 MAX_PACKAGE_BYTES = 10 * 1024**2
 MAX_UNCOMPRESSED_BYTES = 10 * 1024**2
@@ -65,6 +69,11 @@ def verify_package(package_path: str | Path, expected_profile: str | None = None
         with zipfile.ZipFile(package_path, "r") as zf:
             if not _validate_archive_bounds(zf, result):
                 result.valid = False
+                return result
+            path_findings = find_archive_absolute_path_records(zf)
+            if path_findings:
+                result.valid = False
+                result.errors.append(format_archive_portability_error(path_findings))
                 return result
             # Check for manifest (exact match for "manifest.json")
             manifest_path = None
@@ -257,22 +266,22 @@ def verify_and_print(package_path: str | Path, expected_profile: str | None = No
     if result.errors:
         print(f"\nErrors ({len(result.errors)}):")
         for error in result.errors:
-            print(f"  ✗ {error}")
+            print(f"  [ERROR] {error}")
 
     if result.missing_files:
         print(f"\nMissing Files ({len(result.missing_files)}):")
         for f in result.missing_files:
-            print(f"  ✗ {f}")
+            print(f"  [MISSING] {f}")
 
     if result.checksum_mismatches:
         print(f"\nChecksum Mismatches ({len(result.checksum_mismatches)}):")
         for f in result.checksum_mismatches:
-            print(f"  ✗ {f}")
+            print(f"  [CHECKSUM] {f}")
 
     if result.warnings:
         print(f"\nWarnings ({len(result.warnings)}):")
         for w in result.warnings:
-            print(f"  ⚠ {w}")
+            print(f"  [WARNING] {w}")
 
     if result.checked_files:
         print(f"\nChecked Files: {len(result.checked_files)}")

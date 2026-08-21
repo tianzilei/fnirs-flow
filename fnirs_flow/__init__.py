@@ -5,7 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("fnirs-flow")
 except PackageNotFoundError:  # Source checkout without an editable install.
-    __version__ = "1.2.1"
+    __version__ = "1.2.2"
 
 # Initialize logging on import
 from fnirs_flow.logging_config import init_logging

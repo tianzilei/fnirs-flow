@@ -1,6 +1,6 @@
 # Documentation Index
 
-> Last updated: 2026-08-19
+> Last updated: 2026-08-21
 
 This page indexes the public documentation shipped with the release tree.
 Private research notes, literature worktables, generated outputs, caches, and
@@ -36,6 +36,10 @@ remain available only for older flows and migration code.
 The public tree is validated with the synchronization tests and the release
 commands listed below. Detailed development status reports are intentionally
 kept outside this code-oriented release tree.
+
+The 2026-08-21 public sync passed 1,235 Python tests with 13 skips, all 24
+WebUI unit tests, Ruff, the production WebUI build, and an npm audit with no
+known vulnerabilities.
 
 The primary local reproduction commands are:
 

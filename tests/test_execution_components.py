@@ -67,6 +67,54 @@ def test_dag_scheduler_rejects_cycle():
         )
 
 
+def test_dag_scheduler_repairs_cross_layer_dependency_and_rejects_cross_layer_cycle():
+    assert DAGScheduler.normalize_layers(
+        [["dependent"], ["source"]],
+        [{"source": "source", "target": "dependent"}],
+    ) == [["source"], ["dependent"]]
+
+    with pytest.raises(ValueError, match="Cycle"):
+        DAGScheduler.normalize_layers(
+            [["a"], ["b"]],
+            [{"source": "a", "target": "b"}, {"source": "b", "target": "a"}],
+        )
+
+
+def test_dag_scheduler_rejects_duplicate_layer_membership():
+    with pytest.raises(ValueError, match="Duplicate atom"):
+        DAGScheduler.normalize_layers([["a"], ["a"]], [])
+
+
+def test_group_executor_honors_edge_order_for_group_atoms(tmp_path):
+    table_path = tmp_path / "participants.tsv"
+    table_path.write_text("participant_id\tinclude\tgroup\nsub-01\t1\tcontrol\n", encoding="utf-8")
+    dag = {
+        "atoms": [
+            {
+                "atom_id": "labels",
+                "operation": "participant_label_projection",
+                "execution_scope": "group",
+                "parameters": {"label_column": "group"},
+            },
+            {
+                "atom_id": "participants",
+                "operation": "participant_table_input",
+                "execution_scope": "group",
+                "parameters": {"path": str(table_path)},
+            },
+        ],
+        "execution_layers": [["labels"], ["participants"]],
+        "edges": [{"source": "participants", "target": "labels"}],
+    }
+
+    results = GroupExecutor(object()).execute_atoms(dag, tmp_path)
+
+    assert [(result.atom_id, result.status) for result in results] == [
+        ("participants", "completed"),
+        ("labels", "completed"),
+    ]
+
+
 def test_edge_dependency_resolver_uses_actual_predecessor_and_rejects_ambiguity():
     atom = {"operation": "first_level_glm"}
     params = {}

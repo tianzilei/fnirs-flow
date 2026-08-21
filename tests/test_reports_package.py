@@ -132,6 +132,24 @@ class TestPackageExportImport:
         with pytest.raises(ValueError, match="duplicate paths"):
             import_package(pkg_path, tmp_path / "imported")
 
+    def test_import_package_rejects_machine_local_paths_before_extraction(self, tmp_path):
+        pkg_path = tmp_path / "local-path.fnirsflow.zip"
+        with zipfile.ZipFile(pkg_path, "w") as archive:
+            archive.writestr("plan.json", "{}")
+            archive.writestr(
+                "data_manifest.json",
+                json.dumps({"local_root": "C:\\Users\\analyst\\dataset"}),
+            )
+
+        import_dir = tmp_path / "imported"
+        with pytest.raises(
+            ValueError,
+            match=r"Machine-local absolute path in data_manifest\.json: \$\.local_root",
+        ):
+            import_package(pkg_path, import_dir)
+
+        assert not (import_dir / "plan.json").exists()
+
     def test_import_with_relink(self, tmp_path):
         outdir = self._setup_output_dir(tmp_path)
         # Add data manifest

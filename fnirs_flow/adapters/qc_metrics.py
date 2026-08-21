@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class QCMetricResult(BaseModel):
@@ -13,7 +14,7 @@ class QCMetricResult(BaseModel):
 
     metric_name: str
     channel: str
-    value: float
+    value: float | None
     threshold: float
     status: str = Field(pattern="^(pass|warn|fail)$")
     rationale: str = ""
@@ -27,7 +28,7 @@ class ChannelQCReport(BaseModel):
     session: str = ""
     run: str = ""
     metrics: list[QCMetricResult] = Field(default_factory=list)
-    overall_status: str = "pass"
+    overall_status: str = Field(default="not_evaluated", pattern="^(pass|warn|fail|not_evaluated)$")
 
     def update_overall(self) -> None:
         """Update overall status based on individual metrics."""
@@ -35,6 +36,8 @@ class ChannelQCReport(BaseModel):
             self.overall_status = "fail"
         elif any(m.status == "warn" for m in self.metrics):
             self.overall_status = "warn"
+        elif not self.metrics:
+            self.overall_status = "not_evaluated"
         else:
             self.overall_status = "pass"
 
@@ -42,12 +45,18 @@ class ChannelQCReport(BaseModel):
 class QCThresholds(BaseModel):
     """QC thresholds from presets."""
 
-    sci_min: float = 0.8
-    cv_max: float = 0.15
-    snr_min: float = 2.0
-    saturation_max: float = 0.1
-    sd_distance_min: float = 0.01
-    sd_distance_max: float = 0.08
+    sci_min: float = Field(default=0.8, ge=0.0, le=1.0)
+    cv_max: float = Field(default=0.15, ge=0.0)
+    snr_min: float = Field(default=2.0, ge=0.0)
+    saturation_max: float = Field(default=0.1, ge=0.0, le=1.0)
+    sd_distance_min: float = Field(default=0.01, ge=0.0)
+    sd_distance_max: float = Field(default=0.08, ge=0.0)
+
+    @model_validator(mode="after")
+    def validate_distance_range(self) -> QCThresholds:
+        if self.sd_distance_min > self.sd_distance_max:
+            raise ValueError("sd_distance_min must not exceed sd_distance_max")
+        return self
 
 
 class QCMetricsCalculator:
@@ -70,41 +79,15 @@ class QCMetricsCalculator:
         try:
             from mne.preprocessing.nirs import scalp_coupling_index
 
-            # Get SCI values (one per SD-pair)
+            # MNE returns one value per optical-density channel, in picked order.
             sci_values = scalp_coupling_index(raw, l_freq=l_freq, h_freq=h_freq)
-
-            # Get channel pairing information from MNE
-            # MNE returns channels grouped by SD-pair with alternating wavelengths
-            result = {}
-
-            # Use picks to get the correct channel ordering
-            picks = raw.pick("fnirs_od", exclude=[])
-            ch_names = [raw.ch_names[p] for p in picks]
-
-            # MNE-NIRS returns SCI in SD-pair order
-            # Each SD-pair has 2 channels (one per wavelength)
-            n_pairs = len(sci_values)
-
-            # Get pair information from channel names
-            # Channel names follow pattern: S<source>_D<detector> <wavelength>
-            pair_groups: dict[str, list[str]] = {}
-            for ch in ch_names:
-                # Extract SD-pair ID (e.g., "S1_D1" from "S1_D1 760")
-                parts = ch.split()
-                if len(parts) >= 1:
-                    pair_id = parts[0]
-                    if pair_id not in pair_groups:
-                        pair_groups[pair_id] = []
-                    pair_groups[pair_id].append(ch)
-
-            # Assign SCI values to channels
-            for i, (pair_id, channels) in enumerate(pair_groups.items()):
-                if i < n_pairs:
-                    sci = float(sci_values[i])
-                    for ch in channels:
-                        result[ch] = sci
-
-            return result
+            picked = raw.copy().pick("fnirs_od", exclude=[])
+            ch_names = list(picked.ch_names)
+            if len(sci_values) != len(ch_names):
+                raise ValueError(
+                    f"SCI result length {len(sci_values)} does not match {len(ch_names)} optical-density channels"
+                )
+            return {channel: float(value) for channel, value in zip(ch_names, sci_values, strict=True)}
         except ImportError:
             return {}
 
@@ -125,6 +108,9 @@ class QCMetricsCalculator:
         result = {}
         for i, ch in enumerate(ch_names):
             signal = data[i]
+            if signal.size == 0 or not np.isfinite(signal).all():
+                result[ch] = float("nan")
+                continue
             mean_val = np.mean(np.abs(signal))
             if mean_val > 0:
                 cv = np.std(signal) / mean_val
@@ -154,6 +140,9 @@ class QCMetricsCalculator:
         result = {}
         for i, ch in enumerate(ch_names):
             signal = data[i]
+            if signal.size < 2 or not np.isfinite(signal).all():
+                result[ch] = float("nan")
+                continue
             signal_mean = np.mean(np.abs(signal))
             # Estimate noise from first-difference (high-frequency component)
             noise_std = np.std(np.diff(signal))
@@ -161,7 +150,7 @@ class QCMetricsCalculator:
                 snr = signal_mean / noise_std
                 result[ch] = float(snr)
             else:
-                result[ch] = float("inf")
+                result[ch] = 0.0
 
         return result
 
@@ -183,6 +172,9 @@ class QCMetricsCalculator:
         result = {}
         for i, ch in enumerate(ch_names):
             signal = data[i]
+            if signal.size == 0 or not np.isfinite(signal).all():
+                result[ch] = float("nan")
+                continue
             max_val = np.max(np.abs(signal))
             if max_val > 0:
                 saturated = np.sum(np.abs(signal) > threshold * max_val) / len(signal)
@@ -202,34 +194,17 @@ class QCMetricsCalculator:
             Dict of channel_name -> distance in meters
         """
         try:
+            from mne import pick_types
             from mne.preprocessing.nirs import source_detector_distances
 
-            # Get distances (one per SD-pair)
-            distances = source_detector_distances(info)
-
-            # Get fNIRS channel names
-            fnirs_chs = [ch for ch in info.ch_names if "hbo" in ch.lower() or "hbr" in ch.lower()]
-
-            # Group channels by SD-pair ID
-            pair_groups: dict[str, list[str]] = {}
-            for ch in fnirs_chs:
-                # Extract SD-pair ID (e.g., "S1_D1" from "S1_D1 hbo")
-                parts = ch.split()
-                if len(parts) >= 1:
-                    pair_id = parts[0]
-                    if pair_id not in pair_groups:
-                        pair_groups[pair_id] = []
-                    pair_groups[pair_id].append(ch)
-
-            # Assign distances to channels
-            result = {}
-            for i, (pair_id, channels) in enumerate(pair_groups.items()):
-                if i < len(distances):
-                    dist = float(distances[i])
-                    for ch in channels:
-                        result[ch] = dist
-
-            return result
+            picks = pick_types(info, fnirs=True, exclude=[])
+            distances = source_detector_distances(info, picks=picks)
+            ch_names = [info.ch_names[int(pick)] for pick in picks]
+            if len(distances) != len(ch_names):
+                raise ValueError(
+                    f"Distance result length {len(distances)} does not match {len(ch_names)} fNIRS channels"
+                )
+            return {channel: float(value) for channel, value in zip(ch_names, distances, strict=True)}
         except ImportError:
             return {}
 
@@ -244,6 +219,34 @@ class QCMetricsCalculator:
             QCMetricResult with pass/warn/fail status
         """
         thresholds = self._thresholds
+
+        metric_metadata = {
+            "sci": ("SCI", thresholds.sci_min, f"SCI threshold: {thresholds.sci_min}"),
+            "cv": ("CV", thresholds.cv_max, f"CV threshold: {thresholds.cv_max}"),
+            "snr": ("SNR", thresholds.snr_min, f"SNR threshold: {thresholds.snr_min}"),
+            "saturation": (
+                "Saturation",
+                thresholds.saturation_max,
+                f"Saturation threshold: {thresholds.saturation_max}",
+            ),
+            "sd_distance": (
+                "SD Distance",
+                thresholds.sd_distance_max,
+                f"SD distance range: {thresholds.sd_distance_min}-{thresholds.sd_distance_max}m",
+            ),
+        }
+        if name not in metric_metadata:
+            raise ValueError(f"Unknown QC metric: {name}")
+        if not math.isfinite(value):
+            metric_name, threshold, rationale = metric_metadata[name]
+            return QCMetricResult(
+                metric_name=metric_name,
+                channel="",
+                value=None,
+                threshold=threshold,
+                status="fail",
+                rationale=f"{rationale}; metric is non-finite or unavailable",
+            )
 
         if name == "sci":
             if value >= thresholds.sci_min:
@@ -318,14 +321,7 @@ class QCMetricsCalculator:
                 status=status,
                 rationale=(f"SD distance range: {thresholds.sd_distance_min}-{thresholds.sd_distance_max}m"),
             )
-        else:
-            return QCMetricResult(
-                metric_name=name,
-                channel="",
-                value=value,
-                threshold=0.0,
-                status="pass",
-            )
+        raise AssertionError(f"Unhandled QC metric: {name}")
 
     def compute_full_report(
         self,
@@ -352,6 +348,7 @@ class QCMetricsCalculator:
         cv_values = self.compute_cv(raw)
         snr_values = self.compute_snr(raw)
         saturation_values = self.compute_saturation(raw)
+        sd_distance_values = self.compute_sd_distances(raw.info)
 
         # Get unique channels
         ch_names = raw.ch_names
@@ -385,6 +382,11 @@ class QCMetricsCalculator:
             # Saturation
             if ch in saturation_values:
                 metric = self.evaluate_metric("saturation", saturation_values[ch])
+                metric.channel = ch
+                report.metrics.append(metric)
+
+            if ch in sd_distance_values:
+                metric = self.evaluate_metric("sd_distance", sd_distance_values[ch])
                 metric.channel = ch
                 report.metrics.append(metric)
 

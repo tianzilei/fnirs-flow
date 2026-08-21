@@ -17,6 +17,7 @@ from fnirs_flow.data.participant_tables import (
     write_participant_table_artifacts,
 )
 from fnirs_flow.execution.dag_payload import execution_atoms
+from fnirs_flow.execution.dag_scheduler import DAGScheduler
 from fnirs_flow.execution.models import AtomExecutionResult, RunExecutionResult
 
 
@@ -48,28 +49,34 @@ class GroupExecutor:
             for atom in atoms
             if atom.get("execution_scope") == "group"
             and (atom.get("operation") or atom.get("atom_type"))
-            in {
-                "participant_table_input",
-                "participant_metadata_validate",
-                "participant_label_projection",
-                "participant_site_projection",
-                "participant_covariate_projection",
-                "participant_dpf_projection",
-                "participant_outcome_projection",
-                "localization_projection_import",
-                "nirs_spm_surface_projection",
-                "fnirs_filename_inventory",
-                "nirs_spm_header_inspection",
-                "probe_layout_split",
-                "combat_preflight",
-                "observation_pairing_projection",
-                "group_design_matrix",
-                "group_level_glm",
-                "group_contrast",
-            }
         ]
         if not group_atoms:
             return []
+        group_atom_map = {str(atom.get("atom_id", "")): atom for atom in group_atoms}
+        group_ids = set(group_atom_map)
+        declared_layers = [
+            [str(atom_id) for atom_id in layer if str(atom_id) in group_ids]
+            for layer in dag.get("execution_layers", [])
+        ]
+        declared_layers = [layer for layer in declared_layers if layer]
+        covered_ids = {atom_id for layer in declared_layers for atom_id in layer}
+        if covered_ids != group_ids:
+            declared_layers.append([
+                str(atom.get("atom_id", ""))
+                for atom in group_atoms
+                if str(atom.get("atom_id", "")) not in covered_ids
+            ])
+        group_edges = [
+            edge
+            for edge in dag.get("edges", [])
+            if str(edge.get("source", "")) in group_ids and str(edge.get("target", "")) in group_ids
+        ]
+        ordered_ids = [
+            atom_id
+            for layer in DAGScheduler.normalize_layers(declared_layers, group_edges)
+            for atom_id in layer
+        ]
+        group_atoms = [group_atom_map[atom_id] for atom_id in ordered_ids]
         results: list[AtomExecutionResult] = []
         state: dict[str, Any] = {}
         compiled_dir = outdir / "compiled"
@@ -397,6 +404,8 @@ class GroupExecutor:
                         "expected_tables": ["contrast_results.csv", "contrast_results.json"],
                         "expected_figures": ["contrast_effects.svg"],
                     }
+                else:
+                    raise ValueError(f"Unsupported group operation: {operation}")
                 result.status = "completed"
             except (OSError, ValueError, TypeError) as exc:
                 result.status = "failed"

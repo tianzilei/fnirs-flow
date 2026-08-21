@@ -1024,6 +1024,168 @@ class TestDagBranchIsolation:
         assert lineage["contrast-a"] == ["glm-a"]
         assert lineage["contrast-b"] == ["glm-b"]
 
+    def test_partial_execution_layers_do_not_omit_run_atoms(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "design",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "parameters": {"events": "task"},
+                },
+                {
+                    "atom_id": "glm",
+                    "operation": "first_level_glm",
+                    "category": "analysis",
+                    "parameters": {},
+                },
+            ],
+            "execution_layers": [["design"]],
+            "edges": [{"source": "design", "target": "glm"}],
+        }
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=self._Registry()):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)), {}, dag, tmp_path
+            )
+
+        assert [(item.atom_id, item.status) for item in result.atom_results] == [
+            ("design", "completed"),
+            ("glm", "completed"),
+        ]
+
+    def test_distinct_preprocessing_branches_require_explicit_merge(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        class BranchAdapter(TestDagBranchIsolation._Adapter):
+            def to_optical_density(self, _raw):
+                return object()
+
+        class BranchRegistry:
+            def __init__(self):
+                self.adapter = BranchAdapter()
+
+            def create(self, _backend_id, **_kwargs):
+                return self.adapter
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "od-a",
+                    "operation": "optical_density",
+                    "category": "preprocessing",
+                    "parameters": {},
+                },
+                {
+                    "atom_id": "od-b",
+                    "operation": "optical_density",
+                    "category": "preprocessing",
+                    "parameters": {},
+                },
+                {
+                    "atom_id": "design",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "parameters": {"events": "task"},
+                },
+            ],
+            "execution_layers": [["od-a", "od-b"], ["design"]],
+            "edges": [
+                {"source": "od-a", "target": "design"},
+                {"source": "od-b", "target": "design"},
+            ],
+        }
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=BranchRegistry()):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)), {}, dag, tmp_path
+            )
+
+        design = next(item for item in result.atom_results if item.atom_id == "design")
+        assert design.status == "failed"
+        assert design.error_code == "EXECUTION_VALIDATION_ERROR"
+        assert "['od-a', 'od-b']" in design.error
+        assert "explicit merge atom" in design.error
+
+    def test_group_core_backend_does_not_select_run_reader(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        class RecordingRegistry:
+            def __init__(self):
+                self.adapter = TestDagBranchIsolation._Adapter()
+                self.backend_ids = []
+
+            def create(self, backend_id, **_kwargs):
+                self.backend_ids.append(backend_id)
+                return self.adapter
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "group-design",
+                    "operation": "group_design_matrix",
+                    "execution_scope": "group",
+                    "backend_id": "core",
+                    "parameters": {},
+                },
+                {
+                    "atom_id": "design",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "execution_scope": "run",
+                    "parameters": {"events": "task"},
+                },
+            ],
+            "execution_layers": [["group-design"], ["design"]],
+            "edges": [],
+        }
+        registry = RecordingRegistry()
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=registry):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)), {}, dag, tmp_path
+            )
+
+        assert result.status == "completed"
+        assert registry.backend_ids == ["mne_nirs"]
+
+    def test_group_only_dag_does_not_load_run_backend(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        registry = MagicMock()
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "group-design",
+                    "operation": "group_design_matrix",
+                    "execution_scope": "group",
+                    "backend_id": "core",
+                    "parameters": {},
+                }
+            ],
+            "execution_layers": [["group-design"]],
+            "edges": [],
+        }
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=registry):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)), {}, dag, tmp_path
+            )
+
+        assert result.status == "completed"
+        assert result.atom_results == []
+        registry.create.assert_not_called()
+
     def test_failure_propagates_only_within_connected_branch(self, tmp_path):
         from fnirs_flow.execution.engine import RunContext
 
@@ -1280,6 +1442,89 @@ class TestDagBranchIsolation:
 
 
 class TestGroupScopeExecution:
+    @staticmethod
+    def _write_compiled_project(tmp_path, dag):
+        compiled = tmp_path / "compiled"
+        compiled.mkdir()
+        data_path = tmp_path / "sub-01.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        (compiled / "plan.json").write_text("{}", encoding="utf-8")
+        (compiled / "execution_dag.json").write_text(json.dumps(dag), encoding="utf-8")
+        (compiled / "data_manifest.json").write_text(
+            json.dumps({"subject_session_runs": [{"subject": "01", "task": "test", "path": str(data_path)}]}),
+            encoding="utf-8",
+        )
+
+    def test_group_summary_artifacts_are_in_final_manifest(self, tmp_path):
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "channels",
+                    "operation": "channel_output",
+                    "category": "output",
+                    "parameters": {"contrast_result": {"beta": 1.0}},
+                },
+                {
+                    "atom_id": "roi",
+                    "operation": "roi_output",
+                    "category": "output",
+                    "parameters": {},
+                },
+            ],
+            "execution_layers": [["channels"], ["roi"]],
+            "edges": [{"source": "channels", "target": "roi"}],
+        }
+        self._write_compiled_project(tmp_path, dag)
+
+        with patch(
+            "fnirs_flow.adapters.backend_registry.get_registry",
+            return_value=TestDagBranchIsolation._Registry(),
+        ):
+            result = ExecutionService().execute(
+                ExecutionRequest(project_dir=str(tmp_path), outdir=str(tmp_path), attempt_id="attempt-summary")
+            )
+
+        manifest = json.loads((tmp_path / "logs" / "artifact_manifest.json").read_text(encoding="utf-8"))
+        manifest_types = {item["artifact_type"] for item in manifest["artifacts"]}
+        result_types = {item["type"] for item in result.artifacts}
+        assert {"GroupSummaryTable", "GroupSummaryJson"} <= manifest_types
+        assert {"GroupSummaryTable", "GroupSummaryJson"} <= result_types
+
+    def test_group_atom_failures_are_written_to_failure_manifest(self, tmp_path):
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "bad-group",
+                    "operation": "unsupported_group_operation",
+                    "execution_scope": "group",
+                    "backend_id": "core",
+                    "parameters": {},
+                },
+                {
+                    "atom_id": "run-design",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "parameters": {"events": "task"},
+                },
+            ],
+            "execution_layers": [["bad-group"], ["run-design"]],
+            "edges": [],
+        }
+        self._write_compiled_project(tmp_path, dag)
+
+        with patch(
+            "fnirs_flow.adapters.backend_registry.get_registry",
+            return_value=TestDagBranchIsolation._Registry(),
+        ):
+            result = ExecutionService().execute(
+                ExecutionRequest(project_dir=str(tmp_path), outdir=str(tmp_path), attempt_id="attempt-group-failure")
+            )
+
+        failures = json.loads((tmp_path / "logs" / "failure_manifest.json").read_text(encoding="utf-8"))
+        assert result.failed_runs == 1
+        assert result.failure_ids == ["group"]
+        assert [(item["run"], item["atom_id"]) for item in failures] == [("group", "bad-group")]
+
     def test_group_scope_atoms_run_once_without_inflating_run_counts(self, tmp_path):
         compiled = tmp_path / "compiled"
         compiled.mkdir()

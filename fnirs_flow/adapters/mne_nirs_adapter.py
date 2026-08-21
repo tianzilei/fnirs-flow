@@ -268,17 +268,28 @@ class MneNirsAdapter:
 
     def compute_qc(self, raw: Any, sci_threshold: float = 0.8) -> dict[str, Any]:
         """Compute QC metrics."""
-        sci_values = scalp_coupling_index(raw)
-        sd_dists = source_detector_distances(raw.info)
+        if not np.isfinite(sci_threshold) or not 0 <= sci_threshold <= 1:
+            raise ValueError("sci_threshold must be between 0 and 1")
+        sci_values = np.asarray(scalp_coupling_index(raw), dtype=float)
+        sd_dists = np.asarray(source_detector_distances(raw.info), dtype=float)
         short_chs = short_channels(raw.info)
+        finite_sci = sci_values[np.isfinite(sci_values)]
+        finite_distances = sd_dists[np.isfinite(sd_dists)]
+        bad_channel_mask = ~np.isfinite(sci_values) | (sci_values < sci_threshold)
 
         qc = {
-            "sci_mean": float(sci_values.mean()) if len(sci_values) > 0 else 0.0,
-            "sci_min": float(sci_values.min()) if len(sci_values) > 0 else 0.0,
+            "sci_mean": float(finite_sci.mean()) if finite_sci.size else 0.0,
+            "sci_min": float(finite_sci.min()) if finite_sci.size else 0.0,
+            "sci_pass_rate": float((np.isfinite(sci_values) & (sci_values >= sci_threshold)).mean())
+            if sci_values.size
+            else 0.0,
             "n_channels": len(sci_values),
+            "n_bad_channels": int(bad_channel_mask.sum()),
+            "n_invalid_sci": int((~np.isfinite(sci_values)).sum()),
             "n_short_channels": int(short_chs.sum()) if hasattr(short_chs, "sum") else 0,
-            "sd_distance_mean": float(sd_dists.mean()) if len(sd_dists) > 0 else 0.0,
-            "sci_values": sci_values.tolist(),
+            "sd_distance_mean": float(finite_distances.mean()) if finite_distances.size else 0.0,
+            "sci_values": [float(value) if np.isfinite(value) else None for value in sci_values],
+            "bad_channel_mask": bad_channel_mask.tolist(),
             "sci_threshold": sci_threshold,
         }
 
@@ -432,10 +443,19 @@ class MneNirsAdapter:
         """Compute comprehensive QC metrics."""
         data = raw.get_data()
 
-        sci_values = scalp_coupling_index(raw)
+        for name, value, lower, upper in (
+            ("sci_threshold", sci_threshold, 0.0, 1.0),
+            ("cv_threshold", cv_threshold, 0.0, None),
+            ("snr_threshold", snr_threshold, 0.0, None),
+        ):
+            if not np.isfinite(value) or value < lower or (upper is not None and value > upper):
+                range_text = f"{lower} and {upper}" if upper is not None else f"at least {lower}"
+                raise ValueError(f"{name} must be between {range_text}")
+
+        sci_values = np.asarray(scalp_coupling_index(raw), dtype=float)
         cv_values = compute_coefficient_of_variation(data)
         snr_values = compute_snr(data, fs=raw.info["sfreq"])
-        sd_dists = source_detector_distances(raw.info)
+        sd_dists = np.asarray(source_detector_distances(raw.info), dtype=float)
         short_chs = short_channels(raw.info)
 
         bad_channels = detect_bad_channels(
@@ -446,20 +466,28 @@ class MneNirsAdapter:
             sci_threshold=sci_threshold,
         )
 
+        finite_sci = sci_values[np.isfinite(sci_values)]
+        finite_cv = cv_values[np.isfinite(cv_values)]
+        finite_snr = snr_values[np.isfinite(snr_values)]
+        finite_distances = sd_dists[np.isfinite(sd_dists)]
         qc = {
-            "sci_mean": float(np.mean(sci_values)) if len(sci_values) > 0 else 0.0,
-            "sci_min": float(np.min(sci_values)) if len(sci_values) > 0 else 0.0,
-            "sci_pass_rate": (float(np.mean(sci_values >= sci_threshold)) if len(sci_values) > 0 else 0.0),
-            "cv_mean": float(np.mean(cv_values)) if len(cv_values) > 0 else 0.0,
-            "cv_max": float(np.max(cv_values)) if len(cv_values) > 0 else 0.0,
-            "snr_mean": float(np.mean(snr_values)) if len(snr_values) > 0 else 0.0,
-            "snr_min": float(np.min(snr_values)) if len(snr_values) > 0 else 0.0,
+            "sci_mean": float(np.mean(finite_sci)) if finite_sci.size else 0.0,
+            "sci_min": float(np.min(finite_sci)) if finite_sci.size else 0.0,
+            "sci_pass_rate": float((np.isfinite(sci_values) & (sci_values >= sci_threshold)).mean())
+            if sci_values.size
+            else 0.0,
+            "cv_mean": float(np.mean(finite_cv)) if finite_cv.size else 0.0,
+            "cv_max": float(np.max(finite_cv)) if finite_cv.size else 0.0,
+            "snr_mean": float(np.mean(finite_snr)) if finite_snr.size else 0.0,
+            "snr_min": float(np.min(finite_snr)) if finite_snr.size else 0.0,
             "n_channels": len(sci_values),
             "n_short_channels": int(short_chs.sum()) if hasattr(short_chs, "sum") else 0,
-            "sd_distance_mean": float(np.mean(sd_dists)) if len(sd_dists) > 0 else 0.0,
+            "sd_distance_mean": float(np.mean(finite_distances)) if finite_distances.size else 0.0,
             "n_bad_channels": bad_channels["n_bad"],
             "bad_channel_percentage": bad_channels["bad_percentage"],
             "bad_channel_mask": bad_channels["bad_mask"].tolist(),
+            "sci_values": [float(value) if np.isfinite(value) else None for value in sci_values],
+            "n_invalid_sci": int((~np.isfinite(sci_values)).sum()),
             "thresholds": {
                 "sci": sci_threshold,
                 "cv": cv_threshold,
@@ -485,6 +513,9 @@ class MneNirsAdapter:
                 "snr_threshold": snr_threshold,
             },
         )
+        summary = {key: value for key, value in qc.items() if key not in {"sci_values", "bad_channel_mask"}}
+        self._write_artifact_file("compute_advanced_qc", "qc_summary", summary)
+        self._write_qc_tsv(qc)
         return qc
 
     def apply_short_channel_regression(

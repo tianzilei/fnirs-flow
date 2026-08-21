@@ -1,18 +1,26 @@
 # Changelog
 
-## [1.2.1] - 2026-08-19
+## [1.2.2] - 2026-08-21
 
 This release records the current synchronized development and public trees.
 
 ### Release metadata
 
-- Project version is `1.2.1` across Python, WebUI, API metadata, and public documentation.
+- Project version is `1.2.2` across Python, WebUI, API metadata, and public documentation.
 - Public release synchronization and English-only documentation checks passed.
 - Public CI now enforces architecture, runtime, generated-contract, packaging,
   security, license, WebUI, browser, and release-version gates; version tags
   publish verified distributions to GitHub Releases.
 
-## Unreleased
+### Verified - 2026-08-21 Public Sync
+
+- Clean public tree: `1235 passed, 13 skipped` with pytest.
+- `ruff check cli.py fnirs_flow tests scripts tools`: passed.
+- WebUI unit tests: 24 passed.
+- WebUI production build: passed.
+- `npm audit`: 0 known vulnerabilities.
+- Public release dry-run, forbidden-path audit, English-only scan, local
+  Markdown link check, and all 422 manifest hash checks passed.
 
 ### Added
 
@@ -50,6 +58,13 @@ This release records the current synchronized development and public trees.
   identity/type/checksum, atom status, and numerical result tables.
 - DAG-layer parallelism remains disabled because run-level processing removes
   the measured bottleneck and small workloads regress under extra scheduling.
+
+## [1.2.1] - 2026-08-19
+
+- Synchronized the development and public release trees at version `1.2.1`.
+- Added public CI gates for architecture, runtime, generated contracts,
+  packaging, security, licenses, WebUI, browser tests, and release versions.
+- Added verified-distribution publishing from version tags to GitHub Releases.
 
 ## [1.2.0] - 2026-07-15
 

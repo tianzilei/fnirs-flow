@@ -66,6 +66,39 @@ class TestMneNirsAdapter:
         assert covert_path.name == "sub-01_task-covert_run-01_desc-summary.json"
         assert overt_path.name == "sub-01_task-overt_run-01_desc-summary.json"
 
+    def test_qc_serializes_nonfinite_sci_as_null(self):
+        import json
+
+        import numpy as np
+
+        raw = MagicMock()
+        raw.info = {"sfreq": 10.0}
+        raw.get_data.return_value = np.ones((2, 100), dtype=float)
+        adapter = MneNirsAdapter()
+
+        with (
+            patch(
+                "fnirs_flow.adapters.mne_nirs_adapter.scalp_coupling_index",
+                return_value=np.array([np.nan, 0.9]),
+            ),
+            patch(
+                "fnirs_flow.adapters.mne_nirs_adapter.source_detector_distances",
+                return_value=np.array([0.03, 0.03]),
+            ),
+            patch(
+                "fnirs_flow.adapters.mne_nirs_adapter.short_channels",
+                return_value=np.array([False, False]),
+            ),
+        ):
+            basic = adapter.compute_qc(raw)
+            advanced = adapter.compute_advanced_qc(raw)
+
+        assert basic["sci_values"] == [None, 0.9]
+        assert advanced["sci_values"] == [None, 0.9]
+        assert basic["bad_channel_mask"] == [True, False]
+        assert advanced["bad_channel_mask"] == [True, False]
+        json.dumps({"basic": basic, "advanced": advanced}, allow_nan=False)
+
 
 class TestMneNirsStepsMocked:
     """Tests for adapter steps using mocked MNE functions."""
