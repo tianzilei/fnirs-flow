@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
-from fnirs_flow.execution.engine import RunContext, _build_run_id
+from fnirs_flow.execution.engine import RunContext, _build_run_id, normalize_entity_labels
 from fnirs_flow.execution.models import ExecutionRequest
 from fnirs_flow.infrastructure.uri import ProjectURI
 
@@ -56,10 +56,10 @@ def resolve_runs(compiled_dir: Path, request: ExecutionRequest) -> list[RunConte
         return ""
 
     filters = {
-        "subject": request.participant_labels,
-        "session": request.session_labels,
-        "task": request.task_labels,
-        "run": request.run_labels,
+        "subject": normalize_entity_labels("subject", request.participant_labels),
+        "session": normalize_entity_labels("session", request.session_labels),
+        "task": normalize_entity_labels("task", request.task_labels),
+        "run": normalize_entity_labels("run", request.run_labels),
     }
     for subject_run in manifest.get("subject_session_runs", []):
         if any(labels and subject_run.get(field) not in labels for field, labels in filters.items()):

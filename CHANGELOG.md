@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.2.3] - 2026-08-21
+
+### Fixed
+
+- Corrected run-scope signal routing so design matrices and other typed
+  analysis outputs no longer create false Raw-data fan-in conflicts at GLM
+  joins.
+- Ensured failed atoms always finalize their run as failed, including with
+  `--no-continue-on-failure`; CLI execution now also returns nonzero when runs
+  are skipped because their data paths cannot be resolved.
+- Added `discover --data-root`, normalized BIDS-prefixed execution filters,
+  preserved explicit empty-ROI warnings, and made backend status output safe
+  for non-UTF-8 Windows consoles.
+
+### Validation
+
+- Full development suite: `1256 passed, 2 skipped`.
+- Clean public suite: `1245 passed, 13 skipped`.
+- Public WebUI: 24 unit tests passed; development build and npm audit passed
+  with 0 known vulnerabilities.
+- Wheel and sdist builds passed package-content checks; the independently
+  installed wheel passed the API, schema, WebUI-resource, and MethodAtom
+  black-box checks.
+- Installed-wheel BIDS-NIRS tapping acceptance: 5 successful runs, 0 failed,
+  0 skipped.
+
 ## [1.2.2] - 2026-08-21
 
 This release records the current synchronized development and public trees.

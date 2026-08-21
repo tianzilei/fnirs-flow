@@ -20,7 +20,7 @@ fall back to serial before execution starts. Benchmark both modes on the target
 machine with `tools/benchmark/run_execution_benchmark.py`; Windows process
 startup can make small workloads slower.
 
-**v1.2.2** | Python 3.10+
+**v1.2.3** | Python 3.10+
 
 ---
 
@@ -66,7 +66,7 @@ fnirs-flow uses a lazy-loading architecture. Backends load only when needed:
 python cli.py backends
 ```
 
-### Three-Step Workflow
+### Four-Step Workflow
 
 ```bash
 # 1. Validate a flow configuration
@@ -75,8 +75,13 @@ python cli.py validate configs/demo_task_glm_real.json
 # 2. Compile it into an executable plan
 python cli.py compile configs/demo_task_glm_real.json --outdir outputs/demo
 
-# 3. Run the analysis; requires MNE-NIRS
-python cli.py run outputs/demo --outdir outputs/demo
+# 3. Discover a local BIDS-NIRS dataset
+python cli.py discover bids-nirs-tapping --outdir outputs/demo \
+  --data-root Sample/BIDS-NIRS-Tapping-master
+
+# 4. Run the analysis; requires MNE-NIRS
+python cli.py run outputs/demo --outdir outputs/demo \
+  --data-root Sample/BIDS-NIRS-Tapping-master
 ```
 
 ### Start the WebUI
@@ -112,9 +117,9 @@ cd webui && npm install && npm run dev               # Frontend :5173
 |---|---|---|
 | `validate` | Validate a flow JSON file | `python cli.py validate configs/demo_task_glm_real.json` |
 | `compile` | Compile a flow into plan, DAG, and manifests | `python cli.py compile configs/demo_task_glm_real.json --outdir outputs/demo` |
-| `discover` | Discover and register public datasets | `python cli.py discover bids-nirs-tapping --outdir outputs/demo` |
+| `discover` | Discover and register public datasets | `python cli.py discover bids-nirs-tapping --outdir outputs/demo --data-root Sample/BIDS-NIRS-Tapping-master` |
 | `dry-run` | Enumerate all subject/session/run combinations without execution | `python cli.py dry-run outputs/demo --outdir outputs/demo` |
-| `run` | Execute analysis with MNE-NIRS | `python cli.py run outputs/demo --outdir outputs/demo` |
+| `run` | Execute analysis with MNE-NIRS | `python cli.py run outputs/demo --outdir outputs/demo --data-root Sample/BIDS-NIRS-Tapping-master` |
 | `export` | Export a reproducibility package | `python cli.py export outputs/demo --outdir outputs/demo` |
 | `rerun` | Rerun an imported package | `python cli.py rerun outputs/imported_package` |
 | `import-homer3` | Import Homer3 configuration into fnirs-flow atoms | `python cli.py import-homer3 pipeline.cfg --outdir outputs/imported` |
@@ -129,6 +134,7 @@ cd webui && npm install && npm run dev               # Frontend :5173
 
 ```bash
 python cli.py run outputs/demo --outdir outputs/demo \
+  --data-root Sample/BIDS-NIRS-Tapping-master \
   --participant-label sub-01 sub-02 \
   --session-label ses-01 \
   --run-label run-01

@@ -1320,7 +1320,7 @@ def execute_project_runs(
         store.update_state(
             project_id,
             last_attempt_id=result.attempt_id,
-            last_execution_status="failed" if result.failed_runs else "completed",
+            last_execution_status="failed" if result.failed_runs or result.skipped_runs else "completed",
         )
         return response
     except (OSError, KeyError, ValueError, RuntimeError) as e:

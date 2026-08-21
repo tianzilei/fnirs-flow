@@ -771,7 +771,12 @@ class ExecutionService:
                         "status": data_result.status,
                         "data": raw if is_read_atom else None,
                     }
-                    raw_outputs[atom_id] = raw_input
+                    # Dataset discovery produces metadata, not signal data.  Only
+                    # an explicit read atom may introduce a Raw branch into the
+                    # run DAG.  Treating every data-category predecessor as Raw
+                    # creates false fan-in conflicts at downstream joins.
+                    if is_read_atom:
+                        raw_outputs[atom_id] = raw_input
                     self._emit_progress(
                         "atom_completed",
                         run_id=run_ctx.run_id,
@@ -809,6 +814,8 @@ class ExecutionService:
                         atom_id=atom_id,
                         status=atom_result.status,
                     )
+                    if not continue_on_failure:
+                        return
                     continue
 
                 if operation == "empty_marker":
@@ -893,7 +900,12 @@ class ExecutionService:
                                 params,
                             )
                             intermediate_state[atom_id] = result
-                            raw_outputs[atom_id] = raw_input
+                            # Analysis and output atoms produce typed values
+                            # (design matrices, model results, contrasts, and
+                            # tables).  They must not masquerade as pass-through
+                            # Raw branches.  Signal input for a join is resolved
+                            # only from connected preprocessing/read atoms, with
+                            # the run's loaded Raw as the legacy fallback.
                             # Store specific results for downstream injection
                             if operation == "build_design_matrix":
                                 intermediate_state["design_matrix"] = result
@@ -925,6 +937,23 @@ class ExecutionService:
                     atom_result.status = "completed"
                     result_type = type(result).__name__ if result is not None else "None"
                     atom_result.output_handles["data"] = result_type
+                    if isinstance(result, dict):
+                        structured_warnings = result.get("warnings", [])
+                        if structured_warnings is None:
+                            structured_warnings = []
+                        elif isinstance(structured_warnings, str):
+                            structured_warnings = [structured_warnings]
+                        elif not isinstance(structured_warnings, (list, tuple, set)):
+                            structured_warnings = [structured_warnings]
+                        warning = result.get("warning")
+                        if warning:
+                            structured_warnings = [*structured_warnings, warning]
+                        for item in structured_warnings:
+                            text = str(item)
+                            if text and text not in atom_result.warnings:
+                                atom_result.warnings.append(text)
+                        if operation == "roi_output":
+                            atom_result.output_handles["n_rois"] = int(result.get("n_rois", 0))
 
                 except ExecutionCancelledError:
                     raise
@@ -1304,6 +1333,9 @@ class ExecutionService:
                     "failed_error": run.failed_error,
                     "skipped_steps": run.skipped_steps,
                     "atom_statuses": {atom.atom_id: atom.status for atom in run.atom_results},
+                    "atom_warnings": {
+                        atom.atom_id: atom.warnings for atom in run.atom_results if atom.warnings
+                    },
                 }
                 for run in result.run_results
             ],

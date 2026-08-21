@@ -70,6 +70,14 @@ class RunExecutor:
                 run_result,
                 continue_on_failure=continue_on_failure,
             )
+            # A host may stop the DAG early when continue_on_failure is false.
+            # Enforce a terminal run state here so an atom failure can never be
+            # reported as a still-running (and therefore apparently successful)
+            # execution attempt.
+            if run_result.status == "running":
+                run_result.status = (
+                    "failed" if any(item.status == "failed" for item in run_result.atom_results) else "completed"
+                )
             if run_result.status == "completed":
                 self.host._write_run_outputs(run_result, outdir)
         except Exception as exc:

@@ -8,9 +8,9 @@
       "source": ".gitignore"
     },
     {
-      "bytes": 28153,
+      "bytes": 29230,
       "path": "CHANGELOG.md",
-      "sha256": "1ccc2ef5e62f41d26424a26144204831c6a2d55f1f3ba1a7bfcdcfd4d29783ed",
+      "sha256": "5baa95e3dbebb52df47998357abbb078cdef5a27c2951af76a53cf0a32850f7f",
       "source": "CHANGELOG.md"
     },
     {
@@ -26,9 +26,9 @@
       "source": "PUBLIC_SYNC_SPEC.md"
     },
     {
-      "bytes": 10279,
+      "bytes": 10614,
       "path": "README.md",
-      "sha256": "55f2cef11cb006f9410ce46e0ef3e439811952a0e7d8c0bdaeb4a516e751e20b",
+      "sha256": "9995c25d5ab262421540df19501cd943e60716666e46f08c72ce950537979ef8",
       "source": "README.md"
     },
     {
@@ -122,9 +122,9 @@
       "source": "configs/example_task_study.json"
     },
     {
-      "bytes": 3385,
+      "bytes": 3479,
       "path": "docs/README.md",
-      "sha256": "183c41f48e7b0168c4018cae21f10f6bfc7e90b3916999d71eb066b6b44fc39d",
+      "sha256": "4759acf444f423b7b7ca07ef9bbb4ec0959f394b0c91d428b6cbdf937d765c0a",
       "source": "docs/README.md"
     },
     {
@@ -160,7 +160,7 @@
     {
       "bytes": 376,
       "path": "fnirs_flow/__init__.py",
-      "sha256": "8e48fdb96b60a66a749da390313b8bd8c0e195cfacd94b7adb5a3110a8e0ce05",
+      "sha256": "440fcc666dd1d8a2fe23e4f9bb7ab9219b6ae8a3a4fb771960caf420c092e738",
       "source": "fnirs_flow/__init__.py"
     },
     {
@@ -494,9 +494,9 @@
       "source": "fnirs_flow/application/__init__.py"
     },
     {
-      "bytes": 726,
+      "bytes": 807,
       "path": "fnirs_flow/application/data_use_cases.py",
-      "sha256": "5d9a4336a49dd09ae5f742b1160c0e5c76f183a7c5baa0fd43d74b0efcb1f3e3",
+      "sha256": "cb6f7e07de4a1e11f3589254ae053338f834002bcf800ec1c72b09cff2014873",
       "source": "fnirs_flow/application/data_use_cases.py"
     },
     {
@@ -572,15 +572,15 @@
       "source": "fnirs_flow/application/project_service.py"
     },
     {
-      "bytes": 60386,
+      "bytes": 60409,
       "path": "fnirs_flow/application/project_use_cases.py",
-      "sha256": "7350371123e807ee7235f88c9b3f1ce0279c37113d4d7f39d4b8e3e4ad6cefe1",
+      "sha256": "98595e9151e0e42ca04d80b648978d5ccdc0b510dd87e5a81d85b32ff1567f56",
       "source": "fnirs_flow/application/project_use_cases.py"
     },
     {
-      "bytes": 41893,
+      "bytes": 42595,
       "path": "fnirs_flow/cli.py",
-      "sha256": "0fbed8630aa8178e5856704af3c53b91c3082db8ea0545f7b29681ea38b5bc12",
+      "sha256": "fa045934635ea25e3763329bd479ca5a8bf46d0492bfb28c7e38439b7e8b236c",
       "source": "fnirs_flow/cli.py"
     },
     {
@@ -758,9 +758,9 @@
       "source": "fnirs_flow/execution/dag_scheduler.py"
     },
     {
-      "bytes": 10694,
+      "bytes": 11266,
       "path": "fnirs_flow/execution/engine.py",
-      "sha256": "6d749a09826caa51e99c40dbe0165639637b2bbf03bd753bebfed09c7db22b97",
+      "sha256": "d3611b263e668fb2da5030ae5b420f9d9f0dc83e45464e2a56cea366f389a6a4",
       "source": "fnirs_flow/execution/engine.py"
     },
     {
@@ -800,15 +800,15 @@
       "source": "fnirs_flow/execution/orchestrator.py"
     },
     {
-      "bytes": 64449,
+      "bytes": 66526,
       "path": "fnirs_flow/execution/orchestrator_impl.py",
-      "sha256": "331bb0cd966893ee492944afcbf3130ee0e266eeb2cb5fb758077f071ae9c678",
+      "sha256": "cfb1bb127c95e928d900b678c7aa32b449525427ba1eacc009eaaae0b5181afd",
       "source": "fnirs_flow/execution/orchestrator_impl.py"
     },
     {
-      "bytes": 3651,
+      "bytes": 3813,
       "path": "fnirs_flow/execution/plan_loader.py",
-      "sha256": "a6183149f91fe80129cc0d06a85c943f3b0cf1d0cae47e6b9509f907f1caece5",
+      "sha256": "d3ed2da70c98e7bb22ba3827c1c25d9513a011b03b322be3ee0bd875eccec76a",
       "source": "fnirs_flow/execution/plan_loader.py"
     },
     {
@@ -824,9 +824,9 @@
       "source": "fnirs_flow/execution/result_outputs.py"
     },
     {
-      "bytes": 4426,
+      "bytes": 4915,
       "path": "fnirs_flow/execution/run_executor.py",
-      "sha256": "e649b0342f695d204d206eef722a48791b85715d13b0fffa1d57864039e784cb",
+      "sha256": "0fd19b691d6afc6a9501300ae9c376f13ac93c3bdf560fd08301810f37d54901",
       "source": "fnirs_flow/execution/run_executor.py"
     },
     {
@@ -1492,13 +1492,13 @@
     {
       "bytes": 148266,
       "path": "generated/openapi.json",
-      "sha256": "429452d44aa5084d9b6e641bc7de35c4d3949e8f21b7f3d50f5ed4a7ec707818",
+      "sha256": "b1732e8d76f2289db2d461b4ffa7d9cab21895f3a0362fc77a40febb8465f918",
       "source": "generated/openapi.json"
     },
     {
       "bytes": 2804,
       "path": "pyproject.toml",
-      "sha256": "fbaa19827ef0ce9e7eff04a66b28f582a28c5f197888abcaa1292b63b1cf0b47",
+      "sha256": "3cdbae269c6197e7c17a0293b321f02c2a98b686a8cb275a52342a0eb6077ee0",
       "source": "pyproject.toml"
     },
     {
@@ -1724,9 +1724,9 @@
       "source": "tests/test_batch_runner.py"
     },
     {
-      "bytes": 3515,
+      "bytes": 7072,
       "path": "tests/test_cli.py",
-      "sha256": "6d399b025ef5ad1ba7ab4091ed1ae497e7d6499b4401bad73eb5340a10eaa04e",
+      "sha256": "3218af27efa2e7a097117eded9cb154c98d19c8310906bcd0e2dd60c22c78a8d",
       "source": "tests/test_cli.py"
     },
     {
@@ -1808,9 +1808,9 @@
       "source": "tests/test_execution_benchmark.py"
     },
     {
-      "bytes": 8492,
+      "bytes": 9800,
       "path": "tests/test_execution_components.py",
-      "sha256": "4abf743f4af20aea75766070df7e5845600b2f7839ff8e3373c94e2f28e62df7",
+      "sha256": "e12450c9ff6a4509566bbec575098f0892986bce14582a07dc37c8702be49c4c",
       "source": "tests/test_execution_components.py"
     },
     {
@@ -1826,9 +1826,9 @@
       "source": "tests/test_execution_jobs.py"
     },
     {
-      "bytes": 88580,
+      "bytes": 96750,
       "path": "tests/test_execution_service.py",
-      "sha256": "0f66602b1e003dc7baa1274f3be72d90e35d5fe64a640556a0dd686747d1abc8",
+      "sha256": "e65a80f598073a88a30bd1f314111b976b6cfca4f4bd47bd7f8d5497bc1f820a",
       "source": "tests/test_execution_service.py"
     },
     {
@@ -2200,13 +2200,13 @@
     {
       "bytes": 96475,
       "path": "webui/package-lock.json",
-      "sha256": "927b6a14c7cdd86b154a1baca69ee8d45322dfb845d6d1460cdda9c97facbcc5",
+      "sha256": "21c9c0c08bb4ae39b07d686e6997b2fd2d198f88152d848132455410b0c766eb",
       "source": "webui/package-lock.json"
     },
     {
       "bytes": 852,
       "path": "webui/package.json",
-      "sha256": "076094a2580908dc8880ca073f02b10b593af8c9f1358aa2053c5d335a9aa820",
+      "sha256": "a91624bd146c41f5309de295eee2bbe530fdeab815df33d8904a10b7e1bf940e",
       "source": "webui/package.json"
     },
     {

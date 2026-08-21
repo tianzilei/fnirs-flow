@@ -687,6 +687,30 @@ class TestExecutionRequest:
 
         assert [(run.task, run.run) for run in runs] == [("covert", "01")]
 
+    def test_entity_filters_accept_standard_bids_prefixes(self, tmp_path):
+        manifest = {
+            "subject_session_runs": [
+                {"subject": "01", "session": "pre", "task": "covert", "run": "01", "path": "a.snirf"},
+                {"subject": "02", "session": "post", "task": "overt", "run": "02", "path": "b.snirf"},
+            ]
+        }
+        (tmp_path / "data_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+        runs = ExecutionService()._resolve_runs(
+            tmp_path,
+            ExecutionRequest(
+                project_dir=str(tmp_path),
+                participant_labels=["sub-01"],
+                session_labels=["ses-pre"],
+                task_labels=["task-covert"],
+                run_labels=["run-01"],
+            ),
+        )
+
+        assert [(run.subject, run.session, run.task, run.run) for run in runs] == [
+            ("01", "pre", "covert", "01")
+        ]
+
 
 class TestExecutionFailureAggregation:
     class _Artifacts:
@@ -777,6 +801,37 @@ class TestExecutionFailureAggregation:
 
         assert result.status == "failed"
         assert [(item.atom_id, item.status) for item in result.atom_results] == [("bad-atom", "failed")]
+
+    def test_unregistered_operation_stops_before_independent_atoms(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {"atom_id": "bad", "operation": "unsupported-operation", "category": "preprocessing"},
+                {
+                    "atom_id": "later",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "parameters": {"events": "task"},
+                },
+            ],
+            "execution_layers": [["bad"], ["later"]],
+            "edges": [],
+        }
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=self._Registry()):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)),
+                {},
+                dag,
+                tmp_path,
+                continue_on_failure=False,
+            )
+
+        assert result.status == "failed"
+        assert [item.atom_id for item in result.atom_results] == ["bad"]
 
 
 class TestValidationQcExecution:
@@ -1113,6 +1168,114 @@ class TestDagBranchIsolation:
         assert "['od-a', 'od-b']" in design.error
         assert "explicit merge atom" in design.error
 
+    def test_typed_design_branch_does_not_create_false_raw_fan_in(self, tmp_path):
+        """A GLM joins signal and design inputs without treating both as Raw."""
+        from fnirs_flow.execution.engine import RunContext
+
+        class JoinAdapter(TestDagBranchIsolation._Adapter):
+            def __init__(self):
+                super().__init__()
+                self.glm_raw = None
+
+            def to_optical_density(self, _raw):
+                return "optical-density"
+
+            def fit_first_level_glm(self, raw, design_matrix, **kwargs):
+                self.glm_raw = raw
+                return super().fit_first_level_glm(raw, design_matrix, **kwargs)
+
+        class JoinRegistry:
+            def __init__(self):
+                self.adapter = JoinAdapter()
+
+            def create(self, _backend_id, **_kwargs):
+                return self.adapter
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {"atom_id": "dataset", "operation": "dataset_discovery", "category": "data"},
+                {"atom_id": "read", "operation": "read_run", "category": "data"},
+                {
+                    "atom_id": "design",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "parameters": {"events": "task"},
+                },
+                {"atom_id": "od", "operation": "optical_density", "category": "preprocessing"},
+                {"atom_id": "glm", "operation": "first_level_glm", "category": "analysis"},
+            ],
+            "execution_layers": [["dataset"], ["design", "read"], ["od"], ["glm"]],
+            "edges": [
+                {"source": "dataset", "target": "design"},
+                {"source": "dataset", "target": "read"},
+                {"source": "read", "target": "od"},
+                {"source": "design", "target": "glm"},
+                {"source": "od", "target": "glm"},
+            ],
+        }
+        registry = JoinRegistry()
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=registry):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)), {}, dag, tmp_path
+            )
+
+        assert result.status == "completed"
+        assert registry.adapter.glm_raw == "optical-density"
+        assert [(item.atom_id, item.status) for item in result.atom_results] == [
+            ("dataset", "skipped"),
+            ("design", "completed"),
+            ("read", "completed"),
+            ("od", "completed"),
+            ("glm", "completed"),
+        ]
+
+    def test_stop_on_raw_fan_in_failure_sets_terminal_failed_state(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        class BranchAdapter(TestDagBranchIsolation._Adapter):
+            def to_optical_density(self, _raw):
+                return object()
+
+        class BranchRegistry:
+            def create(self, _backend_id, **_kwargs):
+                return BranchAdapter()
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {"atom_id": "od-a", "operation": "optical_density", "category": "preprocessing"},
+                {"atom_id": "od-b", "operation": "optical_density", "category": "preprocessing"},
+                {
+                    "atom_id": "design",
+                    "operation": "build_design_matrix",
+                    "category": "analysis",
+                    "parameters": {"events": "task"},
+                },
+            ],
+            "execution_layers": [["od-a", "od-b"], ["design"]],
+            "edges": [
+                {"source": "od-a", "target": "design"},
+                {"source": "od-b", "target": "design"},
+            ],
+        }
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=BranchRegistry()):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="run-1", data_path=str(data_path)),
+                {},
+                dag,
+                tmp_path,
+                continue_on_failure=False,
+            )
+
+        assert result.status == "failed"
+        assert result.failed_step == "design"
+        assert result.failed_error_code == "EXECUTION_VALIDATION_ERROR"
+
     def test_group_core_backend_does_not_select_run_reader(self, tmp_path):
         from fnirs_flow.execution.engine import RunContext
 
@@ -1340,6 +1503,47 @@ class TestDagBranchIsolation:
         assert [row["source_atom_id"] for row in result.roi_results] == ["roi-a", "roi-b"]
         assert all("source_atom_id" not in row for value in registry.adapter.roi_inputs for row in value["channels"])
         assert (tmp_path / "derivatives/roi/sub-01_roi_results.csv").exists()
+
+    def test_structured_empty_roi_warning_is_preserved(self, tmp_path):
+        from fnirs_flow.execution.engine import RunContext
+
+        class EmptyRoiAdapter(TestDagBranchIsolation._Adapter):
+            def roi_output(self, channel_results, atlas="mni", roi_mapping=None):
+                return {
+                    "rois": [],
+                    "n_rois": 0,
+                    "atlas": atlas,
+                    "warning": "No ROI mapping provided. Only channel-level results available.",
+                }
+
+        class EmptyRoiRegistry:
+            def create(self, _backend_id, **_kwargs):
+                return EmptyRoiAdapter()
+
+        data_path = tmp_path / "run.snirf"
+        data_path.write_text("placeholder", encoding="utf-8")
+        dag = {
+            "atoms": [
+                {
+                    "atom_id": "roi",
+                    "operation": "roi_output",
+                    "category": "output",
+                    "parameters": {"channel_results": {"channels": []}},
+                }
+            ],
+            "execution_layers": [["roi"]],
+            "edges": [],
+        }
+
+        with patch("fnirs_flow.adapters.backend_registry.get_registry", return_value=EmptyRoiRegistry()):
+            result = ExecutionService()._execute_run(
+                RunContext(run_id="sub-01", data_path=str(data_path)), {}, dag, tmp_path
+            )
+
+        roi = result.atom_results[0]
+        assert roi.status == "completed"
+        assert roi.output_handles["n_rois"] == 0
+        assert roi.warnings == ["No ROI mapping provided. Only channel-level results available."]
 
     def test_atom_progress_events_are_ordered_and_detailed(self, tmp_path):
         from fnirs_flow.execution.engine import RunContext

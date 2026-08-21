@@ -54,6 +54,43 @@ def test_run_executor_projects_atom_failure_into_run_summary(tmp_path):
     assert result.failed_error == "GLM input contains non-finite values"
 
 
+def test_run_executor_finalizes_early_failed_host_return(tmp_path):
+    from fnirs_flow.execution.models import AtomExecutionResult
+
+    class FakeService:
+        def _check_cancelled(self):
+            return None
+
+        def _execute_dag(self, _run_ctx, _dag, _outdir, result, continue_on_failure=True):
+            assert not continue_on_failure
+            result.atom_results.append(
+                AtomExecutionResult(
+                    atom_id="glm",
+                    status="failed",
+                    error_code="EXECUTION_VALIDATION_ERROR",
+                    error="invalid join",
+                )
+            )
+            # Simulate a host that returns immediately without finalizing the run.
+
+        def _write_run_outputs(self, _result, _outdir):
+            raise AssertionError("failed runs must not write result tables")
+
+    data_path = tmp_path / "run.snirf"
+    data_path.write_bytes(b"fixture")
+    result = RunExecutor(FakeService()).execute(
+        RunContext(run_id="sub-01", data_path=str(data_path)),
+        {},
+        {"atoms": [{"atom_id": "glm", "execution_scope": "run"}]},
+        tmp_path,
+        continue_on_failure=False,
+    )
+
+    assert result.status == "failed"
+    assert result.failed_step == "glm"
+    assert result.failed_error == "invalid join"
+
+
 def test_dag_scheduler_splits_intra_layer_dependencies():
     layers = DAGScheduler.normalize_layers([["b", "a"]], [{"source": "a", "target": "b"}])
     assert layers == [["a"], ["b"]]

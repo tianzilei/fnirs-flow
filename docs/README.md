@@ -40,8 +40,8 @@ kept outside this code-oriented release tree.
 The repository does not include hosted CI/CD workflows. Maintainers run these
 checks locally before creating a release.
 
-The 2026-08-21 public sync passed 1,235 Python tests with 13 skips, all 24
-WebUI unit tests, Ruff, the production WebUI build, and an npm audit with no
+The 2026-08-21 public sync passed 1,245 Python tests with 13 skips, all 24
+WebUI unit tests, Ruff, the development-mode WebUI build, and an npm audit with no
 known vulnerabilities.
 
 The primary local reproduction commands are:
@@ -71,9 +71,9 @@ npm --prefix webui run build
 ```bash
 python cli.py validate configs/demo_task_glm_real.json
 python cli.py compile configs/demo_task_glm_real.json --outdir outputs/demo
-python cli.py discover bids-nirs-tapping --outdir outputs/demo
+python cli.py discover bids-nirs-tapping --outdir outputs/demo --data-root Sample/BIDS-NIRS-Tapping-master
 python cli.py dry-run outputs/demo --outdir outputs/demo
-python cli.py run outputs/demo --outdir outputs/demo
+python cli.py run outputs/demo --outdir outputs/demo --data-root Sample/BIDS-NIRS-Tapping-master
 python cli.py export outputs/demo --outdir outputs/demo --profile reproducibility_package
 python cli.py verify-package outputs/demo/package.fnirsflow.zip
 python cli.py webui

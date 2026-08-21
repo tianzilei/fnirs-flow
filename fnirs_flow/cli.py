@@ -44,7 +44,9 @@ def cmd_backends(args: argparse.Namespace) -> int:
 
     for backend_id in registry.list_all():
         is_available = registry.is_available(backend_id)
-        status = "✓ Available" if is_available else "✗ Not Available"
+        # Keep CLI status output portable across Windows code pages (for
+        # example, the default GBK console used on Chinese Windows systems).
+        status = "[OK] Available" if is_available else "[--] Not Available"
         print(f"\n{backend_id}: {status}")
 
         if is_available:
@@ -132,12 +134,16 @@ def cmd_discover(args: argparse.Namespace) -> int:
     from fnirs_flow.application.data_use_cases import discover_dataset_to_workspace
 
     try:
-        manifest = discover_dataset_to_workspace(args.dataset_id, args.outdir)
+        manifest = discover_dataset_to_workspace(
+            args.dataset_id,
+            args.outdir,
+            data_root=getattr(args, "data_root", None),
+        )
         compiled_dir = Path(args.outdir) / "compiled"
         print(f"Dataset '{args.dataset_id}' discovered")
         print(f"  Files:      {len(manifest.files)}")
         print(f"  Runs:       {len(manifest.subject_session_runs)}")
-        print(f"  Local root: {manifest.local_root}")
+        print(f"  Local root: {manifest.runtime_local_root or manifest.local_root}")
         print(f"  Output:     {compiled_dir}")
         if not manifest.files:
             print()
@@ -223,7 +229,10 @@ def cmd_run(args: argparse.Namespace) -> int:
                     if ar.error:
                         print(f"        Error: {ar.error}")
 
-        return 0 if result.failed_runs == 0 else 1
+        # A skipped real-data run means the requested analysis did not execute
+        # (most commonly because --data-root is missing or invalid).  Do not
+        # expose that state as a successful CLI exit.
+        return 0 if result.failed_runs == 0 and result.skipped_runs == 0 else 1
     except FileNotFoundError as e:
         print(f"Error: {e}")
         return 1
@@ -853,6 +862,7 @@ def main(argv: list[str] | None = None) -> int:
     p_discover = subparsers.add_parser("discover", help="Discover a public dataset")
     p_discover.add_argument("dataset_id", help="Dataset identifier")
     p_discover.add_argument("--outdir", required=True, help="Output directory")
+    p_discover.add_argument("--data-root", help="Local root directory for BIDS-NIRS data")
     p_discover.set_defaults(func=cmd_discover)
 
     p_dryrun = subparsers.add_parser("dry-run", help="Dry-run a compiled plan")
@@ -1058,6 +1068,7 @@ def main(argv: list[str] | None = None) -> int:
     p_discover_legacy = subparsers.add_parser("discover-dataset", help="[Deprecated] Use 'discover'")
     p_discover_legacy.add_argument("dataset_id", help="Dataset identifier")
     p_discover_legacy.add_argument("--outdir", required=True, help="Output directory")
+    p_discover_legacy.add_argument("--data-root", help="Local root directory for BIDS-NIRS data")
     p_discover_legacy.set_defaults(func=cmd_discover)
 
     args = parser.parse_args(argv)

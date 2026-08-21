@@ -111,6 +111,16 @@ def _build_run_id(sr: dict[str, Any], _seen: set[str] | None = None) -> str:
     return run_id
 
 
+def normalize_entity_labels(field: str, labels: list[str] | None) -> list[str]:
+    """Normalize optional BIDS-prefixed CLI labels to manifest entity values."""
+    prefix = {"subject": "sub-", "session": "ses-", "task": "task-", "run": "run-"}.get(field, "")
+    normalized = []
+    for label in labels or []:
+        value = str(label)
+        normalized.append(value[len(prefix):] if prefix and value.startswith(prefix) else value)
+    return normalized
+
+
 def dry_run(
     plan_dir: str | Path,
     data_manifest_path: str | Path | None = None,
@@ -154,10 +164,10 @@ def dry_run(
             data_manifest_path = plan_dir / "data_manifest.json"
 
     selection_filters = {
-        "subject": participant_labels or [],
-        "session": session_labels or [],
-        "task": task_labels or [],
-        "run": run_labels or [],
+        "subject": normalize_entity_labels("subject", participant_labels),
+        "session": normalize_entity_labels("session", session_labels),
+        "task": normalize_entity_labels("task", task_labels),
+        "run": normalize_entity_labels("run", run_labels),
     }
     if Path(data_manifest_path).exists():
         manifest = json.loads(Path(data_manifest_path).read_text(encoding="utf-8"))
