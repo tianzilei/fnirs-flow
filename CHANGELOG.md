@@ -8,9 +8,9 @@ This release records the current synchronized development and public trees.
 
 - Project version is `1.2.2` across Python, WebUI, API metadata, and public documentation.
 - Public release synchronization and English-only documentation checks passed.
-- Public CI now enforces architecture, runtime, generated-contract, packaging,
-  security, license, WebUI, browser, and release-version gates; version tags
-  publish verified distributions to GitHub Releases.
+- Repository-hosted CI/CD workflows have been removed. Release validation is
+  run locally, and verified distributions are published manually to GitHub
+  Releases.
 
 ### Verified - 2026-08-21 Public Sync
 
@@ -35,6 +35,8 @@ This release records the current synchronized development and public trees.
 
 ### Changed
 
+- Removed the public GitHub Actions CI and release workflows; local release
+  checks remain available under `tools/release/`.
 - Updated the public documentation index and release notices so every shipped
   document is self-contained, English-only, and limited to files present in the
   public release tree.

@@ -235,6 +235,9 @@ generated analysis artifacts, reference checkouts, caches, platform metadata,
 and submission working files. See `PUBLIC_RELEASE_MANIFEST.json` for the exact
 published file list.
 
+Repository-hosted CI/CD workflows are not included. Releases are validated
+locally with the commands in `docs/README.md` and published manually.
+
 ---
 
 ## Reference Specifications

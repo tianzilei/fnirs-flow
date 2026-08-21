@@ -48,6 +48,11 @@ Excluded content must never be present in the public repository:
 The public repository owns `.git/`, `.github/`, and `.gitattributes`; a clean
 sync preserves these paths.
 
+The public repository does not ship hosted CI/CD workflows. Maintainers run
+the documented validation commands locally and publish verified release
+artifacts manually. Other repository-owned configuration under `.github/` may
+be retained.
+
 ## Language Policy
 
 The public repository uses English for all documentation and code comments.
@@ -108,6 +113,7 @@ Confirm these conditions:
   table, reference repository, local cache, or platform metadata file appears in
   `git status --short`.
 - `.github/` and `.gitattributes` were preserved from the public repository.
+- `.github/workflows/` does not contain hosted CI/CD workflows.
 - Public documentation links resolve to files that actually exist in the public
   tree.
 

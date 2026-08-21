@@ -8,9 +8,9 @@
       "source": ".gitignore"
     },
     {
-      "bytes": 28072,
+      "bytes": 28153,
       "path": "CHANGELOG.md",
-      "sha256": "d6cc6417907992df71bfa8c5578b7d48500bea9ab00faf000712ca7febc460d4",
+      "sha256": "1ccc2ef5e62f41d26424a26144204831c6a2d55f1f3ba1a7bfcdcfd4d29783ed",
       "source": "CHANGELOG.md"
     },
     {
@@ -20,15 +20,15 @@
       "source": "LICENSE"
     },
     {
-      "bytes": 6689,
+      "bytes": 6993,
       "path": "PUBLIC_SYNC_SPEC.md",
-      "sha256": "c7d983b1ce0c41718af16dd00b4b6e6d5f12a47c4fff7434dd406a2a809a5ff4",
+      "sha256": "349c417c50f2720109d26571341ab20de2a6cf0b5a6ae1c96ab26c3f3d8b5fd0",
       "source": "PUBLIC_SYNC_SPEC.md"
     },
     {
-      "bytes": 10133,
+      "bytes": 10279,
       "path": "README.md",
-      "sha256": "7b996014c9de561da2c5bf86b0f2d894d58e31467173a28f1464e2220f81ab5b",
+      "sha256": "55f2cef11cb006f9410ce46e0ef3e439811952a0e7d8c0bdaeb4a516e751e20b",
       "source": "README.md"
     },
     {
@@ -122,9 +122,9 @@
       "source": "configs/example_task_study.json"
     },
     {
-      "bytes": 3264,
+      "bytes": 3385,
       "path": "docs/README.md",
-      "sha256": "e05baf28a1fd992547a4de8596059d2c416e91f1a4571623212553eb0db3add7",
+      "sha256": "183c41f48e7b0168c4018cae21f10f6bfc7e90b3916999d71eb066b6b44fc39d",
       "source": "docs/README.md"
     },
     {
