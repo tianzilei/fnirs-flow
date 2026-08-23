@@ -8,9 +8,9 @@
       "source": ".gitignore"
     },
     {
-      "bytes": 30082,
+      "bytes": 30898,
       "path": "CHANGELOG.md",
-      "sha256": "34815ebadaff2f7f33cf2cf24a81230627d839ba4fb9c3cb51701fea7532e7f6",
+      "sha256": "9ee253bbb07719971d5c2e2bbc9b7ad54eb5304899cc840e133521ef6d1f0d70",
       "source": "CHANGELOG.md"
     },
     {
@@ -28,7 +28,7 @@
     {
       "bytes": 10614,
       "path": "README.md",
-      "sha256": "a912b72e9dd9e2156e803ca4fcd484f34142bcdbe7433476b72784644ee9b49a",
+      "sha256": "15619b0b7cb6cf1e8d4891dba1c71d2d5aae00eab0d43dfa2b926acf97be0961",
       "source": "README.md"
     },
     {
@@ -122,9 +122,9 @@
       "source": "configs/example_task_study.json"
     },
     {
-      "bytes": 3519,
+      "bytes": 3545,
       "path": "docs/README.md",
-      "sha256": "12708d760354c335e08b1c2f5333d8f1043ae575e1d05487c408564678fe9009",
+      "sha256": "5ed111f60ba68bacddc88d4775f32eb320d8acf0c757d9da25adcb384192f334",
       "source": "docs/README.md"
     },
     {
@@ -160,7 +160,7 @@
     {
       "bytes": 376,
       "path": "fnirs_flow/__init__.py",
-      "sha256": "29037ba938e29d28334ab7b71d95e3eea83a112d689bfa69630a882a5ec6aecf",
+      "sha256": "46288ed4ff00b5c41444e101ae77f9fe1e7635b9d8d6a48fa6027228c54297b0",
       "source": "fnirs_flow/__init__.py"
     },
     {
@@ -1317,27 +1317,27 @@
     },
     {
       "bytes": 5626,
-      "path": "fnirs_flow/resources/webui/dist/assets/AtomLibrary-CS_SE-ni.js",
-      "sha256": "8dfb80a6955ba845de58dcc13cc75ac581759748c43c9c73f07a305329b8d4cb",
-      "source": "fnirs_flow/resources/webui/dist/assets/AtomLibrary-CS_SE-ni.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/AtomLibrary-DXyztLSL.js",
+      "sha256": "e81e8e07a4a105fd21deab753b15064cb4dff16ba91ff4f56cbe31907313c8cc",
+      "source": "fnirs_flow/resources/webui/dist/assets/AtomLibrary-DXyztLSL.js"
     },
     {
       "bytes": 5903,
-      "path": "fnirs_flow/resources/webui/dist/assets/CompileSummary-I_Zp5lzT.js",
-      "sha256": "14f017ca369d211e90050cd4ef12701592ba3cd23860af1571a45d814c9c9373",
-      "source": "fnirs_flow/resources/webui/dist/assets/CompileSummary-I_Zp5lzT.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/CompileSummary-Btys1fM4.js",
+      "sha256": "f8af3a282d2238518390008968799493e1b3a8c48418606a9991abd1a3084dfe",
+      "source": "fnirs_flow/resources/webui/dist/assets/CompileSummary-Btys1fM4.js"
     },
     {
       "bytes": 14826,
-      "path": "fnirs_flow/resources/webui/dist/assets/DataWorkspace-DyWrmray.js",
-      "sha256": "5d932353be3af8288b629b77905855f7f63c27454e25f94e64c565143c97d8cc",
-      "source": "fnirs_flow/resources/webui/dist/assets/DataWorkspace-DyWrmray.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/DataWorkspace-Bw53uVdE.js",
+      "sha256": "e085e52520558027bf92ef5d39bcddd213fc78eaaf9993923268175208aac419",
+      "source": "fnirs_flow/resources/webui/dist/assets/DataWorkspace-Bw53uVdE.js"
     },
     {
       "bytes": 4778,
-      "path": "fnirs_flow/resources/webui/dist/assets/ExportPackage-Dh5oiXCm.js",
-      "sha256": "d1670f5ff953efbd5a340287008012ee521691527a9131627ad55e4ad8733892",
-      "source": "fnirs_flow/resources/webui/dist/assets/ExportPackage-Dh5oiXCm.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/ExportPackage-lo3067-A.js",
+      "sha256": "c499d6bddfba6ef414f94ec865a47ad30c6262ef4b7053879bf4e65804907cda",
+      "source": "fnirs_flow/resources/webui/dist/assets/ExportPackage-lo3067-A.js"
     },
     {
       "bytes": 6990,
@@ -1346,100 +1346,100 @@
       "source": "fnirs_flow/resources/webui/dist/assets/FlowBuilder-8hax8RNO.css"
     },
     {
-      "bytes": 224384,
-      "path": "fnirs_flow/resources/webui/dist/assets/FlowBuilder-JMVN24BZ.js",
-      "sha256": "983b910141599a8ff563f5c6e03d58ff582523e96f1f29bbca4f6a72c3e95462",
-      "source": "fnirs_flow/resources/webui/dist/assets/FlowBuilder-JMVN24BZ.js"
+      "bytes": 224599,
+      "path": "fnirs_flow/resources/webui/dist/assets/FlowBuilder-CQRu0RNC.js",
+      "sha256": "7ffc959908a6220b74ea166a9f9fe58d9acca8aaf886e917115085eb79db310e",
+      "source": "fnirs_flow/resources/webui/dist/assets/FlowBuilder-CQRu0RNC.js"
     },
     {
       "bytes": 5121,
-      "path": "fnirs_flow/resources/webui/dist/assets/ImportPackage-B2oGI5-x.js",
-      "sha256": "6f5cd4979c79ff13f51f57f8060820448300843ae20bc349b087de243c25beaa",
-      "source": "fnirs_flow/resources/webui/dist/assets/ImportPackage-B2oGI5-x.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/ImportPackage-Bqkd5teY.js",
+      "sha256": "687573819842529b4dcd599fd36389e282eac49a30cfa6862a3324bd769d4954",
+      "source": "fnirs_flow/resources/webui/dist/assets/ImportPackage-Bqkd5teY.js"
     },
     {
       "bytes": 19680,
-      "path": "fnirs_flow/resources/webui/dist/assets/ProjectWorkspace-BLEJ4yo9.js",
-      "sha256": "b066878a01a97d7822aa7c1217281d6c04f52fa902175839311db9a6f55c8f6f",
-      "source": "fnirs_flow/resources/webui/dist/assets/ProjectWorkspace-BLEJ4yo9.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/ProjectWorkspace-Cd7-GGf6.js",
+      "sha256": "7bd552e72aa6680baeb23ee0b8fb175536065b2eca0d4f9ef2c44d9e360508fd",
+      "source": "fnirs_flow/resources/webui/dist/assets/ProjectWorkspace-Cd7-GGf6.js"
     },
     {
       "bytes": 10841,
-      "path": "fnirs_flow/resources/webui/dist/assets/ResultsWorkspace-CuGurpkq.js",
-      "sha256": "54093ebb79da4592e14fefdb3651b220780dd1624c91d29e25687fd76e6cf43d",
-      "source": "fnirs_flow/resources/webui/dist/assets/ResultsWorkspace-CuGurpkq.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/ResultsWorkspace-BdyYHqTF.js",
+      "sha256": "a9906f5e5003dfbd21c313806246e1a58fd7ccd42497d3b14aad9cde8c331b8f",
+      "source": "fnirs_flow/resources/webui/dist/assets/ResultsWorkspace-BdyYHqTF.js"
     },
     {
       "bytes": 10283,
-      "path": "fnirs_flow/resources/webui/dist/assets/RunMonitor-DwvWqWEq.js",
-      "sha256": "b53428c9741e5ae07965a1d104000c32fde05584bdf6dda656dac3b5054056d1",
-      "source": "fnirs_flow/resources/webui/dist/assets/RunMonitor-DwvWqWEq.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/RunMonitor-Cv0PDXSR.js",
+      "sha256": "b8fa0d6acb2e59bfe33943c5b8864b6ec8403d30514799d7bd355463a78b1e40",
+      "source": "fnirs_flow/resources/webui/dist/assets/RunMonitor-Cv0PDXSR.js"
     },
     {
       "bytes": 4762,
-      "path": "fnirs_flow/resources/webui/dist/assets/SystemDiagnostics-VAWolV8_.js",
-      "sha256": "bf771df3591e1d939e50e70d1a6e8500cb377608993d54641460c8337aa6f8fa",
-      "source": "fnirs_flow/resources/webui/dist/assets/SystemDiagnostics-VAWolV8_.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/SystemDiagnostics-zaQL5OZH.js",
+      "sha256": "9dc50c020264764733621902e08490b9dc218dabf5eedda51ad5b794792fddaf",
+      "source": "fnirs_flow/resources/webui/dist/assets/SystemDiagnostics-zaQL5OZH.js"
     },
     {
       "bytes": 5676,
-      "path": "fnirs_flow/resources/webui/dist/assets/ValidationDashboard-tNbCSZq7.js",
-      "sha256": "d00f9f6ab5594e842eac72352cfdb77fa3e81f80995c0ce253e6c96e4d98e460",
-      "source": "fnirs_flow/resources/webui/dist/assets/ValidationDashboard-tNbCSZq7.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/ValidationDashboard-CMdcnVjN.js",
+      "sha256": "22c1e24cbc9cba2265cd0040583773d1e353b8a774fb9bc2a928bbf6bd2472a5",
+      "source": "fnirs_flow/resources/webui/dist/assets/ValidationDashboard-CMdcnVjN.js"
     },
     {
       "bytes": 154,
-      "path": "fnirs_flow/resources/webui/dist/assets/arrow-right-BQ997XMU.js",
-      "sha256": "678d0c2d4cc0ed8161e289a8a78288ac2f8d87ff1604c8c542c298dd2d6c4bfc",
-      "source": "fnirs_flow/resources/webui/dist/assets/arrow-right-BQ997XMU.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/arrow-right-Dn12dhTK.js",
+      "sha256": "09b5cb4836ac762f597773c4944959a3dbeff673c2b78e4ea4aee7f1e97de620",
+      "source": "fnirs_flow/resources/webui/dist/assets/arrow-right-Dn12dhTK.js"
     },
     {
       "bytes": 194,
-      "path": "fnirs_flow/resources/webui/dist/assets/chevron-right-C6c7jtQ7.js",
-      "sha256": "55eca997562df64638ba653a2019c5b6c66c552940bdd06455fad34091894d85",
-      "source": "fnirs_flow/resources/webui/dist/assets/chevron-right-C6c7jtQ7.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/chevron-right-ChGzbdj5.js",
+      "sha256": "3cf8a4a9548cf256b75dba20d7d6c6f396f6bd4bc76d986c9507a25858ba9a66",
+      "source": "fnirs_flow/resources/webui/dist/assets/chevron-right-ChGzbdj5.js"
     },
     {
       "bytes": 196,
-      "path": "fnirs_flow/resources/webui/dist/assets/circle-x-CRX9XvFf.js",
-      "sha256": "8ebb69f320a41b376da8aa7a26963aa83716be7e115b80029cf32d0cce71f06a",
-      "source": "fnirs_flow/resources/webui/dist/assets/circle-x-CRX9XvFf.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/circle-x-DYJy463S.js",
+      "sha256": "478e512eb1c3bb22be4476c7ba13b7dcb526d445c9985737132caf0886e858d3",
+      "source": "fnirs_flow/resources/webui/dist/assets/circle-x-DYJy463S.js"
     },
     {
       "bytes": 225,
-      "path": "fnirs_flow/resources/webui/dist/assets/copy-CGKhzH8x.js",
-      "sha256": "238e11d2973a2ae49255df8f6ba85a97852eb18b20c3fcb64c2cfe38b9996ceb",
-      "source": "fnirs_flow/resources/webui/dist/assets/copy-CGKhzH8x.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/copy-Fs4cUWDj.js",
+      "sha256": "172a97e22c71c6975e148c864d69808e52c0ebfb96a609e95fb0941fa48cf10d",
+      "source": "fnirs_flow/resources/webui/dist/assets/copy-Fs4cUWDj.js"
     },
     {
       "bytes": 458,
-      "path": "fnirs_flow/resources/webui/dist/assets/file-braces-CzAHVRxX.js",
-      "sha256": "47aea16db7d2e5937d4d5d9776b1125ac22d3e18d679a5a7212648fb805d831c",
-      "source": "fnirs_flow/resources/webui/dist/assets/file-braces-CzAHVRxX.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/file-braces-Drc2-3UH.js",
+      "sha256": "b61004fd8221d09d5674d138667297b9eb54cd56ca3585f8d8166b0a9b39d6fc",
+      "source": "fnirs_flow/resources/webui/dist/assets/file-braces-Drc2-3UH.js"
     },
     {
       "bytes": 358,
-      "path": "fnirs_flow/resources/webui/dist/assets/folder-open-8EG6rOBX.js",
-      "sha256": "829a3644a07c56e5a3fb7f2555d6854391e3704c1c7c89e7aa5e33e22aa47a9b",
-      "source": "fnirs_flow/resources/webui/dist/assets/folder-open-8EG6rOBX.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/folder-open-BERU4kbT.js",
+      "sha256": "7e2605ae547dcb26afee05eb2e0e1cad91d3fdaa5ab19fc5c96f7b847917782b",
+      "source": "fnirs_flow/resources/webui/dist/assets/folder-open-BERU4kbT.js"
     },
     {
       "bytes": 218,
-      "path": "fnirs_flow/resources/webui/dist/assets/git-branch-CIY4kANQ.js",
-      "sha256": "8d5c40946b0e9560e1c31c64769ad53d293b64ee6cb8a41cab8a33de77619e11",
-      "source": "fnirs_flow/resources/webui/dist/assets/git-branch-CIY4kANQ.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/git-branch-C8FQIMd6.js",
+      "sha256": "920e44e4f7131bef67db9d2b8c8e75249c9224578472f4643263f3998fb4d2db",
+      "source": "fnirs_flow/resources/webui/dist/assets/git-branch-C8FQIMd6.js"
     },
     {
       "bytes": 319,
-      "path": "fnirs_flow/resources/webui/dist/assets/git-fork-DPV6jWRH.js",
-      "sha256": "5b1f8543122ced2fe89a242d26219f10c11b7ffeb6c6c59ee6b74b5e131a87d6",
-      "source": "fnirs_flow/resources/webui/dist/assets/git-fork-DPV6jWRH.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/git-fork-Do8EP-ls.js",
+      "sha256": "0e4e95a09e94628d5c128e6401f7425dae8a13eaa6459a779e691911c1498dee",
+      "source": "fnirs_flow/resources/webui/dist/assets/git-fork-Do8EP-ls.js"
     },
     {
       "bytes": 260380,
-      "path": "fnirs_flow/resources/webui/dist/assets/index-C38Y-5i6.js",
-      "sha256": "165d1efc10ce8be0b9056f819e0a8b706ffd70cbb5df67d5743ddc8d03701734",
-      "source": "fnirs_flow/resources/webui/dist/assets/index-C38Y-5i6.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/index-B0vXl9vI.js",
+      "sha256": "9743c81c8c4083f4a6c1fa62ebda0d2ccd9fdbb1a790b307186953565ba77bca",
+      "source": "fnirs_flow/resources/webui/dist/assets/index-B0vXl9vI.js"
     },
     {
       "bytes": 60125,
@@ -1449,38 +1449,38 @@
     },
     {
       "bytes": 410,
-      "path": "fnirs_flow/resources/webui/dist/assets/layers-CbDk5K2V.js",
-      "sha256": "64b1d8919167c47d41f23681ae494f2cc815d3fb8d838bfb7b12e634fc0d49e3",
-      "source": "fnirs_flow/resources/webui/dist/assets/layers-CbDk5K2V.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/layers-quy5ioH9.js",
+      "sha256": "912255c0ffb856c2dea4260e70369d52b635093b6be42aa16c089f6ac76e1499",
+      "source": "fnirs_flow/resources/webui/dist/assets/layers-quy5ioH9.js"
     },
     {
       "bytes": 361,
-      "path": "fnirs_flow/resources/webui/dist/assets/package-saKCZ-hz.js",
-      "sha256": "683ee1a0520a85fdeeabead2611f8c4079ebf570f8e6a8b8f80c35f05d709d83",
-      "source": "fnirs_flow/resources/webui/dist/assets/package-saKCZ-hz.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/package-BbQUAajR.js",
+      "sha256": "5e518898ac1d34bc42ac8c7a3579a66c46b7f582072dd6d3cc300b6092a3c53f",
+      "source": "fnirs_flow/resources/webui/dist/assets/package-BbQUAajR.js"
     },
     {
       "bytes": 309,
-      "path": "fnirs_flow/resources/webui/dist/assets/shield-check-Co-zRqIi.js",
-      "sha256": "37be130cc664fc7b09d38c731932181c7b2a5100bb86aa3ec5377cd982cb95b4",
-      "source": "fnirs_flow/resources/webui/dist/assets/shield-check-Co-zRqIi.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/shield-check-tBZ11WnG.js",
+      "sha256": "87784680b0a6febdc1559b8e547cf702f3cae5c141aa649eb2e3c09225cd8499",
+      "source": "fnirs_flow/resources/webui/dist/assets/shield-check-tBZ11WnG.js"
     },
     {
       "bytes": 1552,
-      "path": "fnirs_flow/resources/webui/dist/assets/sparkles-BYCtB8Lt.js",
-      "sha256": "766fc6891868fada352ad65243ccc80129fbc4c5082cf4f2a0ceea6e1dc9953a",
-      "source": "fnirs_flow/resources/webui/dist/assets/sparkles-BYCtB8Lt.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/sparkles-C5dt1fsc.js",
+      "sha256": "2e55b69756ef80812aaaf0f1022a126d39f0cd1888d6bf4229b0bb1d49b66268",
+      "source": "fnirs_flow/resources/webui/dist/assets/sparkles-C5dt1fsc.js"
     },
     {
       "bytes": 219,
-      "path": "fnirs_flow/resources/webui/dist/assets/upload-C8a34hT6.js",
-      "sha256": "747210c6aa38a3b1bccd3fc6437e868a3ba5e5da555d3e8ac398bac67551d6b2",
-      "source": "fnirs_flow/resources/webui/dist/assets/upload-C8a34hT6.js"
+      "path": "fnirs_flow/resources/webui/dist/assets/upload-GHeGckgW.js",
+      "sha256": "0acddf39813f988706c43d3b7be418e94efdcdf812a8e2b002036617751468b9",
+      "source": "fnirs_flow/resources/webui/dist/assets/upload-GHeGckgW.js"
     },
     {
       "bytes": 595,
       "path": "fnirs_flow/resources/webui/dist/index.html",
-      "sha256": "3cb6e8a7f1a983cd53730e59ba66cf7a6eeec13228495df1eaa703ac0be9c7dd",
+      "sha256": "b57c6845af8593e7721337275ca23eb30219a108b52902c31209eda9b307428c",
       "source": "fnirs_flow/resources/webui/dist/index.html"
     },
     {
@@ -1564,7 +1564,7 @@
     {
       "bytes": 2931,
       "path": "pyproject.toml",
-      "sha256": "4f39575e46de80af132fcfcd9625d854646999d937562e6404f95a47c75fde38",
+      "sha256": "ffcf76960dc71a1c629e33485e0d4ed725979b52e21992353c0510b6bf17ad05",
       "source": "pyproject.toml"
     },
     {
@@ -1646,9 +1646,9 @@
       "source": "scripts/run_ds007738_full_analysis.py"
     },
     {
-      "bytes": 17111,
+      "bytes": 17236,
       "path": "scripts/sync_public_release.py",
-      "sha256": "e8e9fe01ac5db5fb3a907558e2030a41b9daf4af50ebc381ffb21bd29a270fc0",
+      "sha256": "5d836cee20dba0721e7e2bc853cd85660c95eba00fe6b54a86ef17e37eed6f7e",
       "source": "scripts/sync_public_release.py"
     },
     {
@@ -2078,9 +2078,9 @@
       "source": "tests/test_project_uri.py"
     },
     {
-      "bytes": 2190,
+      "bytes": 2761,
       "path": "tests/test_public_sync.py",
-      "sha256": "82ba835bc572eefcba58cf191163c0d1ae3a0b184d9617d628c46db924e971d0",
+      "sha256": "625e254a3f35077cade376e3e0d9ee77213d64b8095ebca275c99c2eebb6a4d9",
       "source": "tests/test_public_sync.py"
     },
     {
@@ -2272,13 +2272,13 @@
     {
       "bytes": 96475,
       "path": "webui/package-lock.json",
-      "sha256": "05990c1e0d435df5e14c1e50f1f9ab047c2ee8fba856925bf6d186d848dfe079",
+      "sha256": "6c91f32c08675e1eb02e24ed0774f97811e67cd92e00eea6bb99e70fe5c8a5f5",
       "source": "webui/package-lock.json"
     },
     {
       "bytes": 852,
       "path": "webui/package.json",
-      "sha256": "6d8491ed0e03a03e00a13532980b3ed66ba7b4f0affc1e917afd080003b82045",
+      "sha256": "29eb0fc5addcd6cd4fe15016827b4f9f6a83f9c37b42c2985ccb1ec11c53fb46",
       "source": "webui/package.json"
     },
     {

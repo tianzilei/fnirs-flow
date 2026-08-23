@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.2.5] - 2026-08-23
+
+### Changed
+
+- Reconciled development and public release metadata after v1.2.4 so future
+  clean synchronizations preserve the published version history instead of
+  reverting public version declarations.
+- Regenerated the public release manifest from the explicit 433-file
+  whitelist and reviewed all required public Markdown for the English-only
+  release policy.
+
+### Validation
+
+- Development suite: 1,299 passed, 2 skipped.
+- Clean public suite: 1,288 passed, 13 skipped.
+- Ruff passed for `cli.py fnirs_flow tests scripts tools`.
+- WebUI unit tests: 24 passed; development build passed.
+- `npm audit --audit-level=moderate`: 0 vulnerabilities.
+- Public release dry-run, clean synchronization, forbidden-path audit,
+  English-only scan, and release-version consistency checks passed.
+
 ## [1.2.4] - 2026-08-23
 
 ### Fixed

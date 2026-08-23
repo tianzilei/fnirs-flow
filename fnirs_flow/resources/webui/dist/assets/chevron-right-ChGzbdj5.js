@@ -1,0 +1,1 @@
+import{$ as e}from"./index-B0vXl9vI.js";var t=e(`chevron-down`,[[`path`,{d:`m6 9 6 6 6-6`,key:`qrunsl`}]]),n=e(`chevron-right`,[[`path`,{d:`m9 18 6-6-6-6`,key:`mthhwq`}]]);export{t as n,n as t};

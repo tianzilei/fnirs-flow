@@ -185,6 +185,7 @@ is not copied by this script.
 """
 
 PUBLIC_RELEASE_MANIFEST = "PUBLIC_RELEASE_MANIFEST.json"
+PUBLIC_PROJECT_NAME = "fnirs-flow"
 
 
 @dataclass(frozen=True)
@@ -458,8 +459,9 @@ def build_manifest(root: Path, target: Path, plan: list[CopyItem]) -> dict[str, 
 
     return {
         "schema_version": 1,
-        "source_root_name": root.name,
-        "target_root_name": target.name,
+        # Keep host-specific checkout names out of the public manifest.
+        "source_root_name": PUBLIC_PROJECT_NAME,
+        "target_root_name": PUBLIC_PROJECT_NAME,
         "copied_file_count": len(files),
         "forbidden_public_paths": list(FORBIDDEN_PUBLIC_PATHS),
         "generated_files": [
