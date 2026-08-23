@@ -53,8 +53,8 @@ class BackendProtocol(Protocol):
         """Convert OD to haemoglobin concentration."""
         ...
 
-    def apply_block_averaging(self, raw: Any, events: Any, **kwargs: Any) -> dict[str, Any]:
-        """Apply block/trial averaging."""
+    def block_averaging(self, raw: Any, events: Any, **kwargs: Any) -> dict[str, Any]:
+        """Compute block/trial averages."""
         ...
 
     def build_design_matrix(self, raw: Any, events: Any, event_id: dict[str, int], **kwargs: Any) -> dict[str, Any]:

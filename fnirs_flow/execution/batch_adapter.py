@@ -65,6 +65,13 @@ def execute_run_with_adapter(
                     raw,
                     l_freq=params.get("l_freq", 0.01),
                     h_freq=params.get("h_freq", 0.2),
+                    filter_type=params.get("filter_type", "bandpass"),
+                    implementation=params.get("implementation", params.get("method", "fir")),
+                    **{
+                        key: value
+                        for key, value in params.items()
+                        if key not in {"l_freq", "h_freq", "filter_type", "implementation", "method"}
+                    },
                 )
             elif operation == "beer_lambert_law":
                 raw = adapter.to_haemoglobin(raw, ppf=params.get("ppf", 6.0))

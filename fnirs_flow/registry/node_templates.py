@@ -6,7 +6,7 @@ from fnirs_flow.flow.atoms import AtomPort, BackendBinding, MethodAtomCategory
 from fnirs_flow.registry.node_library import MethodAtomTemplate
 
 COMMON_PARAMETER_OPTIONS = {
-    "aggregation": ["mean", "median", "sum", "min", "max"],
+    "aggregation": ["mean"],
     "baseline_correction": ["mean", "median", "linear", "none"],
     "coding": ["dummy", "effect", "helmert"],
     "covariance_structure": ["unstructured", "diagonal", "compound_symmetry", "autoregressive"],
@@ -43,11 +43,12 @@ COMMON_PARAMETER_SPECS = {
 
 PROBABILITY_PARAMETER_NAMES = {
     "alpha",
+    "cv_threshold",
     "dropout",
     "forgetting_factor",
     "icc_threshold",
-    "n_components",
     "power",
+    "sci_threshold",
     "significance_level",
 }
 
@@ -75,7 +76,7 @@ def infer_common_parameter_spec(name: str, value: object) -> dict[str, object]:
     if isinstance(value, int | float) and not isinstance(value, bool):
         spec: dict[str, object] = {"type": "number", "control": "number"}
         normalized_name = name.lower()
-        if normalized_name in PROBABILITY_PARAMETER_NAMES or normalized_name.endswith("_threshold"):
+        if normalized_name in PROBABILITY_PARAMETER_NAMES:
             spec.update({"minimum": 0, "maximum": 1})
         elif (
             normalized_name.endswith(("freq", "frequency", "hz"))
@@ -727,7 +728,7 @@ BANDPASS_FILTER = MethodAtomTemplate(
     default_config={
         "l_freq": 0.01,
         "h_freq": 0.2,
-        "method": "fir",
+        "implementation": "fir",
         "fir_design": "firwin",
     },
     ports=[
@@ -735,7 +736,7 @@ BANDPASS_FILTER = MethodAtomTemplate(
         AtomPort(name="filtered_data", direction="out", schema="OpticalDensityData"),
     ],
     evidence_refs=["prep-bandpass-97"],
-    reference="MNE-Python: mne.filter.filter_data",
+    reference="MNE-Python: mne.io.Raw.filter",
     tags=["preprocessing", "filter", "bandpass"],
 )
 
@@ -748,7 +749,7 @@ NOTCH_FILTER = MethodAtomTemplate(
     description="Apply notch filter to remove line noise (13 studies report notch filtering)",
     default_config={
         "freqs": [50.0, 100.0],
-        "method": "fir",
+        "implementation": "fir",
         "notch_widths": 2.0,
     },
     ports=[
@@ -769,7 +770,7 @@ LOWPASS_FILTER = MethodAtomTemplate(
     description="Apply lowpass filter to fNIRS data (3 studies report lowpass filtering)",
     default_config={
         "h_freq": 0.5,
-        "method": "fir",
+        "implementation": "fir",
         "fir_design": "firwin",
     },
     ports=[
@@ -923,7 +924,7 @@ CV_CHECK = MethodAtomTemplate(
     atom_type="signal_qc",
     operation="cv_check",
     description="Coefficient of Variation quality assessment for signal stability",
-    default_config={"cv_threshold": 0.15, "window_size": 10},
+    default_config={"cv_threshold": 0.15},
     ports=[
         AtomPort(name="od_data", direction="in", schema="OpticalDensityData"),
         AtomPort(name="cv_values", direction="out", schema="FloatArray"),
@@ -940,7 +941,7 @@ SNR_CHECK = MethodAtomTemplate(
     atom_type="signal_qc",
     operation="snr_check",
     description="Signal-to-Noise Ratio quality assessment",
-    default_config={"snr_threshold": 2.0, "method": "peak_snr"},
+    default_config={"snr_threshold": 2.0, "method": "spectral_power_ratio"},
     ports=[
         AtomPort(name="od_data", direction="in", schema="OpticalDensityData"),
         AtomPort(name="snr_values", direction="out", schema="FloatArray"),
@@ -1043,6 +1044,7 @@ BLOCK_AVERAGING = MethodAtomTemplate(
         "response_window": [0, 20],
         "baseline_correction": "mean",
     },
+    parameter_options={"baseline_correction": ["mean", "zscore"]},
     ports=[
         AtomPort(name="haemoglobin", direction="in", schema="HaemoglobinData"),
         AtomPort(name="events", direction="in", schema="EventData"),
@@ -1458,8 +1460,8 @@ CHANNEL_OUTPUT = MethodAtomTemplate(
     category=MethodAtomCategory.OUTPUT,
     atom_type="data_export",
     operation="channel_output",
-    description="Export channel-level results to CSV",
-    default_config={"format": "csv"},
+    description="Prepare channel-level contrast results for report and file exporters",
+    default_config={},
     ports=[
         AtomPort(name="contrast_results", direction="in", schema="ContrastResults"),
         AtomPort(name="channel_csv", direction="out", schema="CSVFile"),
@@ -1473,8 +1475,8 @@ ROI_OUTPUT = MethodAtomTemplate(
     category=MethodAtomCategory.OUTPUT,
     atom_type="data_export",
     operation="roi_output",
-    description="Export ROI-level aggregated results",
-    default_config={"aggregation": "mean", "format": "csv"},
+    description="Aggregate channel-level results into user-supplied ROIs",
+    default_config={"aggregation": "mean"},
     ports=[
         AtomPort(name="contrast_results", direction="in", schema="ContrastResults"),
         AtomPort(name="roi_csv", direction="out", schema="CSVFile"),
@@ -1817,7 +1819,7 @@ CEDALION_SNIRF_READER = MethodAtomTemplate(
     tags=["data", "snirf", "cedalion"],
     backend_binding=BackendBinding(
         backend_id="cedalion",
-        operation="snirf_read",
+        operation="read_run",
         version_spec=">=26.5,<27",
     ),
 )
@@ -1838,7 +1840,7 @@ CEDALION_OPTICAL_DENSITY = MethodAtomTemplate(
     tags=["preprocessing", "optical_density", "cedalion"],
     backend_binding=BackendBinding(
         backend_id="cedalion",
-        operation="int2od",
+        operation="to_optical_density",
         version_spec=">=26.5,<27",
     ),
 )
@@ -1859,7 +1861,7 @@ CEDALION_BEER_LAMBERT = MethodAtomTemplate(
     tags=["preprocessing", "beer_lambert", "cedalion"],
     backend_binding=BackendBinding(
         backend_id="cedalion",
-        operation="od2conc",
+        operation="to_haemoglobin",
         version_spec=">=26.5,<27",
     ),
 )

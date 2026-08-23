@@ -435,6 +435,7 @@ def roi_output(
     channel_results: dict[str, Any],
     atlas: str = "mni",
     roi_mapping: dict[str, list[int]] | None = None,
+    aggregation: str = "mean",
 ) -> dict[str, Any]:
     """Export ROI-level results by averaging channels within ROIs.
 
@@ -447,6 +448,8 @@ def roi_output(
     Returns:
         Dictionary with ROI-level results
     """
+    if aggregation != "mean":
+        raise ValueError("roi_output currently supports only aggregation='mean'")
     if roi_mapping is None:
         return {
             "rois": [],
@@ -478,4 +481,5 @@ def roi_output(
         "rois": rois,
         "n_rois": len(rois),
         "atlas": atlas,
+        "aggregation": aggregation,
     }

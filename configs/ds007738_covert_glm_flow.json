@@ -57,7 +57,7 @@
     },
     {
       "id": "filtering", "type": "filtering", "atom_type": "filtering", "operation": "filtering", "category": "preprocessing", "position": {"x": 640, "y": 40},
-      "config": {"l_freq": 0.01, "h_freq": 0.2},
+      "config": {"l_freq": 0.01, "h_freq": 0.2, "filter_type": "bandpass", "implementation": "fir", "fir_design": "firwin"},
       "ports": [
         {"name": "corrected_data", "direction": "in", "schema": "OpticalDensityData", "required": true},
         {"name": "filtered_data", "direction": "out", "schema": "OpticalDensityData", "required": true}

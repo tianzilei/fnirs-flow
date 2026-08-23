@@ -99,16 +99,25 @@ class TestLiteratureDerivedMethodAtoms:
         assert "source_atom_id" not in atom.config
         assert atom.metadata["source_atom_id"] == "ATOM_descriptive_statistics"
 
+    def test_literature_candidates_are_not_executable_defaults(self):
+        template = next(
+            item for item in LITERATURE_METHOD_ATOM_TEMPLATES if item.template_id == "atom_motion_correction"
+        )
+        assert "method" not in template.default_config
+        assert "method" in template.metadata["parameter_candidates"]
+        assert template.default_readiness_status.value == "needs_attention"
+
     def test_nirs_spm_spatial_registration_projection_atom(self):
         library = create_builtin_library()
         template = library.get("atom_nirs_spm_spatial_registration_projection")
         assert template is not None
         assert template.operation == "nirs_spm_spatial_registration_projection"
         assert "NIRS_SPM_UsersGuide_v4_spatial_registration" in template.evidence_refs
-        assert template.default_config["software"] == "NIRS-SPM v4 r1"
-        assert template.default_config["mri_registration_algorithm"] == "Horn absolute orientation"
-        assert template.default_config["template_registration_algorithm"] == "NFRI MNI estimation"
-        assert template.default_config["projection_sequence"] == [
+        assert template.metadata["parameter_candidates"]["software"] == "NIRS-SPM v4 r1"
+        assert "software" not in template.default_config
+        assert template.metadata["parameter_candidates"]["mri_registration_algorithm"] == "Horn absolute orientation"
+        assert template.metadata["parameter_candidates"]["template_registration_algorithm"] == "NFRI MNI estimation"
+        assert template.metadata["parameter_candidates"]["projection_sequence"] == [
             "rendered_brain",
             "hypothetical_head_surface",
             "cortical_surface",

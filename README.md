@@ -20,7 +20,7 @@ fall back to serial before execution starts. Benchmark both modes on the target
 machine with `tools/benchmark/run_execution_benchmark.py`; Windows process
 startup can make small workloads slower.
 
-**v1.2.3** | Python 3.10+
+**v1.2.4** | Python 3.10+
 
 ---
 

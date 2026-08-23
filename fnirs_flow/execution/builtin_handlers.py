@@ -12,7 +12,7 @@ from fnirs_flow.execution.operations import OperationContext, OperationHandler, 
 
 
 def _public_params(params: dict[str, Any], *, exclude: set[str] | None = None) -> dict[str, Any]:
-    excluded = {"method", *(exclude or set())}
+    excluded = set(exclude or set())
     return {key: value for key, value in params.items() if not key.startswith("_") and key not in excluded}
 
 
@@ -30,6 +30,13 @@ class BuiltinOperationHandler(OperationHandler):
         return handler(context)
 
     @staticmethod
+    def _execute_read_run(context: OperationContext) -> Any:
+        filepath = context.parameters.get("filepath") or context.parameters.get("path")
+        if filepath is None:
+            raise ValueError("read_run requires 'filepath' or 'path'")
+        return context.adapter.read_run(filepath)
+
+    @staticmethod
     def _execute_optical_density(context: OperationContext) -> Any:
         kwargs: dict[str, Any] = {}
         if "cedalion" in getattr(context.adapter, "versions", {}):
@@ -39,25 +46,41 @@ class BuiltinOperationHandler(OperationHandler):
     def _execute_compute_qc(self, context: OperationContext) -> Any:
         params = context.parameters
         declared = str(params.get("_declared_operation") or self.spec.operation_id)
-        advanced = declared in {"cv_check", "snr_check", "bad_channel_detection"} and hasattr(
-            context.adapter, "compute_advanced_qc"
-        )
 
         def call(source: Any) -> Any:
-            if advanced:
+            if declared == "sci_check":
+                return context.adapter.compute_sci_qc(
+                    source,
+                    l_freq=params.get("l_freq", 0.7),
+                    h_freq=params.get("h_freq", 1.5),
+                    threshold=params.get("threshold", 0.8),
+                )
+            if declared == "cv_check":
+                return context.adapter.compute_cv_qc(
+                    source,
+                    cv_threshold=params.get("cv_threshold", 0.15),
+                )
+            if declared == "snr_check":
+                return context.adapter.compute_snr_qc(
+                    source,
+                    snr_threshold=params.get("snr_threshold", 2.0),
+                    method=params.get("method", "spectral_power_ratio"),
+                )
+            if declared == "bad_channel_detection":
                 return context.adapter.compute_advanced_qc(
                     source,
                     sci_threshold=params.get("sci_threshold", params.get("threshold", 0.8)),
                     cv_threshold=params.get("cv_threshold", params.get("threshold", 0.15)),
                     snr_threshold=params.get("snr_threshold", params.get("threshold", 2.0)),
                 )
-            try:
-                return context.adapter.compute_qc(
-                    source,
-                    sci_threshold=params.get("sci_threshold", params.get("threshold", 0.8)),
-                )
-            except TypeError:
-                return context.adapter.compute_qc(source)
+            return context.adapter.compute_qc(
+                source,
+                sci_threshold=params.get("sci_threshold", params.get("threshold", 0.8)),
+                sd_distance_min=params.get("sd_distance_min", 0.01),
+                sd_distance_max=params.get("sd_distance_max", 0.08),
+                min_sci_pass_rate=params.get("min_sci_pass_rate"),
+                preset=params.get("preset"),
+            )
 
         try:
             return call(context.raw)
@@ -70,24 +93,29 @@ class BuiltinOperationHandler(OperationHandler):
         params = context.parameters
         declared = str(params.get("_declared_operation") or self.spec.operation_id)
         aliases = {"tddr", "wavelet", "spline", "ica", "pca", "cbsi"}
-        method = params.get("method") or (declared if declared in aliases else "tddr")
+        method = declared if declared in aliases else params.get("method", "tddr")
         return context.adapter.apply_motion_correction(
             context.raw,
             method=method,
-            **_public_params(params),
+            **_public_params(params, exclude={"method"}),
         )
 
     def _execute_filtering(self, context: OperationContext) -> Any:
         params = context.parameters
         declared = str(params.get("_declared_operation") or self.spec.operation_id)
         aliases = {"bandpass", "notch", "lowpass"}
-        method = params.get("method") or (declared if declared in aliases else "bandpass")
+        filter_type = declared if declared in aliases else params.get("filter_type", "bandpass")
+        implementation = params.get("implementation", params.get("method", "fir"))
         return context.adapter.apply_filter(
             context.raw,
             l_freq=params.get("l_freq", 0.01),
             h_freq=params.get("h_freq", 0.2),
-            method=method,
-            **_public_params(params, exclude={"l_freq", "h_freq"}),
+            filter_type=filter_type,
+            implementation=implementation,
+            **_public_params(
+                params,
+                exclude={"l_freq", "h_freq", "filter_type", "implementation", "method"},
+            ),
         )
 
     @staticmethod
@@ -98,15 +126,13 @@ class BuiltinOperationHandler(OperationHandler):
         return context.adapter.to_haemoglobin(context.raw, **kwargs)
 
     @staticmethod
-    def _execute_combat_harmonization(context: OperationContext) -> Any:
-        return context.raw
-
-    @staticmethod
     def _execute_block_averaging(context: OperationContext) -> Any:
         return context.adapter.block_averaging(
             context.raw,
             baseline_window=context.parameters.get("baseline_window", [-5, 0]),
             response_window=context.parameters.get("response_window", [0, 20]),
+            baseline_correction=context.parameters.get("baseline_correction", "mean"),
+            events=context.parameters.get("events"),
         )
 
     @staticmethod
@@ -162,6 +188,7 @@ class BuiltinOperationHandler(OperationHandler):
             channel_results,
             atlas=context.parameters.get("atlas", "mni"),
             roi_mapping=context.parameters.get("roi_mapping"),
+            aggregation=context.parameters.get("aggregation", "mean"),
         )
 
 

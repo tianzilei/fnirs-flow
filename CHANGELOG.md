@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.2.4] - 2026-08-23
+
+### Fixed
+
+- Corrected MethodAtom execution semantics and backend contracts across the
+  MNE-NIRS adapter, QC operations, filtering, motion correction, ROI output,
+  and compile-gate backend validation.
+- Added executable scientific and deep-learning MethodAtom handlers and
+  synchronized the public MethodAtom evidence, parameter, slot, risk, and
+  reporting assets.
+- Added the public release validation coverage for the synchronized handlers
+  and evidence-library assets.
+
+### Validation
+
+- Public Python suite: 1,287 passed, 13 skipped.
+- Stratified ds007738 numerical comparison: 9 runs and 81 operation checks
+  passed within `rtol=1e-10`, `atol=1e-12`.
+- All completed ds007738 comparison: 55 runs and 495 operation checks passed
+  within the same tolerances.
+- Independently installed wheel black-box checks passed.
+
 ## [1.2.3] - 2026-08-21
 
 ### Fixed

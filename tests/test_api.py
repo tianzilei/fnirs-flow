@@ -817,7 +817,7 @@ def test_atom_templates():
     assert study_design["parameter_specs"]["design_type"]["control"] == "select"
     bandpass = next(template for template in templates if template["id"] == "bandpass_filter")
     assert bandpass["parameter_specs"]["l_freq"] == {"type": "number", "control": "number", "minimum": 0}
-    assert set(bandpass["operation_contract"]["handler_backends"]) == {"cedalion", "mne_nirs"}
+    assert set(bandpass["operation_contract"]["handler_backends"]) == {"mne_nirs"}
     assert bandpass["operation_contract"]["execution_scope"] == "run"
     bids_import = next(template for template in templates if template["id"] == "bids_import")
     assert bids_import["parameter_specs"]["bids_dir"]["control"] == "path"

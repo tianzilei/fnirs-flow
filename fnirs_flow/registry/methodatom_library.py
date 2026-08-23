@@ -152,20 +152,37 @@ def _default_config(row: dict[str, str]) -> dict[str, Any]:
     parameters = _safe_json(row.get("parameters", ""), {})
     if not isinstance(parameters, dict):
         parameters = {"value": parameters}
+    parameter_status = _safe_json(row.get("parameter_status", ""), {})
+    if not isinstance(parameter_status, dict):
+        parameter_status = {}
+
+    # Literature values are candidates unless the library explicitly records
+    # a reviewed project default.  Passing reported/inferred values directly
+    # to an adapter turns evidence into an accidental executable policy.
+    executable_defaults = {
+        key: value
+        for key, value in parameters.items()
+        if parameter_status.get(key) == "project_default"
+    }
+    execution_readiness = (
+        row.get("execution_readiness", "").strip()
+        or row.get("readiness_status", "").strip()
+        or "needs_attention"
+    )
     return {
-        **parameters,
+        **executable_defaults,
         "source_atom_id": row.get("atom_id", ""),
         "source_study_id": row.get("study_id", ""),
         "target_flow_slot": row.get("target_flow_slot", ""),
         "scenario": row.get("scenario", ""),
-        "readiness_status": row.get("method_readiness", "").strip()
-        or row.get("readiness_status", ""),
-        "execution_readiness": row.get("execution_readiness", "").strip()
-        or row.get("readiness_status", ""),
+        "readiness_status": execution_readiness,
+        "execution_readiness": execution_readiness,
         "execution_scope": row.get("execution_scope", "").strip() or "run",
         "missing_for_execution": row.get("missing_for_execution", "").strip(),
         "confidence": row.get("confidence", ""),
         "review_required": row.get("review_required", ""),
+        "parameter_candidates": parameters,
+        "parameter_status": parameter_status,
     }
 
 
@@ -198,9 +215,18 @@ def load_literature_method_atom_templates(
             get_cedalion_binding, is_verified_cedalion_atom = _cedalion_enrichment()
             backend_operation = get_cedalion_binding(atom_id)
             default_config = _default_config(row)
-            if backend_operation and not is_verified_cedalion_atom(atom_id):
+            verified_backend_binding = bool(
+                backend_operation and is_verified_cedalion_atom(atom_id)
+            )
+            if backend_operation and not verified_backend_binding:
                 default_config["readiness_status"] = "needs_attention"
                 default_config["verification_status"] = "contract_test_required"
+            elif not backend_operation:
+                # A literature method can be methodologically ready without
+                # having an executable project binding.  Keep that distinction
+                # visible on the canvas and at the compile gate.
+                default_config["readiness_status"] = "needs_attention"
+                default_config["verification_status"] = "backend_binding_required"
             tags = [
                 "literature_derived",
                 "methodatom_library",

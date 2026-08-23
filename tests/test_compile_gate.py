@@ -23,12 +23,11 @@ class TestCompileGateErrors:
         with pytest.raises(ValueError, match="Unknown operation: not_registered_anywhere"):
             compile_flow(flow, tmp_path / "out")
 
-    def test_rejects_registered_operation_without_handler(self, tmp_path):
+    def test_registered_scientific_operation_has_handler(self, tmp_path):
         flow = _demo_flow()
         flow["nodes"][0]["config"]["operation"] = "mara"
-
-        with pytest.raises(ValueError, match="Operation mara has no registered handler"):
-            compile_flow(flow, tmp_path / "out")
+        result = compile_flow(flow, tmp_path / "out")
+        assert result.plan is not None
 
     def test_rejects_missing_flow_id(self, tmp_path):
         flow = _demo_flow()
@@ -57,10 +56,42 @@ class TestCompileGateErrors:
         assert "flow_id" in msg or "Flow" in msg
 
     def test_allows_low_risk_flows(self, tmp_path):
-        flow = _demo_flow()
+        flow = json.loads((Path(__file__).parent.parent / "configs" / "ds007738_covert_glm_flow.json").read_text())
         result = compile_flow(flow, tmp_path / "out")
         assert result.plan is not None
         assert result.execution_dag is not None
+
+    @pytest.mark.parametrize(
+        "operation",
+        [
+            "combat_harmonization",
+            "linear_mixed_effects_glm",
+            "nuisance_glm",
+            "site_covariate_glm",
+            "cbsi",
+        ],
+    )
+    def test_scientific_methods_compile_or_enforce_scope(self, tmp_path, operation):
+        flow = json.loads((Path(__file__).parent.parent / "configs" / "ds007738_covert_glm_flow.json").read_text())
+        node = next(item for item in flow["nodes"] if item["id"] == "filtering")
+        node["operation"] = operation
+        node["type"] = operation
+        node["atom_type"] = operation
+        node["backend_binding"]["operation"] = operation
+        if operation in {"linear_mixed_effects_glm", "site_covariate_glm"}:
+            node["config"]["execution_scope"] = "group"
+            result = compile_flow(flow, tmp_path / operation)
+            assert result.plan is not None
+        else:
+            result = compile_flow(flow, tmp_path / operation)
+            assert result.plan is not None
+
+    @pytest.mark.parametrize("operation", ["multi_site_harmonization", "mixed_effects_glm"])
+    def test_non_methodatom_scenario_aliases_fail_closed(self, tmp_path, operation):
+        flow = _demo_flow()
+        flow["nodes"][0]["config"]["operation"] = operation
+        with pytest.raises(ValueError, match="Unknown operation"):
+            compile_flow(flow, tmp_path / operation)
 
 
 class TestCompileGateFatalRisks:

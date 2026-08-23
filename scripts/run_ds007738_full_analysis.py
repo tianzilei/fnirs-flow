@@ -348,7 +348,14 @@ def process_run(run: RunRecord, index: int, total: int) -> dict[str, Any]:
             return payload
 
         raw_mc = adapter.apply_motion_correction(raw_od, method="tddr")
-        raw_filt = adapter.apply_filter(raw_mc, l_freq=0.01, h_freq=0.2, method="bandpass")
+        raw_filt = adapter.apply_filter(
+            raw_mc,
+            l_freq=0.01,
+            h_freq=0.2,
+            filter_type="bandpass",
+            implementation="fir",
+            fir_design="firwin",
+        )
         raw_hb = adapter.to_haemoglobin(raw_filt, ppf=6.0)
 
         try:

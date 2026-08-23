@@ -22,8 +22,7 @@ class OperationHandler(Protocol):
 
     spec: OperationSpec
 
-    def execute(self, context: Any) -> Any:
-        ...
+    def execute(self, context: Any) -> Any: ...
 
 
 @dataclass
@@ -61,9 +60,36 @@ class DelegatedOperationHandler:
 
     def execute(self, context: OperationContext) -> Any:
         raise ValueError(
-            f"Operation {self.spec.operation_id} must be executed by its "
-            f"{self.spec.execution_scope}-scope executor"
+            f"Operation {self.spec.operation_id} must be executed by its {self.spec.execution_scope}-scope executor"
         )
+
+
+class BackendMethodOperationHandler:
+    """Invoke an explicitly verified adapter method for a MethodAtom."""
+
+    def __init__(self, spec: OperationSpec, method_name: str) -> None:
+        self.spec = spec
+        self.method_name = method_name
+
+    def execute(self, context: OperationContext) -> Any:
+        method = getattr(context.adapter, self.method_name, None)
+        if method is None or not callable(method):
+            raise ValueError(
+                f"Backend {getattr(context.adapter, 'backend_id', 'unknown')} does not implement {self.method_name}"
+            )
+        parameters = {key: value for key, value in context.parameters.items() if not key.startswith("_")}
+        if context.raw is None:
+            return method(**parameters)
+        return method(context.raw, **parameters)
+
+
+def backend_method_factory(method_name: str) -> Callable[[OperationSpec], OperationHandler]:
+    """Build a handler factory for a reviewed adapter method binding."""
+
+    def factory(spec: OperationSpec) -> OperationHandler:
+        return BackendMethodOperationHandler(spec, method_name)
+
+    return factory
 
 
 def reviewed_noop_factory(spec: OperationSpec) -> OperationHandler:
@@ -95,6 +121,8 @@ class OperationSpec:
     def handler_factory_for(self, backend_id: str | None = None) -> Callable[..., OperationHandler] | None:
         if backend_id and backend_id in self.backend_handler_factories:
             return self.backend_handler_factories[backend_id]
+        if backend_id and self.supported_backends and backend_id not in self.supported_backends:
+            return None
         return self.handler_factory
 
 
@@ -182,6 +210,7 @@ class OperationRegistry:
 
 
 OPERATION_ALIASES: dict[str, str] = {
+    "snirf_reader": "read_run",
     "optical_density_conversion": "optical_density",
     "qc_metrics": "compute_qc",
     "sci_check": "compute_qc",
@@ -193,18 +222,12 @@ OPERATION_ALIASES: dict[str, str] = {
     "spline": "motion_correction",
     "ica": "motion_correction",
     "pca": "motion_correction",
-    "cbsi": "motion_correction",
     "bandpass": "filtering",
     "notch": "filtering",
     "lowpass": "filtering",
     "mbll": "beer_lambert_law",
     "design_matrix": "build_design_matrix",
     "contrast": "estimate_contrast",
-    "multi_site_harmonization": "combat_harmonization",
-    "linear_mixed_effects_glm": "first_level_glm",
-    "mixed_effects_glm": "first_level_glm",
-    "nuisance_glm": "first_level_glm",
-    "site_covariate_glm": "first_level_glm",
 }
 
 
@@ -219,10 +242,8 @@ def create_default_registry() -> OperationRegistry:
 
     registry = OperationRegistry()
 
-    scientific_handlers = {
-        "mne_nirs": builtin_handler_factory,
-        "cedalion": builtin_handler_factory,
-    }
+    mne_handlers = {"mne_nirs": builtin_handler_factory}
+    cedalion_handlers = {"cedalion": builtin_handler_factory}
 
     # Preprocessing operations
     registry.register(
@@ -237,6 +258,7 @@ def create_default_registry() -> OperationRegistry:
     )
     for op_id, desc in [
         ("read_run", "Read raw SNIRF/BIDS-NIRS data"),
+        ("snirf_reader", "Read a SNIRF run with the selected backend"),
         ("optical_density", "Convert raw intensity to optical density"),
         ("optical_density_conversion", "Alias for optical_density used by node templates"),
         ("compute_qc", "Compute quality control metrics"),
@@ -251,23 +273,31 @@ def create_default_registry() -> OperationRegistry:
         ("spline", "Alias for motion_correction with spline method"),
         ("ica", "Alias for motion_correction with ICA method"),
         ("pca", "Alias for motion_correction with PCA method"),
-        ("cbsi", "Alias for motion_correction with CBSI method"),
         ("filtering", "Apply bandpass/notch filtering"),
         ("bandpass", "Alias for filtering with bandpass method"),
         ("notch", "Alias for filtering with notch method"),
         ("lowpass", "Alias for filtering with lowpass method"),
         ("beer_lambert_law", "Convert OD to haemoglobin concentration"),
         ("mbll", "Alias for beer_lambert_law used by node templates"),
-        ("combat_harmonization", "Reviewed pass-through placeholder for ComBat harmonization"),
-        ("multi_site_harmonization", "Alias for combat_harmonization used by legacy demo flows"),
     ]:
+        backend_handlers = dict(mne_handlers)
+        if op_id in {
+            "read_run",
+            "snirf_reader",
+            "optical_density",
+            "optical_density_conversion",
+            "beer_lambert_law",
+            "mbll",
+        }:
+            backend_handlers.update(cedalion_handlers)
         registry.register(
             OperationSpec(
                 operation_id=op_id,
                 category="preprocessing",
                 description=desc,
+                supported_backends=sorted(backend_handlers),
                 handler_factory=builtin_handler_factory,
-                backend_handler_factories=scientific_handlers,
+                backend_handler_factories=backend_handlers,
             )
         )
 
@@ -276,10 +306,6 @@ def create_default_registry() -> OperationRegistry:
         ("build_design_matrix", "Construct GLM design matrix from events"),
         ("design_matrix", "Alias for build_design_matrix used by legacy demo flows"),
         ("first_level_glm", "Fit first-level GLM (HbO/HbR)"),
-        ("linear_mixed_effects_glm", "Legacy/template advanced GLM alias executed with first-level GLM semantics"),
-        ("mixed_effects_glm", "Legacy advanced GLM alias executed with first-level GLM semantics"),
-        ("nuisance_glm", "Legacy/template nuisance GLM alias executed with first-level GLM semantics"),
-        ("site_covariate_glm", "Legacy site-covariate GLM alias executed with first-level GLM semantics"),
         ("estimate_contrast", "Estimate linear contrasts"),
         ("contrast", "Alias for estimate_contrast used by legacy demo flows"),
         ("channel_output", "Export channel-level results"),
@@ -291,15 +317,11 @@ def create_default_registry() -> OperationRegistry:
                 operation_id=op_id,
                 category="analysis",
                 description=desc,
+                supported_backends=["mne_nirs"],
                 handler_factory=builtin_handler_factory,
-                backend_handler_factories=scientific_handlers,
+                backend_handler_factories=mne_handlers,
             )
         )
-
-    for group_alias in ("linear_mixed_effects_glm", "site_covariate_glm"):
-        spec = registry.get(group_alias)
-        if spec is not None:
-            spec.execution_scope = "group"
 
     # Report operations
     for op_id, desc in [
@@ -370,10 +392,13 @@ def create_default_registry() -> OperationRegistry:
             )
         )
 
-    # Complete the contract catalog from declarative MethodAtom templates.
-    # This keeps compilation and the WebUI catalog on the same source of truth;
-    # operations without an execution implementation remain explicit reviewed
-    # metadata/control operations rather than unknown dispatcher fall-throughs.
+    # Complete the discovery catalog from declarative MethodAtom templates.
+    # Catalog presence is deliberately separate from executability: an
+    # unimplemented scientific MethodAtom has no handler and therefore fails
+    # the compile gate instead of degrading to a pass-through.
+    from fnirs_flow.adapters.cedalion_bindings import is_verified_cedalion_atom
+    from fnirs_flow.execution.deep_learning_handlers import DEEP_LEARNING_OPERATIONS, deep_learning_handler_factory
+    from fnirs_flow.execution.scientific_handlers import SCIENTIFIC_OPERATIONS, generic_handler_factory
     from fnirs_flow.registry.atom_templates import ALL_METHOD_ATOM_TEMPLATES
 
     for template in ALL_METHOD_ATOM_TEMPLATES:
@@ -381,33 +406,51 @@ def create_default_registry() -> OperationRegistry:
         if not operation_id or registry.has(operation_id):
             continue
         scope = template.default_execution_scope or "run"
+        if operation_id in {
+            "combat_harmonization",
+            "linear_mixed_effects_glm",
+            "site_covariate_glm",
+            "group_glm_nirs_spm",
+        }:
+            scope = "group"
+        verified_backend_handlers: dict[str, Callable[..., OperationHandler]] = {}
+        if (
+            template.backend_binding
+            and template.metadata.get("source_atom_id")
+            and is_verified_cedalion_atom(str(template.metadata["source_atom_id"]))
+        ):
+            verified_backend_handlers[template.backend_binding.backend_id] = backend_method_factory(
+                template.backend_binding.operation
+            )
+        scientific_handler = generic_handler_factory if operation_id in SCIENTIFIC_OPERATIONS else None
+        operation_handler = scientific_handler or (
+            deep_learning_handler_factory if operation_id in DEEP_LEARNING_OPERATIONS else None
+        )
+        declared_backend_handlers = dict(verified_backend_handlers)
+        # Literature Cedalion atoms retain their explicit backend binding.  A
+        # binding becomes executable only when its wrapper is present; the
+        # template verification/readiness fields still control compile-time
+        # approval and make the unverified state visible to users.
+        if template.backend_binding and not declared_backend_handlers:
+            declared_backend_handlers[template.backend_binding.backend_id] = backend_method_factory(
+                template.backend_binding.operation
+            )
         registry.register(
             OperationSpec(
                 operation_id=operation_id,
                 category=str(template.category.value),
-                input_schemas=[
-                    port.port_schema for port in template.ports if port.direction == "in" and port.required
-                ],
+                input_schemas=[port.port_schema for port in template.ports if port.direction == "in" and port.required],
                 output_schemas=[port.port_schema for port in template.ports if port.direction == "out"],
                 capabilities=list(template.required_capabilities),
                 execution_scope=scope,
                 supported_backends=[template.backend_binding.backend_id] if template.backend_binding else [],
                 description=template.description,
-                allow_reviewed_noop=template.category.value in {"data", "design", "validation", "export"},
-                handler_factory=(
-                    reviewed_noop_factory
-                    if template.category.value in {"data", "design", "validation", "export"}
-                    else None
-                ),
+                allow_reviewed_noop=operation_id == "study_design",
+                handler_factory=(reviewed_noop_factory if operation_id == "study_design" else operation_handler),
                 backend_handler_factories=(
-                    {template.backend_binding.backend_id: reviewed_noop_factory}
-                    if template.backend_binding
-                    and template.category.value in {"data", "design", "validation", "export"}
-                    else (
-                        {"core": reviewed_noop_factory}
-                        if template.category.value in {"data", "design", "validation", "export"}
-                        else {}
-                    )
+                    declared_backend_handlers
+                    or ({"core": reviewed_noop_factory} if operation_id == "study_design" else {})
+                    or ({"mne_nirs": operation_handler} if operation_handler else {})
                 ),
             )
         )

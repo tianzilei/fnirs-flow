@@ -1,6 +1,6 @@
 # Documentation Index
 
-> Last updated: 2026-08-21
+> Last updated: 2026-08-23
 
 This page indexes the public documentation shipped with the release tree.
 Private research notes, literature worktables, generated outputs, caches, and
@@ -40,9 +40,9 @@ kept outside this code-oriented release tree.
 The repository does not include hosted CI/CD workflows. Maintainers run these
 checks locally before creating a release.
 
-The 2026-08-21 public sync passed 1,245 Python tests with 13 skips, all 24
-WebUI unit tests, Ruff, the development-mode WebUI build, and an npm audit with no
-known vulnerabilities.
+The 2026-08-23 public release passed 1,287 Python tests with 13 skips. The
+release also passed the public wheel black-box checks and the documented
+MethodAtom/adapter numerical comparisons on the completed ds007738 runs.
 
 The primary local reproduction commands are:
 

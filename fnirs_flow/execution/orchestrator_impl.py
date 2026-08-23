@@ -743,7 +743,7 @@ class ExecutionService:
 
                 # Data loading happens before DAG dispatch, but it still receives
                 # a first-class atom result so the UI can show its derivative files.
-                if category == "data":
+                if category == "data" and operation in {"dataset_discovery", "read_run"}:
                     is_read_atom = operation == "read_run"
                     data_result = AtomExecutionResult(
                         atom_id=atom_id,
@@ -893,6 +893,7 @@ class ExecutionService:
                             if operation == "compute_qc" and isinstance(result, dict):
                                 run_result.qc_summary[atom_id] = result
                         elif category in ("analysis", "output"):
+                            params.setdefault("_declared_operation", declared_operation)
                             result = self._dispatch_analysis(
                                 adapter,
                                 raw_input,
@@ -929,9 +930,16 @@ class ExecutionService:
                                     enriched_row = dict(row)
                                     enriched_row.setdefault("source_atom_id", atom_id)
                                     run_result.roi_results.append(enriched_row)
+                        elif spec := self.registry.get(declared_operation) or self.registry.get(operation):
+                            if spec.handler_factory_for(getattr(adapter, "backend_id", None)) is None:
+                                raise ValueError(f"Operation has no registered handler: {declared_operation}")
+                            result = self.dispatcher.execute(
+                                declared_operation if self.registry.has(declared_operation) else operation,
+                                OperationContext(adapter=adapter, raw=raw_input, parameters=params, service=self),
+                            )
+                            intermediate_state[atom_id] = result
                         else:
-                            # Data nodes (e.g., read_run) - skip, already handled
-                            intermediate_state[atom_id] = {"status": "skipped"}
+                            raise ValueError(f"Unregistered operation: {declared_operation}")
                         caught_warnings = list(caught)
 
                     atom_result.status = "completed"
@@ -1097,8 +1105,8 @@ class ExecutionService:
         if operation == "estimate_contrast" and "contrasts" not in params:
             params["contrasts"] = atom.get("parameters", {}).get("contrasts", [])
 
-        # Special case: build_design_matrix needs events from TSV file
-        if operation == "build_design_matrix" and "events" not in params:
+        # Event-aware analyses consume the same run-level BIDS events table.
+        if operation in {"build_design_matrix", "block_averaging"} and "events" not in params:
             events_path = state.get("events_path", "")
             if events_path:
                 raw_obj = state.get("raw")
@@ -1115,7 +1123,8 @@ class ExecutionService:
                     excluded_conditions=atom.get("parameters", {}).get("excluded_event_conditions"),
                 )
                 params["events"] = events
-                params["event_id"] = event_id
+                if operation == "build_design_matrix":
+                    params["event_id"] = event_id
 
     def _inject_edge_dependencies(
         self,
@@ -1163,16 +1172,17 @@ class ExecutionService:
         params: dict[str, Any],
     ) -> Any:
         """Dispatch an analysis operation to the adapter."""
+        declared_operation = str(params.get("_declared_operation") or operation)
         operation = canonical_operation(str(operation))
-        spec = self.registry.get(operation)
+        spec = self.registry.get(declared_operation) or self.registry.get(operation)
         if spec is not None and spec.handler_factory_for(
             getattr(adapter, "backend_id", None)
         ) is not None:
             return self.dispatcher.execute(
-                operation,
+                declared_operation if self.registry.has(declared_operation) else operation,
                 OperationContext(adapter=adapter, raw=raw, parameters=params, service=self),
             )
-        raise ValueError(f"Operation has no registered analysis handler: {operation}")
+        raise ValueError(f"Operation has no registered analysis handler: {declared_operation}")
 
     @staticmethod
     def _normalize_hrf_model(value: Any) -> str:

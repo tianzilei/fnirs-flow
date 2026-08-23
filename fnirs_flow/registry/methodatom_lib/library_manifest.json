@@ -1,0 +1,18 @@
+{
+  "schema_name": "methodatom_literature_library",
+  "schema_version": "0.2.0",
+  "generated_by": "tools/audit/rebuild_methodatom_qa_assets.py",
+  "tables": [
+    "adapter_definitions.csv",
+    "atom_evidence_links.csv",
+    "flow_slot_contracts.csv",
+    "method_atoms.csv",
+    "parameter_candidates.csv",
+    "reporting_requirements.csv",
+    "risk_rule_candidates.csv",
+    "sources.csv",
+    "templates.csv"
+  ],
+  "default_promotion_policy": "Only parameter_status=project_default is executable.",
+  "bibliographic_metadata_status": "needs_attention"
+}

@@ -70,7 +70,6 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         domain="preprocessing",
         parameters={
             "method": "tddr",
-            "iterations": 50,
         },
         rationale="Robust motion correction without user parameters",
         reference="MNE-NIRS TDDR implementation",
@@ -83,7 +82,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         parameters={
             "l_freq": 0.01,
             "h_freq": 0.2,
-            "method": "fir",
+            "implementation": "fir",
             "fir_design": "firwin",
         },
         rationale="Standard bandpass filter for task-based fNIRS",
@@ -109,7 +108,7 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         parameters={
             "l_freq": 0.01,
             "h_freq": 0.1,
-            "method": "fir",
+            "implementation": "fir",
             "fir_design": "firwin",
         },
         rationale="Standard bandpass filter for resting-state connectivity analysis",

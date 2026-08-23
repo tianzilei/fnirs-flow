@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fnirs-flow"
-version = "1.2.3"
+version = "1.2.4"
 description = "GUI-enabled fNIRS toolbox + reproducibility framework with Flow-based orchestration"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -47,6 +47,13 @@ ml-motion = [
     "scikit-learn>=1.3,<2.0",
     "PyWavelets>=1.4,<2.0",
 ]
+scientific = [
+    "networkx>=3.0,<4.0",
+    "statsmodels>=0.14,<1.0",
+]
+deep-learning = [
+    "torch>=2.2,<3.0",
+]
 cedalion = [
     "cedalion @ git+https://github.com/ibs-lab/cedalion.git@4eebc94018d1a59d5f112f0be05a3f520431499b",
 ]
@@ -61,7 +68,7 @@ dev = [
     "fnirs-flow[full]",
 ]
 full = [
-    "fnirs-flow[api,mne,ml-motion]",
+    "fnirs-flow[api,mne,ml-motion,scientific]",
 ]
 
 [project.scripts]

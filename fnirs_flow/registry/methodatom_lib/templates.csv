@@ -1,0 +1,6 @@
+template_id,name,scenario,template_version,atom_sequence,slot_sequence,required_adapters,required_risk_rules,required_reporting_requirements,input_contract,output_contract,evidence_refs,readiness_status,notes
+TMPL_hyperscanning,Hyperscanning,hyperscanning,0.1.0,[],[],[],[],[],{},{},EQ_PMC9917717_01|EQ_PMC8231828_01|EQ_PMC7047008_01,needs_attention,Evidence-backed template candidate; atom and slot sequence require human approval.
+TMPL_ml_validation,Ml Validation,ml_validation,0.1.0,[],[],[],[],[],{},{},EQ_PMC12505193_02|EQ_PMC7868344_01|EQ_PMC7868344_03,needs_attention,Evidence-backed template candidate; atom and slot sequence require human approval.
+TMPL_reporting_export,Reporting Export,reporting_export,0.1.0,[],[],[],[],[],{},{},EQ_PMC11833346_01|EQ_PMC11833346_02|EQ_PMC11833346_04,needs_attention,Evidence-backed template candidate; atom and slot sequence require human approval.
+TMPL_resting_connectivity,Resting Connectivity,resting_connectivity,0.1.0,[],[],[],[],[],{},{},EQ_PMC11833346_05|EQ_PMC11833346_09|EQ_PMC11833346_10,needs_attention,Evidence-backed template candidate; atom and slot sequence require human approval.
+TMPL_task_glm,Task Glm,task_glm,0.1.0,[],[],[],[],[],{},{},EQ_PMC12929548_07|EQ_PMC12053328_02|EQ_PMC12952035_02,needs_attention,Evidence-backed template candidate; atom and slot sequence require human approval.

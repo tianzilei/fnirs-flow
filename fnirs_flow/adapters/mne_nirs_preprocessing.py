@@ -156,7 +156,7 @@ def filter_raw(
         Filtered MNE Raw object (new copy, original unchanged)
     """
     raw = raw.copy()
-    if method == "iir":
+    if method in {"iir", "scipy_butterworth_sos"}:
         from scipy.signal import butter, sosfiltfilt
 
         sfreq = raw.info["sfreq"]
@@ -175,14 +175,17 @@ def filter_raw(
         import mne
 
         raw = mne.io.RawArray(data, raw.info, first_samp=raw.first_samp, verbose=False)
-    else:
+    elif method == "fir":
         raw.filter(l_freq=l_freq, h_freq=h_freq, **kwargs)
+    else:
+        raise ValueError("filter implementation must be 'fir', 'iir', or 'scipy_butterworth_sos'")
     return raw
 
 
 def notch_filter(
     raw: Any,
     freqs: list[float] | None = None,
+    method: str = "fir",
     **kwargs: Any,
 ) -> Any:
     """Apply notch filter to remove line noise.
@@ -198,7 +201,11 @@ def notch_filter(
     if freqs is None:
         freqs = [50.0, 100.0]
     raw = raw.copy()
-    raw.notch_filter(freqs=freqs, **kwargs)
+    if method == "scipy_butterworth_sos":
+        method = "iir"
+    if method not in {"fir", "iir"}:
+        raise ValueError("notch filter implementation must be 'fir', 'iir', or 'scipy_butterworth_sos'")
+    raw.notch_filter(freqs=freqs, method=method, **kwargs)
     return raw
 
 
@@ -209,14 +216,11 @@ def notch_filter(
 
 def compute_coefficient_of_variation(
     data: np.ndarray,
-    window_size: int = 10,
 ) -> np.ndarray:
     """Compute Coefficient of Variation for signal quality assessment.
 
     Args:
         data: Signal data array (channels x samples)
-        window_size: Window size for CV computation
-
     Returns:
         Array of CV values per channel
     """

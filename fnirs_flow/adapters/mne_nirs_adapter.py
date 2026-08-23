@@ -75,6 +75,21 @@ def _compute_raw_hash(raw: Any) -> str:
         return hashlib.sha256(str(raw.ch_names).encode()).hexdigest()[:16]
 
 
+def _artifact_type_for_raw(raw: Any) -> str:
+    """Describe the actual signal domain instead of inferring it from the method."""
+    try:
+        channel_types = set(raw.get_channel_types())
+    except (AttributeError, TypeError, ValueError):
+        return "SignalData"
+    if channel_types & {"hbo", "hbr"}:
+        return "HaemoglobinData"
+    if "fnirs_od" in channel_types:
+        return "OpticalDensity"
+    if channel_types & {"fnirs_cw_amplitude", "fnirs_fd_ac_amplitude", "fnirs_fd_phase"}:
+        return "RawIntensity"
+    return "SignalData"
+
+
 class MneNirsAdapter:
     """Adapter for MNE-NIRS backend execution.
 
@@ -266,10 +281,22 @@ class MneNirsAdapter:
         self._write_artifact_file("optical_density", "od_summary", summary)
         return result
 
-    def compute_qc(self, raw: Any, sci_threshold: float = 0.8) -> dict[str, Any]:
+    def compute_qc(
+        self,
+        raw: Any,
+        sci_threshold: float = 0.8,
+        sd_distance_min: float = 0.01,
+        sd_distance_max: float = 0.08,
+        min_sci_pass_rate: float | None = None,
+        preset: str | None = None,
+    ) -> dict[str, Any]:
         """Compute QC metrics."""
         if not np.isfinite(sci_threshold) or not 0 <= sci_threshold <= 1:
             raise ValueError("sci_threshold must be between 0 and 1")
+        if not 0 <= sd_distance_min <= sd_distance_max:
+            raise ValueError("sd_distance_min must not exceed sd_distance_max")
+        if min_sci_pass_rate is not None and not 0 <= min_sci_pass_rate <= 1:
+            raise ValueError("min_sci_pass_rate must be between 0 and 1")
         sci_values = np.asarray(scalp_coupling_index(raw), dtype=float)
         sd_dists = np.asarray(source_detector_distances(raw.info), dtype=float)
         short_chs = short_channels(raw.info)
@@ -288,14 +315,31 @@ class MneNirsAdapter:
             "n_invalid_sci": int((~np.isfinite(sci_values)).sum()),
             "n_short_channels": int(short_chs.sum()) if hasattr(short_chs, "sum") else 0,
             "sd_distance_mean": float(finite_distances.mean()) if finite_distances.size else 0.0,
+            "sd_distance_pass_rate": float(
+                ((sd_dists >= sd_distance_min) & (sd_dists <= sd_distance_max) & np.isfinite(sd_dists)).mean()
+            )
+            if sd_dists.size
+            else 0.0,
             "sci_values": [float(value) if np.isfinite(value) else None for value in sci_values],
             "bad_channel_mask": bad_channel_mask.tolist(),
             "sci_threshold": sci_threshold,
+            "sd_distance_min": sd_distance_min,
+            "sd_distance_max": sd_distance_max,
+            "min_sci_pass_rate": min_sci_pass_rate,
+            "preset": preset,
         }
+        if min_sci_pass_rate is not None:
+            qc["sci_gate_passed"] = qc["sci_pass_rate"] >= min_sci_pass_rate
 
         self._provenance.log(
             step_id="compute_qc",
-            parameters={"sci_threshold": sci_threshold},
+            parameters={
+                "sci_threshold": sci_threshold,
+                "sd_distance_min": sd_distance_min,
+                "sd_distance_max": sd_distance_max,
+                "min_sci_pass_rate": min_sci_pass_rate,
+                "preset": preset,
+            },
         )
         # Emit QC report artifact (no raw object, use None)
         artifact_id = f"qc-{self._entity_id()}"
@@ -327,34 +371,51 @@ class MneNirsAdapter:
         """Apply motion correction."""
         data = raw.get_data()
 
+        resolved: dict[str, Any] = {"method": method}
         if method == "tddr":
             result = temporal_derivative_distribution_repair(raw)
         elif method == "wavelet":
-            corrected = wavelet_motion_correction(
-                data,
+            resolved.update(
                 wavelet_level=kwargs.get("wavelet_level", 5),
                 threshold_type=kwargs.get("threshold_type", "soft"),
             )
+            corrected = wavelet_motion_correction(
+                data,
+                wavelet_level=resolved["wavelet_level"],
+                threshold_type=resolved["threshold_type"],
+            )
             result = _copy_raw_with_data(raw, corrected)
         elif method == "spline":
-            corrected = spline_motion_correction(
-                data,
+            resolved.update(
                 spline_segments=kwargs.get("spline_segments", 3),
                 threshold=kwargs.get("threshold", 1.0),
             )
+            corrected = spline_motion_correction(
+                data,
+                spline_segments=resolved["spline_segments"],
+                threshold=resolved["threshold"],
+            )
             result = _copy_raw_with_data(raw, corrected)
         elif method == "ica":
-            corrected, components = ica_motion_correction(
-                data,
+            resolved.update(
                 n_components=kwargs.get("n_components"),
                 threshold=kwargs.get("threshold", 3.0),
             )
+            corrected, components = ica_motion_correction(
+                data,
+                n_components=resolved["n_components"],
+                threshold=resolved["threshold"],
+            )
             result = _copy_raw_with_data(raw, corrected)
         elif method == "pca":
-            corrected = pca_motion_correction(
-                data,
+            resolved.update(
                 n_components=kwargs.get("n_components", 0.95),
                 threshold=kwargs.get("threshold", 3.0),
+            )
+            corrected = pca_motion_correction(
+                data,
+                n_components=resolved["n_components"],
+                threshold=resolved["threshold"],
             )
             result = _copy_raw_with_data(raw, corrected)
         elif method == "cbsi":
@@ -366,19 +427,19 @@ class MneNirsAdapter:
 
         self._provenance.log(
             step_id="motion_correction",
-            parameters={"method": method, **kwargs},
+            parameters=resolved,
         )
         self._emit_artifact(
-            "OpticalDensity" if method in ("tddr",) else "RawIntensity",
+            _artifact_type_for_raw(raw),
             result,
             "motion_correction",
-            {"method": method, **kwargs},
+            resolved,
         )
         # Write motion correction report
         report = {
             "step": "motion_correction",
             "method": method,
-            "parameters": kwargs,
+            "parameters": resolved,
         }
         self._write_artifact_file("motion_correction", "motion_report", report)
         return result
@@ -404,31 +465,71 @@ class MneNirsAdapter:
         raw: Any,
         l_freq: float = 0.01,
         h_freq: float = 0.2,
-        method: str = "bandpass",
+        filter_type: str = "bandpass",
+        implementation: str = "fir",
         **kwargs: Any,
     ) -> Any:
         """Apply filter to raw data."""
-        if method == "bandpass":
-            result = filter_raw(raw, l_freq=l_freq, h_freq=h_freq, method="iir", **kwargs)
-        elif method == "notch":
+        resolved = {
+            "filter_type": filter_type,
+            "implementation": implementation,
+            "l_freq": l_freq if filter_type == "bandpass" else None,
+            "h_freq": h_freq if filter_type in {"bandpass", "lowpass"} else None,
+            **kwargs,
+        }
+        if implementation == "fir":
+            resolved.setdefault("fir_design", "firwin")
+            resolved.setdefault("phase", "zero")
+            resolved.setdefault("fir_window", "hamming")
+            resolved.setdefault("pad", "reflect_limited")
+        elif implementation == "scipy_butterworth_sos":
+            resolved.setdefault("design", "butterworth")
+            resolved.setdefault("order", 4)
+            resolved.setdefault("representation", "sos")
+            resolved.setdefault("phase", "zero_sosfiltfilt")
+
+        if filter_type == "bandpass":
+            result = filter_raw(raw, l_freq=l_freq, h_freq=h_freq, method=implementation, **kwargs)
+        elif filter_type == "notch":
             freqs = kwargs.get("freqs", [50.0, 100.0])
-            result = notch_filter(raw, freqs=freqs, **kwargs)
-        elif method == "lowpass":
-            result = filter_raw(raw, l_freq=None, h_freq=h_freq, **kwargs)
+            notch_kwargs = {key: value for key, value in kwargs.items() if key != "freqs"}
+            result = notch_filter(raw, freqs=freqs, method=implementation, **notch_kwargs)
+        elif filter_type == "lowpass":
+            result = filter_raw(raw, l_freq=None, h_freq=h_freq, method=implementation, **kwargs)
         else:
-            raise ValueError(f"Unknown filter method: {method}. Supported: bandpass, notch, lowpass")
+            raise ValueError(f"Unknown filter type: {filter_type}. Supported: bandpass, notch, lowpass")
+
+        if implementation == "fir":
+            sfreq = float(raw.info["sfreq"])
+            try:
+                from mne.filter import create_filter
+
+                filter_length = len(
+                    create_filter(
+                        None,
+                        sfreq,
+                        l_freq if filter_type == "bandpass" else None,
+                        h_freq if filter_type in {"bandpass", "lowpass"} else None,
+                        method="fir",
+                        fir_design=resolved.get("fir_design", "firwin"),
+                        phase=resolved.get("phase", "zero"),
+                        verbose=False,
+                    )
+                )
+            except (ImportError, TypeError, ValueError):
+                filter_length = None
+            resolved["filter_length_samples"] = filter_length
+            resolved["filter_length_seconds"] = filter_length / sfreq if filter_length else None
 
         self._provenance.log(
             step_id="filtering",
-            parameters={"l_freq": l_freq, "h_freq": h_freq, "method": method},
+            parameters=resolved,
         )
-        self._emit_artifact("OpticalDensity", result, "filtering", {"method": method})
+        self._emit_artifact("OpticalDensity", result, "filtering", resolved)
         # Write filter summary
         summary = {
             "step": "filtering",
-            "method": method,
-            "l_freq": l_freq,
-            "h_freq": h_freq,
+            **resolved,
         }
         self._write_artifact_file("filtering", "filter_summary", summary)
         return result
@@ -517,6 +618,98 @@ class MneNirsAdapter:
         self._write_artifact_file("compute_advanced_qc", "qc_summary", summary)
         self._write_qc_tsv(qc)
         return qc
+
+    def compute_sci_qc(
+        self,
+        raw: Any,
+        l_freq: float = 0.7,
+        h_freq: float = 1.5,
+        threshold: float = 0.8,
+    ) -> dict[str, Any]:
+        """Compute only the declared scalp-coupling-index assessment."""
+        values = np.asarray(scalp_coupling_index(raw, l_freq=l_freq, h_freq=h_freq), dtype=float)
+        passed = np.isfinite(values) & (values >= threshold)
+        parameters = {"l_freq": l_freq, "h_freq": h_freq, "threshold": threshold}
+        result = {
+            "sci_values": [float(value) if np.isfinite(value) else None for value in values],
+            "pass_mask": passed.tolist(),
+            "pass_rate": float(passed.mean()) if passed.size else 0.0,
+            **parameters,
+        }
+        self._provenance.log(step_id="sci_check", parameters=parameters)
+        self._emit_artifact("QCReport", raw, "sci_check", parameters)
+        return result
+
+    def compute_cv_qc(
+        self,
+        raw: Any,
+        cv_threshold: float = 0.15,
+    ) -> dict[str, Any]:
+        """Compute only the declared coefficient-of-variation assessment."""
+        values = np.asarray(compute_coefficient_of_variation(raw.get_data()), dtype=float)
+        passed = np.isfinite(values) & (values <= cv_threshold)
+        parameters = {"cv_threshold": cv_threshold}
+        result = {
+            "cv_values": [float(value) if np.isfinite(value) else None for value in values],
+            "pass_mask": passed.tolist(),
+            "pass_rate": float(passed.mean()) if passed.size else 0.0,
+            **parameters,
+        }
+        self._provenance.log(step_id="cv_check", parameters=parameters)
+        self._emit_artifact("QCReport", raw, "cv_check", parameters)
+        return result
+
+    def compute_snr_qc(
+        self,
+        raw: Any,
+        snr_threshold: float = 2.0,
+        method: str = "spectral_power_ratio",
+    ) -> dict[str, Any]:
+        """Compute only the implemented spectral-power-ratio SNR assessment."""
+        if method != "spectral_power_ratio":
+            raise ValueError("snr_check currently supports only method='spectral_power_ratio'")
+        values = np.asarray(compute_snr(raw.get_data(), fs=raw.info["sfreq"]), dtype=float)
+        passed = np.isfinite(values) & (values >= snr_threshold)
+        parameters = {"snr_threshold": snr_threshold, "method": method}
+        result = {
+            "snr_values": [float(value) if np.isfinite(value) else None for value in values],
+            "pass_mask": passed.tolist(),
+            "pass_rate": float(passed.mean()) if passed.size else 0.0,
+            **parameters,
+        }
+        self._provenance.log(step_id="snr_check", parameters=parameters)
+        self._emit_artifact("QCReport", raw, "snr_check", parameters)
+        return result
+
+    def block_averaging(
+        self,
+        raw: Any,
+        baseline_window: list[float] | tuple[float, float] = (-5.0, 0.0),
+        response_window: list[float] | tuple[float, float] = (0.0, 20.0),
+        baseline_correction: str = "mean",
+        events: Any | None = None,
+    ) -> dict[str, Any]:
+        """Compute block averages while preserving all declared parameters."""
+        if events is None:
+            raise ValueError("block_averaging requires 'events'")
+        if baseline_correction not in {"mean", "zscore"}:
+            raise ValueError("baseline_correction must be 'mean' or 'zscore'")
+        parameters = {
+            "baseline_window": list(baseline_window),
+            "response_window": list(response_window),
+            "baseline_correction": baseline_correction,
+        }
+        result = block_averaging(
+            raw.get_data(),
+            np.asarray(events),
+            sfreq=float(raw.info["sfreq"]),
+            baseline_window=tuple(baseline_window),
+            response_window=tuple(response_window),
+            baseline_correction=baseline_correction,
+        )
+        self._provenance.log(step_id="block_averaging", parameters=parameters)
+        self._emit_artifact("AverageResponse", None, "block_averaging", parameters)
+        return result
 
     def apply_short_channel_regression(
         self,
@@ -814,11 +1007,17 @@ class MneNirsAdapter:
         channel_results: dict[str, Any],
         atlas: str = "mni",
         roi_mapping: dict[str, list[int]] | None = None,
+        aggregation: str = "mean",
     ) -> dict[str, Any]:
         """Export ROI-level results."""
-        result = roi_output(channel_results, atlas=atlas, roi_mapping=roi_mapping)
+        result = roi_output(
+            channel_results,
+            atlas=atlas,
+            roi_mapping=roi_mapping,
+            aggregation=aggregation,
+        )
         self._provenance.log(
             step_id="roi_output",
-            parameters={"atlas": atlas, "n_rois": result.get("n_rois", 0)},
+            parameters={"atlas": atlas, "aggregation": aggregation, "n_rois": result.get("n_rois", 0)},
         )
         return result

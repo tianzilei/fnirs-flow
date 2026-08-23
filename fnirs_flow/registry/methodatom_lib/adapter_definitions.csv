@@ -1,0 +1,2 @@
+adapter_id,name,source_atom_type,target_atom_type,source_port,target_port,input_schema,output_schema,transform_kind,lossiness,required_metadata,provenance_fields,evidence_refs,notes
+ADAPTER_backend_wrapper,Verified backend wrapper,method_atom,backend_method,input,input,Any,Any,backend_wrapper,none,backend_id|backend_operation,backend_id|backend_version|operation,,Only verified bindings are promoted into OperationRegistry handlers.

@@ -1,25 +1,25 @@
 link_id,evidence_ref,target_object_type,target_object_id,evidence_use,confidence,quote_or_summary,source_id,notes
 EVLINK_0001,EQ_PMC11833346_01,method_atom,ATOM_methods_report,method_atom,high,"Within the sixteen studies, there was a wide variety of applied processing software, with no two studies using the same processing pipeline or toolbox. Four studies did not report the software, while ",SRC_PMC11833346,From preprocessing_methods.software
-EVLINK_0002,EQ_PMC11833346_02,method_atom,,method_atom,high,"six studies corrected for multiple comparisons (Bonferroni, false discovery rate, or family-wise error), one thresholded the t-maps at 50%, seven had no correction of alpha level, and one did not repo",SRC_PMC11833346,From analysis_methods.multiple_comparison_control
+EVLINK_0002,EQ_PMC11833346_02,background_only,,background_only,high,"six studies corrected for multiple comparisons (Bonferroni, false discovery rate, or family-wise error), one thresholded the t-maps at 50%, seven had no correction of alpha level, and one did not repo",SRC_PMC11833346,From analysis_methods.multiple_comparison_control
 EVLINK_0003,EQ_PMC11833346_03,method_atom,ATOM_data_import,method_atom,high,"The number of channels differed along with technical advancement during the years the studies were conducted as well as the purpose of the studies (i.e., technical investigation or group-wise differen",SRC_PMC11833346,From acquisition.channels_n
 EVLINK_0004,EQ_PMC11833346_04,background_only,ATOM_mbll_conversion,background_only,high,All included studies reported HbO2. The majority reported additionally HbR (N = 10) and only four studies reported total hemoglobin (HbT).,SRC_PMC11833346,From results_claims.CLM_PMC11833346_01
-EVLINK_0005,EQ_PMC11833346_05,risk_rule,,risk_rule,high,"Especially the instruction on how the authors defined 'resting-state' is not reported in the majority of the studies. Another important point is that studies varied between eyes closed, eyes open, or ",SRC_PMC11833346,From risk_register.RSK_PMC11833346_04
-EVLINK_0006,EQ_PMC11833346_06,risk_rule,,risk_rule,high,seven had no correction of alpha level,SRC_PMC11833346,From risk_register.RSK_PMC11833346_02
-EVLINK_0007,EQ_PMC11833346_07,risk_rule,,risk_rule,high,"None of the studies was pre-registered. Also, data and code sharing, which is also mentioned by Yücel et al. (2021), would enable reproducibility.",SRC_PMC11833346,From risk_register.RSK_PMC11833346_06
-EVLINK_0008,EQ_PMC11833346_08,risk_rule,ATOM_signal_qc,risk_rule,high,"Ten of the 16 included studies reported clear rejection criteria based on signal-to-noise ratio or other signal quality metrics, but only three reported how many participants or channels were excluded",SRC_PMC11833346,From risk_register.RSK_PMC11833346_03
+EVLINK_0005,EQ_PMC11833346_05,background_only,,background_only,high,"Especially the instruction on how the authors defined 'resting-state' is not reported in the majority of the studies. Another important point is that studies varied between eyes closed, eyes open, or ",SRC_PMC11833346,From risk_register.RSK_PMC11833346_04
+EVLINK_0006,EQ_PMC11833346_06,background_only,,background_only,high,seven had no correction of alpha level,SRC_PMC11833346,From risk_register.RSK_PMC11833346_02
+EVLINK_0007,EQ_PMC11833346_07,background_only,,background_only,high,"None of the studies was pre-registered. Also, data and code sharing, which is also mentioned by Yücel et al. (2021), would enable reproducibility.",SRC_PMC11833346,From risk_register.RSK_PMC11833346_06
+EVLINK_0008,EQ_PMC11833346_08,method_atom,ATOM_signal_qc,risk_rule,high,"Ten of the 16 included studies reported clear rejection criteria based on signal-to-noise ratio or other signal quality metrics, but only three reported how many participants or channels were excluded",SRC_PMC11833346,From risk_register.RSK_PMC11833346_03
 EVLINK_0009,EQ_PMC11833346_09,background_only,ATOM_resting_connectivity,background_only,high,"In Mild cognitive impairment, studies mainly found resting-state connectivity reductions in frontal regions. Hence, Mild cognitive impairment seems to be the only neurodegenerative disease that shows ",SRC_PMC11833346,From results_claims.CLM_PMC11833346_06
 EVLINK_0010,EQ_PMC11833346_10,background_only,,background_only,high,"rsfNIRS seems to capture resting-state alterations related to neurodegenerative diseases... at the current state, we are far from finding a disease-specific biomarker due to study heterogeneity.",SRC_PMC11833346,From results_claims.CLM_PMC11833346_07
 EVLINK_0011,EQ_PMC12929548_01,background_only,,background_only,high,"Most studies relied on unimodal neuroimaging, predominantly electroencephalography (EEG) or functional near-infrared spectroscopy (fNIRS), with only seven studies implementing multimodal combinations.",SRC_PMC12929548,From results_claims.CLM_PMC12929548_01
 EVLINK_0012,EQ_PMC12929548_02,background_only,,background_only,high,"Analytically, functional connectivity dominated, whereas effective connectivity, multimodal fusion, and machine learning were scarcely used.",SRC_PMC12929548,From results_claims.CLM_PMC12929548_02
 EVLINK_0013,EQ_PMC12929548_03,background_only,,background_only,high,"fNIRS emerged as the most versatile modality regarding analysis, appearing across nearly all analysis categories. It also represented the only instance of unsupervised machine learning within the incl",SRC_PMC12929548,From results_claims.CLM_PMC12929548_03
 EVLINK_0014,EQ_PMC12929548_04,background_only,,background_only,high,"Executive function and social cognition consistently emerge as the most frequently investigated cognitive domains, forming the largest group of targeted cognitive functions.",SRC_PMC12929548,From results_claims.CLM_PMC12929548_04
-EVLINK_0015,EQ_PMC12929548_05,risk_rule,,risk_rule,high,"Multimodal approaches remain rare. The most common pairing combined EEG with eye-tracking or ECG, the latter likely reflecting existing EEG measurement infrastructures. Notably, we did not identify an",SRC_PMC12929548,From risk_register.RSK_PMC12929548_01
-EVLINK_0016,EQ_PMC12929548_06,risk_rule,,risk_rule,high,Only four out of 45 studies incorporated measures of effective connectivity. A possible explanation could be that effective connectivity measures require explicit biophysical or statistical generative,SRC_PMC12929548,From risk_register.RSK_PMC12929548_02
+EVLINK_0015,EQ_PMC12929548_05,background_only,,background_only,high,"Multimodal approaches remain rare. The most common pairing combined EEG with eye-tracking or ECG, the latter likely reflecting existing EEG measurement infrastructures. Notably, we did not identify an",SRC_PMC12929548,From risk_register.RSK_PMC12929548_01
+EVLINK_0016,EQ_PMC12929548_06,background_only,,background_only,high,Only four out of 45 studies incorporated measures of effective connectivity. A possible explanation could be that effective connectivity measures require explicit biophysical or statistical generative,SRC_PMC12929548,From risk_register.RSK_PMC12929548_02
 EVLINK_0017,EQ_PMC12929548_07,background_only,,background_only,high,"The degree of digitality modulates neural and behavioral responses, but the literature remains fragmented by different choices in task, measurement, and analysis. Findings from face-to-face hyperscann",SRC_PMC12929548,From results_claims.CLM_PMC12929548_05
-EVLINK_0018,EQ_PMC12929548_08,risk_rule,,risk_rule,high,"We strongly encourage authors to report specific methodological details that directly impact the interpretation of inter-brain connectivity and synchronization. Based on our review of the literature, ",SRC_PMC12929548,From risk_register.RSK_PMC12929548_03
+EVLINK_0018,EQ_PMC12929548_08,background_only,,background_only,high,"We strongly encourage authors to report specific methodological details that directly impact the interpretation of inter-brain connectivity and synchronization. Based on our review of the literature, ",SRC_PMC12929548,From risk_register.RSK_PMC12929548_03
 EVLINK_0019,EQ_PMC12505193_01,background_only,,background_only,high,"The dorsolateral PFC is identified as a critical area for Alzheimer's disease (AD) assessment using NIRS, correlating with cognitive performance.",SRC_PMC12505193,From results_claims.CLM_PMC12505193_01
 EVLINK_0020,EQ_PMC12505193_02,background_only,ATOM_ml_classification,background_only,high,"Blood-based NIRS has emerged as a promising biomarker-driven approach for AD detection. Multivariate classification models of blood-based NIRS have achieved 92.8% accuracy, 87.5% sensitivity, and 96.1",SRC_PMC12505193,From results_claims.CLM_PMC12505193_02
-EVLINK_0021,EQ_PMC12505193_03,risk_rule,ATOM_methods_report,risk_rule,high,"Methodologically, the complexity of data processing poses another hurdle, as consistent preprocessing and reporting standards are lacking across studies. This complicates comparisons and undermines re",SRC_PMC12505193,From risk_register.RSK_PMC12505193_01
+EVLINK_0021,EQ_PMC12505193_03,method_atom,ATOM_methods_report,risk_rule,high,"Methodologically, the complexity of data processing poses another hurdle, as consistent preprocessing and reporting standards are lacking across studies. This complicates comparisons and undermines re",SRC_PMC12505193,From risk_register.RSK_PMC12505193_01
 EVLINK_0022,EQ_PMC12505193_04,background_only,,background_only,high,"NIRS systems cost between $24,000 and $500,000, making them significantly more affordable than conventional neuroimaging methods. By comparison, MRI scanners can cost approximately $1.4 to $1.5 millio",SRC_PMC12505193,From results_claims.CLM_PMC12505193_04
 EVLINK_0023,EQ_PMC12505193_05,background_only,,background_only,high,"Investigating NIRS findings in diverse ethnic groups, particularly underrepresented populations, is essential for a more inclusive understanding of neurological conditions and ensuring the equitable a",SRC_PMC12505193,From results_claims.CLM_PMC12505193_05
 EVLINK_0024,EQ_PMC12061381_01,background_only,,background_only,high,"Neurophysiological metrics were observed to have superior sensitivity compared with peripheral autonomic measurements. EEG and fNIRS demonstrated 100% and 80% sensitivity, respectively, in detecting t",SRC_PMC12061381,From results_claims.CLM_PMC12061381_01
@@ -30,35 +30,35 @@ EVLINK_0028,EQ_PMC12061381_05,background_only,,background_only,high,"When >1 obj
 EVLINK_0029,EQ_PMC12931874_01,background_only,,background_only,high,"Of the studies we identified, 5 of 10 in brain injury, 3 of 4 in brain development, 10 of 15 in neurodevelopment, 9 of 15 in AKI, and 1 of 3 in NEC reported associations with rSO2.",SRC_PMC12931874,From results_claims.CLM_PMC12931874_01
 EVLINK_0030,EQ_PMC12931874_02,background_only,,background_only,high,The certainty of the evidence for all outcomes is regarded as low.,SRC_PMC12931874,From results_claims.CLM_PMC12931874_02
 EVLINK_0031,EQ_PMC12931874_03,background_only,,background_only,high,"NIRS monitoring provides only a proxy for regional oxygenation, not a direct measure of oxygen delivery at a cellular level.",SRC_PMC12931874,From results_claims.CLM_PMC12931874_04
-EVLINK_0032,EQ_PMC12931874_04,risk_rule,,risk_rule,high,Only seven studies performed quality control of NIRS measurements during data collection or processing.,SRC_PMC12931874,From risk_register.RSK_PMC12931874_02
+EVLINK_0032,EQ_PMC12931874_04,background_only,,background_only,high,Only seven studies performed quality control of NIRS measurements during data collection or processing.,SRC_PMC12931874,From risk_register.RSK_PMC12931874_02
 EVLINK_0033,EQ_PMC12053328_01,background_only,,background_only,high,23 of the 41 studies reported increased HbO or HbT levels in the PFC during occupational workload.,SRC_PMC12053328,From results_claims.CLM_PMC12053328_01
 EVLINK_0034,EQ_PMC12053328_02,background_only,,background_only,high,Only five studies examined typical office tasks.,SRC_PMC12053328,From results_claims.CLM_PMC12053328_02
 EVLINK_0035,EQ_PMC12053328_03,background_only,,background_only,high,Only 17 explicitly implemented methods to correct systemic and extracerebral artifacts.,SRC_PMC12053328,From results_claims.CLM_PMC12053328_04
 EVLINK_0036,EQ_PMC12053328_04,background_only,,background_only,high,Only two study conducted a sensitivity power analysis using G*Power 3 to determine sample size.,SRC_PMC12053328,From results_claims.CLM_PMC12053328_05
-EVLINK_0037,EQ_PMC12053328_05,risk_rule,ATOM_data_import,risk_rule,high,"Only two (63, 85) of the included studies employed this technique [short-separation channels], possibly due to hardware limitations in most fNIRS systems.",SRC_PMC12053328,From risk_register.RSK_PMC12053328_01
+EVLINK_0037,EQ_PMC12053328_05,method_atom,ATOM_data_import,risk_rule,high,"Only two (63, 85) of the included studies employed this technique [short-separation channels], possibly due to hardware limitations in most fNIRS systems.",SRC_PMC12053328,From risk_register.RSK_PMC12053328_01
 EVLINK_0038,EQ_PMC11221214_01,background_only,,background_only,high,"The incidence of postoperative delirium in the intervention group was significantly lower than that in the control group (OR, 0.657; 95% CI, 0.447–0.965; P = 0.032; I² = 0%).",SRC_PMC11221214,From results_claims.CLM_PMC11221214_01
 EVLINK_0039,EQ_PMC11221214_02,background_only,,background_only,high,"There were no significant differences in the length of ICU stay (SMD, 0.005 days; 95% CI, −0.135–0.146; P = 0.940; I² = 39.3%).",SRC_PMC11221214,From results_claims.CLM_PMC11221214_02
-EVLINK_0040,EQ_PMC11221214_03,risk_rule,,risk_rule,high,The definition criteria of cerebral oximetry desaturation in each study vary from below 75%–80% of baseline value or below 50%–60% of absolute value.,SRC_PMC11221214,From risk_register.RSK_PMC11221214_01
+EVLINK_0040,EQ_PMC11221214_03,background_only,,background_only,high,The definition criteria of cerebral oximetry desaturation in each study vary from below 75%–80% of baseline value or below 50%–60% of absolute value.,SRC_PMC11221214,From risk_register.RSK_PMC11221214_01
 EVLINK_0041,EQ_PMC11221214_04,background_only,,background_only,high,Intraoperative rSO2 monitoring can reduce the incidence of POD and improve the postoperative quality of life.,SRC_PMC11221214,From results_claims.CLM_PMC11221214_04
 EVLINK_0042,EQ_PMC7396619_01,background_only,,background_only,high,Several studies show that people can regulate hemodynamic signals from cortical brain regions with fNIRS-neurofeedback.,SRC_PMC7396619,From results_claims.CLM_PMC7396619_01
 EVLINK_0043,EQ_PMC7396619_02,background_only,,background_only,high,The median sample size of the studies was 20 (12 per cell).,SRC_PMC7396619,From results_claims.CLM_PMC7396619_02
-EVLINK_0044,EQ_PMC7396619_03,risk_rule,,risk_rule,high,Our results showed that the power was even insufficient to reliably detect large behavioral effects (0.43).,SRC_PMC7396619,From risk_register.RSK_PMC7396619_01
-EVLINK_0045,EQ_PMC7396619_04,risk_rule,,risk_rule,high,Only one study reported a pre-registration of the experimental protocol.,SRC_PMC7396619,From risk_register.RSK_PMC7396619_03
+EVLINK_0044,EQ_PMC7396619_03,background_only,,background_only,high,Our results showed that the power was even insufficient to reliably detect large behavioral effects (0.43).,SRC_PMC7396619,From risk_register.RSK_PMC7396619_01
+EVLINK_0045,EQ_PMC7396619_04,background_only,,background_only,high,Only one study reported a pre-registration of the experimental protocol.,SRC_PMC7396619,From risk_register.RSK_PMC7396619_03
 EVLINK_0046,EQ_PMC7396619_05,background_only,ATOM_data_export,background_only,high,"None of the studies reported having uploaded materials, analysis scripts, code, or data to an open-access data repository.",SRC_PMC7396619,From results_claims.CLM_PMC7396619_05
 EVLINK_0047,EQ_PMC3598807_01,background_only,,background_only,high,"By far, the most commonly used brand of system is Hitachi (58%). The second most common is Hamamatsu (20%).",SRC_PMC3598807,From results_claims.CLM_PMC3598807_01
 EVLINK_0048,EQ_PMC3598807_02,background_only,,background_only,high,The lowest attrition rates are found in newborns and in 5- to 8-month-olds.,SRC_PMC3598807,From results_claims.CLM_PMC3598807_02
 EVLINK_0049,EQ_PMC3598807_03,background_only,,background_only,high,"Oxy-Hb increased after stimulation in most of the entries (81 out of 95, or 85%).",SRC_PMC3598807,From results_claims.CLM_PMC3598807_03
 EVLINK_0050,EQ_PMC3598807_04,background_only,ATOM_methods_report,background_only,high,We propose a set of strongly recommended and additional reporting guidelines.,SRC_PMC3598807,From results_claims.CLM_PMC3598807_04
 EVLINK_0051,EQ_PMC12909569_01,background_only,,background_only,high,The mean accuracy across the studies was 93.39% with a standard deviation of 6.50%,SRC_PMC12909569,From results_claims.CLM_PMC12909569_01
-EVLINK_0052,EQ_PMC12909569_02,risk_rule,,risk_rule,high,The inter-study agreement analysis demonstrated a strong heterogeneity regarding both neurophysiological findings and preprocessing strategies.,SRC_PMC12909569,From risk_register.RSK_PMC12909569_01
+EVLINK_0052,EQ_PMC12909569_02,background_only,,background_only,high,The inter-study agreement analysis demonstrated a strong heterogeneity regarding both neurophysiological findings and preprocessing strategies.,SRC_PMC12909569,From risk_register.RSK_PMC12909569_01
 EVLINK_0053,EQ_PMC12909569_03,background_only,,background_only,high,"fNIRS studies focused on alterations in regions associated with language and social cognition, such as the inferior frontal gyrus (IFG) and temporal cortex (TC).",SRC_PMC12909569,From results_claims.CLM_PMC12909569_03
 EVLINK_0054,EQ_PMC12909569_04,background_only,,background_only,high,"many studies employed in-house datasets, limiting reproducibility and preventing independent verification of the reported results.",SRC_PMC12909569,From results_claims.CLM_PMC12909569_04
 EVLINK_0055,EQ_PMC12347915_01,background_only,,background_only,high,39 studies (83.0%) explicitly reported a positive association between fNIRS activation and symptom improvement.,SRC_PMC12347915,From results_claims.CLM_PMC12347915_01
-EVLINK_0056,EQ_PMC12347915_02,risk_rule,,risk_rule,high,"Motion correction procedures were reported in 44.7% of the included studies (n = 21), while the remaining 55.3% (n = 26) did not apply or report any such correction.",SRC_PMC12347915,From risk_register.RSK_PMC12347915_01
+EVLINK_0056,EQ_PMC12347915_02,background_only,,background_only,high,"Motion correction procedures were reported in 44.7% of the included studies (n = 21), while the remaining 55.3% (n = 26) did not apply or report any such correction.",SRC_PMC12347915,From risk_register.RSK_PMC12347915_01
 EVLINK_0057,EQ_PMC12347915_03,background_only,,background_only,high,"The dorsolateral prefrontal cortex (DLPFC) was the most frequently measured region (55.3%), followed by broader prefrontal cortex (PFC) coverage (23.4%).",SRC_PMC12347915,From results_claims.CLM_PMC12347915_03
-EVLINK_0058,EQ_PMC12347915_04,risk_rule,,risk_rule,high,Only 12.8% of studies explicitly stated whether a link between fNIRS signal change and clinical improvement was examined or found.,SRC_PMC12347915,From risk_register.RSK_PMC12347915_02
+EVLINK_0058,EQ_PMC12347915_04,background_only,,background_only,high,Only 12.8% of studies explicitly stated whether a link between fNIRS signal change and clinical improvement was examined or found.,SRC_PMC12347915,From risk_register.RSK_PMC12347915_02
 EVLINK_0059,EQ_PMC7868344_01,background_only,ATOM_ml_classification,background_only,high,"Fusing EEG and fNIRS is a well-known and established methodology proven to enhance brain-computer interface (BCI) performance in terms of classification accuracy, number of control commands, and respo",SRC_PMC7868344,From results_claims.CLM_PMC7868344_01
-EVLINK_0060,EQ_PMC7868344_02,risk_rule,ATOM_motion_correction,risk_rule,high,"since both modalities, EEG and fNIRS, are sensitive to motion artifacts, instrumental, and physiological noises, there is a quest for more robust and sophisticated signal processing algorithms.",SRC_PMC7868344,From risk_register.RSK_PMC7868344_01
+EVLINK_0060,EQ_PMC7868344_02,method_atom,ATOM_motion_correction,risk_rule,high,"since both modalities, EEG and fNIRS, are sensitive to motion artifacts, instrumental, and physiological noises, there is a quest for more robust and sophisticated signal processing algorithms.",SRC_PMC7868344,From risk_register.RSK_PMC7868344_01
 EVLINK_0061,EQ_PMC7868344_03,background_only,,background_only,high,"hybrid temporal and spatial features, obtained by virtue of fusing EEG and fNIRS and associated with cortical activation, can help better identify the correlation between brain activation and gait.",SRC_PMC7868344,From results_claims.CLM_PMC7868344_03
 EVLINK_0062,EQ_PMC12952035_01,background_only,,background_only,high,Functional near-infrared spectroscopy data suggested more efficient prefrontal recruitment during walking after interactive or enriched exercise.,SRC_PMC12952035,From results_claims.CLM_PMC12952035_03
 EVLINK_0063,EQ_PMC12952035_02,background_only,,background_only,high,"Technology-assisted interventions that embedded cognitive demands in movement tasks produced small-to-moderate improvements in executive function, working memory, and dual-task gait.",SRC_PMC12952035,From results_claims.CLM_PMC12952035_01
@@ -71,7 +71,7 @@ EVLINK_0069,EQ_PMC10683738_02,background_only,,background_only,high,"%BOLD occip
 EVLINK_0070,EQ_PMC10014824_01,background_only,,background_only,high,"The findings indicate that EEG is the preferred neuroimaging sensor for detecting brain activity patterns, compared to fMRI, fNIRS, and PET.",SRC_PMC10014824,From results_claims.CLM_PMC10014824_01
 EVLINK_0071,EQ_PMC9975578_01,background_only,,background_only,high,"Acupuncture-induced brain alterations observed in those patients with MCI tended to be observable in the cingulate cortex, prefrontal cortex, and hippocampus.",SRC_PMC9975578,From results_claims.CLM_PMC9975578_01
 EVLINK_0072,EQ_PMC9245014_01,background_only,,background_only,high,"The findings from the review revealed that most of the articles have followed the social psychology paradigm, while 36% of the selected studies have an application in cognitive neuroscience.",SRC_PMC9245014,From results_claims.CLM_PMC9245014_01
-EVLINK_0073,EQ_PMC9245014_02,risk_rule,,risk_rule,high,"While most of the experiments have control experiments as a part of their setup, a small number implemented algorithmic control, and only one study had interventional or a stimulus-induced control exp",SRC_PMC9245014,From risk_register.RSK_PMC9245014_01
+EVLINK_0073,EQ_PMC9245014_02,background_only,,background_only,high,"While most of the experiments have control experiments as a part of their setup, a small number implemented algorithmic control, and only one study had interventional or a stimulus-induced control exp",SRC_PMC9245014,From risk_register.RSK_PMC9245014_01
 EVLINK_0074,EQ_PMC8918582_01,background_only,,background_only,high,The random-effects modeling results confirmed a robust positive correlation between INS and learning outcomes.,SRC_PMC8918582,From results_claims.CLM_PMC8918582_01
 EVLINK_0075,EQ_PMC8886122_01,background_only,,background_only,high,Chronic intervention effects (multiple sessions) were greater than acute intervention effects (single session).,SRC_PMC8886122,From results_claims.CLM_PMC8886122_01
 EVLINK_0076,EQ_PMC8886122_02,background_only,,background_only,high,"studies found physical activity/movement intervention-related changes in neural activity, indicating normalization of cortical arousal in individuals with attention-deficit /hyperactivity disorder (AD",SRC_PMC8886122,From results_claims.CLM_PMC8886122_02
@@ -106,31 +106,31 @@ EVLINK_0104,EQ_PMC11016629_02,background_only,,background_only,high,"fNIRS effec
 EVLINK_0105,EQ_PMC10469683_01,background_only,,background_only,high,"Compared to LL infants, EL infants exhibited (1) atypical language-related neural lateralization; (2) alterations in structural and functional connectivity; and (3) mixed profiles of neural sensitivit",SRC_PMC10469683,From results_claims.CLM_PMC10469683_01
 EVLINK_0106,EQ_PMC10169732_01,background_only,,background_only,high,"Although it is demonstrated that neural correlates of meaningful activities can be measured objectively by neurophysiological registration techniques, ""meaning"" as such has not yet been investigated e",SRC_PMC10169732,From results_claims.CLM_PMC10169732_01
 EVLINK_0107,EQ_PMC9980909_01,background_only,ATOM_first_level_glm,background_only,high,"The primary analysis showed more significant PFC activation in stroke patients performing dual-task walking than single-task walking (SMD = 0.340, P = 0.02, I2 = 7.853%, 95% CI = 0.054–0.626).",SRC_PMC9980909,From results_claims.CLM_PMC9980909_01
-EVLINK_0108,EQ_PMC12394262_01,risk_rule,,risk_rule,high,Review explicitly states no studies used rs-fNIRS. Primarily about fMRI (1.5T or 3T scanners).,SRC_PMC12394262,From risk_register.RSK_PMC12394262_01
-EVLINK_0109,EQ_PMC11528424_01,risk_rule,,risk_rule,high,"Not primarily about fNIRS. MEG, PET, fMRI more prominent.",SRC_PMC11528424,From risk_register.RSK_PMC11528424_01
-EVLINK_0110,EQ_PMC12011959_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring (CrSO2) in neonates during resuscitation. NOT functional fNIRS brain imaging.,SRC_PMC12011959,From risk_register.RSK_PMC12011959_01
-EVLINK_0111,EQ_PMC12080153_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in neonatal transfusion. NOT functional fNIRS brain imaging.,SRC_PMC12080153,From risk_register.RSK_PMC12080153_01
-EVLINK_0112,EQ_PMC11688251_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in pediatric CHD. NOT functional fNIRS brain imaging.,SRC_PMC11688251,From risk_register.RSK_PMC11688251_01
-EVLINK_0113,EQ_PMC12340143_01,risk_rule,,risk_rule,high,The heterogeneity of the results together with the lack of a clear and consistent association between RSO2 values and AKI currently preclude recommending NIRS monitoring.,SRC_PMC12340143,From risk_register.RSK_PMC12340143_01
-EVLINK_0114,EQ_PMC12619181_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in aSAH. NOT functional fNIRS brain imaging.,SRC_PMC12619181,From risk_register.RSK_PMC12619181_01
-EVLINK_0115,EQ_PMC12744649_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in OHCA. NOT functional fNIRS brain imaging.,SRC_PMC12744649,From risk_register.RSK_PMC12744649_01
-EVLINK_0116,EQ_PMC13049829_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring (rSO2) in neonatal PDA. NOT functional fNIRS brain imaging.,SRC_PMC13049829,From risk_register.RSK_PMC13049829_01
-EVLINK_0117,EQ_PMC13075027_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring during CPR. NOT functional fNIRS brain imaging.,SRC_PMC13075027,From risk_register.RSK_PMC13075027_01
-EVLINK_0118,EQ_PMC1764902_01,risk_rule,,risk_rule,high,Primarily about TCD monitoring. Mentions NIRS as complementary tool. NOT functional fNIRS.,SRC_PMC1764902,From risk_register.RSK_PMC1764902_01
-EVLINK_0119,EQ_PMC3863709_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in cardiac surgery. NOT functional fNIRS brain imaging.,SRC_PMC3863709,From risk_register.RSK_PMC3863709_01
-EVLINK_0120,EQ_PMC5595187_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in cardiac surgery. NOT functional fNIRS brain imaging.,SRC_PMC5595187,From risk_register.RSK_PMC5595187_01
-EVLINK_0121,EQ_PMC5960703_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in neonates. NOT functional fNIRS brain imaging.,SRC_PMC5960703,From risk_register.RSK_PMC5960703_01
-EVLINK_0122,EQ_PMC6491319_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring (cerebral oximetry) in surgery. NOT functional fNIRS brain imaging.,SRC_PMC6491319,From risk_register.RSK_PMC6491319_01
-EVLINK_0123,EQ_PMC7267214_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in HIE. NOT functional fNIRS brain imaging.,SRC_PMC7267214,From risk_register.RSK_PMC7267214_01
-EVLINK_0124,EQ_PMC7438789_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in neonates. NOT functional fNIRS brain imaging.,SRC_PMC7438789,From risk_register.RSK_PMC7438789_01
-EVLINK_0125,EQ_PMC7454961_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in cardiac arrest. NOT functional fNIRS brain imaging.,SRC_PMC7454961,From risk_register.RSK_PMC7454961_01
-EVLINK_0126,EQ_PMC7952449_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in preterm infants. NOT functional fNIRS brain imaging.,SRC_PMC7952449,From risk_register.RSK_PMC7952449_01
-EVLINK_0127,EQ_PMC9312707_01,risk_rule,,risk_rule,high,Muscle NIRS in exercise clinical trials. NOT functional brain fNIRS.,SRC_PMC9312707,From risk_register.RSK_PMC9312707_01
-EVLINK_0128,EQ_PMC10202983_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in death determination. NOT functional fNIRS brain imaging.,SRC_PMC10202983,From risk_register.RSK_PMC10202983_01
-EVLINK_0129,EQ_PMC11027033_01,risk_rule,,risk_rule,high,Clinical NIRS monitoring in HIE neonates during hypothermia. NOT functional fNIRS brain imaging.,SRC_PMC11027033,From risk_register.RSK_PMC11027033_01
+EVLINK_0108,EQ_PMC12394262_01,background_only,,background_only,high,Review explicitly states no studies used rs-fNIRS. Primarily about fMRI (1.5T or 3T scanners).,SRC_PMC12394262,From risk_register.RSK_PMC12394262_01
+EVLINK_0109,EQ_PMC11528424_01,background_only,,background_only,high,"Not primarily about fNIRS. MEG, PET, fMRI more prominent.",SRC_PMC11528424,From risk_register.RSK_PMC11528424_01
+EVLINK_0110,EQ_PMC12011959_01,background_only,,background_only,high,Clinical NIRS monitoring (CrSO2) in neonates during resuscitation. NOT functional fNIRS brain imaging.,SRC_PMC12011959,From risk_register.RSK_PMC12011959_01
+EVLINK_0111,EQ_PMC12080153_01,background_only,,background_only,high,Clinical NIRS monitoring in neonatal transfusion. NOT functional fNIRS brain imaging.,SRC_PMC12080153,From risk_register.RSK_PMC12080153_01
+EVLINK_0112,EQ_PMC11688251_01,background_only,,background_only,high,Clinical NIRS monitoring in pediatric CHD. NOT functional fNIRS brain imaging.,SRC_PMC11688251,From risk_register.RSK_PMC11688251_01
+EVLINK_0113,EQ_PMC12340143_01,background_only,,background_only,high,The heterogeneity of the results together with the lack of a clear and consistent association between RSO2 values and AKI currently preclude recommending NIRS monitoring.,SRC_PMC12340143,From risk_register.RSK_PMC12340143_01
+EVLINK_0114,EQ_PMC12619181_01,background_only,,background_only,high,Clinical NIRS monitoring in aSAH. NOT functional fNIRS brain imaging.,SRC_PMC12619181,From risk_register.RSK_PMC12619181_01
+EVLINK_0115,EQ_PMC12744649_01,background_only,,background_only,high,Clinical NIRS monitoring in OHCA. NOT functional fNIRS brain imaging.,SRC_PMC12744649,From risk_register.RSK_PMC12744649_01
+EVLINK_0116,EQ_PMC13049829_01,background_only,,background_only,high,Clinical NIRS monitoring (rSO2) in neonatal PDA. NOT functional fNIRS brain imaging.,SRC_PMC13049829,From risk_register.RSK_PMC13049829_01
+EVLINK_0117,EQ_PMC13075027_01,background_only,,background_only,high,Clinical NIRS monitoring during CPR. NOT functional fNIRS brain imaging.,SRC_PMC13075027,From risk_register.RSK_PMC13075027_01
+EVLINK_0118,EQ_PMC1764902_01,background_only,,background_only,high,Primarily about TCD monitoring. Mentions NIRS as complementary tool. NOT functional fNIRS.,SRC_PMC1764902,From risk_register.RSK_PMC1764902_01
+EVLINK_0119,EQ_PMC3863709_01,background_only,,background_only,high,Clinical NIRS monitoring in cardiac surgery. NOT functional fNIRS brain imaging.,SRC_PMC3863709,From risk_register.RSK_PMC3863709_01
+EVLINK_0120,EQ_PMC5595187_01,background_only,,background_only,high,Clinical NIRS monitoring in cardiac surgery. NOT functional fNIRS brain imaging.,SRC_PMC5595187,From risk_register.RSK_PMC5595187_01
+EVLINK_0121,EQ_PMC5960703_01,background_only,,background_only,high,Clinical NIRS monitoring in neonates. NOT functional fNIRS brain imaging.,SRC_PMC5960703,From risk_register.RSK_PMC5960703_01
+EVLINK_0122,EQ_PMC6491319_01,background_only,,background_only,high,Clinical NIRS monitoring (cerebral oximetry) in surgery. NOT functional fNIRS brain imaging.,SRC_PMC6491319,From risk_register.RSK_PMC6491319_01
+EVLINK_0123,EQ_PMC7267214_01,background_only,,background_only,high,Clinical NIRS monitoring in HIE. NOT functional fNIRS brain imaging.,SRC_PMC7267214,From risk_register.RSK_PMC7267214_01
+EVLINK_0124,EQ_PMC7438789_01,background_only,,background_only,high,Clinical NIRS monitoring in neonates. NOT functional fNIRS brain imaging.,SRC_PMC7438789,From risk_register.RSK_PMC7438789_01
+EVLINK_0125,EQ_PMC7454961_01,background_only,,background_only,high,Clinical NIRS monitoring in cardiac arrest. NOT functional fNIRS brain imaging.,SRC_PMC7454961,From risk_register.RSK_PMC7454961_01
+EVLINK_0126,EQ_PMC7952449_01,background_only,,background_only,high,Clinical NIRS monitoring in preterm infants. NOT functional fNIRS brain imaging.,SRC_PMC7952449,From risk_register.RSK_PMC7952449_01
+EVLINK_0127,EQ_PMC9312707_01,background_only,,background_only,high,Muscle NIRS in exercise clinical trials. NOT functional brain fNIRS.,SRC_PMC9312707,From risk_register.RSK_PMC9312707_01
+EVLINK_0128,EQ_PMC10202983_01,background_only,,background_only,high,Clinical NIRS monitoring in death determination. NOT functional fNIRS brain imaging.,SRC_PMC10202983,From risk_register.RSK_PMC10202983_01
+EVLINK_0129,EQ_PMC11027033_01,background_only,,background_only,high,Clinical NIRS monitoring in HIE neonates during hypothermia. NOT functional fNIRS brain imaging.,SRC_PMC11027033,From risk_register.RSK_PMC11027033_01
 EVLINK_0130,EQ_PMC9815777_01,background_only,,background_only,high,"This review finds that odor induced cortical activation is dependent on multiple factors, such as odorant type, gender and population type.",SRC_PMC9815777,From results_claims.CLM_PMC9815777_01
 EVLINK_0131,EQ_PMC9815777_02,background_only,ATOM_data_import,background_only,high,"This review also finds that there is room for improvement in areas such as participant diversity, use of wearable fNIRS systems, physiological monitoring and multi-distance channels.",SRC_PMC9815777,From results_claims.CLM_PMC9815777_02
-EVLINK_0132,EQ_PMC9815777_03,risk_rule,,risk_rule,high,"fNIRS coverage heavily favored the prefrontal cortex, temporal and parietal regions.",SRC_PMC9815777,From risk_register.RSK_PMC9815777_02
+EVLINK_0132,EQ_PMC9815777_03,background_only,,background_only,high,"fNIRS coverage heavily favored the prefrontal cortex, temporal and parietal regions.",SRC_PMC9815777,From risk_register.RSK_PMC9815777_02
 EVLINK_0133,EQ_PMC9047047_01,background_only,,background_only,high,No studies investigating NIRS and ONSD outside the ICU were found.,SRC_PMC9047047,From results_claims.CLM_PMC9047047_01
 EVLINK_0134,EQ_PMC8851356_01,background_only,ATOM_mbll_conversion,background_only,high,"fNIRS showed distinct developmental trajectories in functional connectivity and regional oxyhemoglobin concentrations in high-risk infants, correlated with core ASD symptoms.",SRC_PMC8851356,From results_claims.CLM_PMC8851356_01
 EVLINK_0135,EQ_PMC8414570_01,background_only,,background_only,high,Three studies found no effect of HbF on cerebral tissue oxygenation. One peripheral NIRS study found a positive correlation between HbF and peripheral fractional oxygen extraction.,SRC_PMC8414570,From results_claims.CLM_PMC8414570_01
@@ -1681,89 +1681,89 @@ EVLINK_1679,EV_VBIT_0063,method_atom,ATOM_data_import,method_atom,high,wavelengt
 EVLINK_1680,EV_VBIT_0064,method_atom,ATOM_data_import,method_atom,high,instrument called optoHIVE was used to detect cortical brain activity,SRC_PMC8901194,From acquisition.device_brand_model
 EVLINK_1681,EV_VBIT_0065,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 8.98 Hz,SRC_PMC8901194,From acquisition.sampling_rate_hz
 EVLINK_1682,EV_VBIT_0066,method_atom,ATOM_data_import,method_atom,high,16 channels were,SRC_PMC8901194,From acquisition.channels_n
-EVLINK_1683,EV_VBIT_0067,method_atom,,method_atom,high,motion correction,SRC_PMC13269331,From preprocessing_methods.motion_correction
+EVLINK_1683,EV_VBIT_0067,background_only,,background_only,high,motion correction,SRC_PMC13269331,From preprocessing_methods.motion_correction
 EVLINK_1684,EV_VBIT_0068,method_atom,ATOM_motion_correction,method_atom,high,Motion Artifact Correction,SRC_PMC13244843,From preprocessing_methods.motion_correction
-EVLINK_1685,EV_VBIT_0069,method_atom,,method_atom,high,wavelet transform,SRC_PMC13136355,From preprocessing_methods.motion_correction
-EVLINK_1686,EV_VBIT_0070,method_atom,,method_atom,high,5-fold cross-validation,SRC_PMC13136355,From analysis_methods.cv_scheme
-EVLINK_1687,EV_VBIT_0071,method_atom,,method_atom,high,leave-one-subject,SRC_PMC13136355,From analysis_methods.validation_unit
-EVLINK_1688,EV_VBIT_0072,method_atom,,method_atom,high,wavelet transform,SRC_PMC11564592,From preprocessing_methods.motion_correction
-EVLINK_1689,EV_VBIT_0073,method_atom,,method_atom,high,leave-one-subject,SRC_PMC11564592,From analysis_methods.validation_unit
+EVLINK_1685,EV_VBIT_0069,background_only,,background_only,high,wavelet transform,SRC_PMC13136355,From preprocessing_methods.motion_correction
+EVLINK_1686,EV_VBIT_0070,background_only,,background_only,high,5-fold cross-validation,SRC_PMC13136355,From analysis_methods.cv_scheme
+EVLINK_1687,EV_VBIT_0071,background_only,,background_only,high,leave-one-subject,SRC_PMC13136355,From analysis_methods.validation_unit
+EVLINK_1688,EV_VBIT_0072,background_only,,background_only,high,wavelet transform,SRC_PMC11564592,From preprocessing_methods.motion_correction
+EVLINK_1689,EV_VBIT_0073,background_only,,background_only,high,leave-one-subject,SRC_PMC11564592,From analysis_methods.validation_unit
 EVLINK_1690,EV_VBIT_0074,method_atom,ATOM_motion_correction,method_atom,high,motion artifact correction,SRC_PMC10790918,From preprocessing_methods.motion_correction
-EVLINK_1691,EV_VBIT_0075,method_atom,,method_atom,high,nested cross-validation,SRC_PMC10790918,From analysis_methods.cv_scheme
-EVLINK_1692,EV_VBIT_0076,method_atom,,method_atom,high,wavelet transform,SRC_PMC10549729,From preprocessing_methods.motion_correction
-EVLINK_1693,EV_VBIT_0077,method_atom,,method_atom,high,short channel regression,SRC_PMC8066873,From preprocessing_methods.short_channel_regression
-EVLINK_1694,EV_VBIT_0078,method_atom,,method_atom,high,canonical hemodynamic response,SRC_PMC8066873,From analysis_methods.hrf_model
-EVLINK_1695,EV_VBIT_0079,method_atom,,method_atom,high,Leave one subject,SRC_PMC8066873,From analysis_methods.validation_unit
-EVLINK_1696,EV_VBIT_0080,method_atom,,method_atom,high,leave-one-subject-out,SRC_PMC7892769,From analysis_methods.cv_scheme
-EVLINK_1697,EV_VBIT_0081,method_atom,,method_atom,high,leave-one-subject,SRC_PMC7892769,From analysis_methods.validation_unit
+EVLINK_1691,EV_VBIT_0075,background_only,,background_only,high,nested cross-validation,SRC_PMC10790918,From analysis_methods.cv_scheme
+EVLINK_1692,EV_VBIT_0076,background_only,,background_only,high,wavelet transform,SRC_PMC10549729,From preprocessing_methods.motion_correction
+EVLINK_1693,EV_VBIT_0077,background_only,,background_only,high,short channel regression,SRC_PMC8066873,From preprocessing_methods.short_channel_regression
+EVLINK_1694,EV_VBIT_0078,background_only,,background_only,high,canonical hemodynamic response,SRC_PMC8066873,From analysis_methods.hrf_model
+EVLINK_1695,EV_VBIT_0079,background_only,,background_only,high,Leave one subject,SRC_PMC8066873,From analysis_methods.validation_unit
+EVLINK_1696,EV_VBIT_0080,background_only,,background_only,high,leave-one-subject-out,SRC_PMC7892769,From analysis_methods.cv_scheme
+EVLINK_1697,EV_VBIT_0081,background_only,,background_only,high,leave-one-subject,SRC_PMC7892769,From analysis_methods.validation_unit
 EVLINK_1698,EV_VBIT_0082,method_atom,ATOM_motion_correction,method_atom,high,Motion artifact detection,SRC_PMC7824905,From preprocessing_methods.motion_correction
-EVLINK_1699,EV_VBIT_0083,method_atom,,method_atom,high,canonical hemodynamic response,SRC_PMC7824905,From analysis_methods.hrf_model
-EVLINK_1700,EV_VBIT_0084,method_atom,,method_atom,high,canonical hemodynamic response,SRC_PMC5512010,From analysis_methods.hrf_model
-EVLINK_1701,EV_VBIT_0085,method_atom,,method_atom,high,motion correction,SRC_PMC13291161,From preprocessing_methods.motion_correction
-EVLINK_1702,EV_VBIT_0086,method_atom,,method_atom,high,5-fold cross-validation,SRC_PMC13291161,From analysis_methods.cv_scheme
-EVLINK_1703,EV_VBIT_0087,method_atom,,method_atom,high,5-fold cross-validation,SRC_PMC13119916,From analysis_methods.cv_scheme
-EVLINK_1704,EV_VBIT_0088,method_atom,,method_atom,high,short-channel regression,SRC_PMC12581266,From preprocessing_methods.short_channel_regression
-EVLINK_1705,EV_VBIT_0089,method_atom,,method_atom,high,Wavelet Transform,SRC_PMC12286323,From preprocessing_methods.motion_correction
-EVLINK_1706,EV_VBIT_0090,method_atom,,method_atom,high,5-fold cross-validation,SRC_PMC12105807,From analysis_methods.cv_scheme
-EVLINK_1707,EV_VBIT_0091,method_atom,,method_atom,high,wavelet transform,SRC_PMC11918759,From preprocessing_methods.motion_correction
-EVLINK_1708,EV_VBIT_0092,method_atom,,method_atom,high,leave-one-subject-out,SRC_PMC11918759,From analysis_methods.cv_scheme
-EVLINK_1709,EV_VBIT_0093,method_atom,,method_atom,high,leave-one-subject,SRC_PMC11918759,From analysis_methods.validation_unit
-EVLINK_1710,EV_VBIT_0094,method_atom,,method_atom,high,short-channel regression,SRC_PMC12270413,From preprocessing_methods.short_channel_regression
-EVLINK_1711,EV_VBIT_0095,method_atom,,method_atom,high,"processing pipeline included channel pruning, conversion, MA correction, band-pass filtering, and image reconstruction based on the default source-detector layout, including Jacob",SRC_PMC12270413,From preprocessing_methods.preprocessing_pipeline
-EVLINK_1712,EV_VBIT_0096,method_atom,,method_atom,high,canonical hemodynamic response,SRC_PMC10295283,From analysis_methods.hrf_model
-EVLINK_1713,EV_VBIT_0097,method_atom,,method_atom,high,short channel regression,SRC_PMC9896013,From preprocessing_methods.short_channel_regression
-EVLINK_1714,EV_VBIT_0098,method_atom,,method_atom,high,short channel regression,SRC_PMC9174890,From preprocessing_methods.short_channel_regression
-EVLINK_1715,EV_VBIT_0099,method_atom,,method_atom,high,GLM was employed,SRC_PMC9174890,From analysis_methods.glm_model
-EVLINK_1716,EV_VBIT_0100,method_atom,,method_atom,high,spline interpolation,SRC_PMC5605645,From preprocessing_methods.motion_correction
+EVLINK_1699,EV_VBIT_0083,background_only,,background_only,high,canonical hemodynamic response,SRC_PMC7824905,From analysis_methods.hrf_model
+EVLINK_1700,EV_VBIT_0084,background_only,,background_only,high,canonical hemodynamic response,SRC_PMC5512010,From analysis_methods.hrf_model
+EVLINK_1701,EV_VBIT_0085,background_only,,background_only,high,motion correction,SRC_PMC13291161,From preprocessing_methods.motion_correction
+EVLINK_1702,EV_VBIT_0086,background_only,,background_only,high,5-fold cross-validation,SRC_PMC13291161,From analysis_methods.cv_scheme
+EVLINK_1703,EV_VBIT_0087,background_only,,background_only,high,5-fold cross-validation,SRC_PMC13119916,From analysis_methods.cv_scheme
+EVLINK_1704,EV_VBIT_0088,background_only,,background_only,high,short-channel regression,SRC_PMC12581266,From preprocessing_methods.short_channel_regression
+EVLINK_1705,EV_VBIT_0089,background_only,,background_only,high,Wavelet Transform,SRC_PMC12286323,From preprocessing_methods.motion_correction
+EVLINK_1706,EV_VBIT_0090,background_only,,background_only,high,5-fold cross-validation,SRC_PMC12105807,From analysis_methods.cv_scheme
+EVLINK_1707,EV_VBIT_0091,background_only,,background_only,high,wavelet transform,SRC_PMC11918759,From preprocessing_methods.motion_correction
+EVLINK_1708,EV_VBIT_0092,background_only,,background_only,high,leave-one-subject-out,SRC_PMC11918759,From analysis_methods.cv_scheme
+EVLINK_1709,EV_VBIT_0093,background_only,,background_only,high,leave-one-subject,SRC_PMC11918759,From analysis_methods.validation_unit
+EVLINK_1710,EV_VBIT_0094,background_only,,background_only,high,short-channel regression,SRC_PMC12270413,From preprocessing_methods.short_channel_regression
+EVLINK_1711,EV_VBIT_0095,background_only,,background_only,high,"processing pipeline included channel pruning, conversion, MA correction, band-pass filtering, and image reconstruction based on the default source-detector layout, including Jacob",SRC_PMC12270413,From preprocessing_methods.preprocessing_pipeline
+EVLINK_1712,EV_VBIT_0096,background_only,,background_only,high,canonical hemodynamic response,SRC_PMC10295283,From analysis_methods.hrf_model
+EVLINK_1713,EV_VBIT_0097,background_only,,background_only,high,short channel regression,SRC_PMC9896013,From preprocessing_methods.short_channel_regression
+EVLINK_1714,EV_VBIT_0098,background_only,,background_only,high,short channel regression,SRC_PMC9174890,From preprocessing_methods.short_channel_regression
+EVLINK_1715,EV_VBIT_0099,background_only,,background_only,high,GLM was employed,SRC_PMC9174890,From analysis_methods.glm_model
+EVLINK_1716,EV_VBIT_0100,background_only,,background_only,high,spline interpolation,SRC_PMC5605645,From preprocessing_methods.motion_correction
 EVLINK_1717,EV_VBIT_0101,method_atom,ATOM_motion_correction,method_atom,high,motion artifact correction,SRC_PMC5380755,From preprocessing_methods.motion_correction
 EVLINK_1718,EV_VBIT_0102,method_atom,ATOM_motion_correction,method_atom,high,motion artifact correction,SRC_PMC13210414,From preprocessing_methods.motion_correction
-EVLINK_1719,EV_VBIT_0103,method_atom,,method_atom,high,short-channel regression,SRC_PMC13210414,From preprocessing_methods.short_channel_regression
-EVLINK_1720,EV_VBIT_0104,method_atom,,method_atom,high,"preprocessing pipeline was applied in the following order. First, noisy channels were detected and corrected. For each channel, the coefficient of variation (CV) was computed as",SRC_PMC13210414,From preprocessing_methods.preprocessing_pipeline
-EVLINK_1721,EV_VBIT_0105,method_atom,,method_atom,high,leave-one-subject-out,SRC_PMC13210414,From analysis_methods.cv_scheme
-EVLINK_1722,EV_VBIT_0106,method_atom,,method_atom,high,leave-one-subject,SRC_PMC13210414,From analysis_methods.validation_unit
-EVLINK_1723,EV_VBIT_0107,method_atom,,method_atom,high,motion correction,SRC_PMC12781209,From preprocessing_methods.motion_correction
-EVLINK_1724,EV_VBIT_0108,method_atom,,method_atom,high,spline correction,SRC_PMC12673338,From preprocessing_methods.motion_correction
-EVLINK_1725,EV_VBIT_0109,method_atom,,method_atom,high,short-channel regression,SRC_PMC12673338,From preprocessing_methods.short_channel_regression
-EVLINK_1726,EV_VBIT_0110,method_atom,,method_atom,high,Wavelet Transform,SRC_PMC12627794,From preprocessing_methods.motion_correction
-EVLINK_1727,EV_VBIT_0111,method_atom,,method_atom,high,"preprocessing pipeline was conducted using MATLAB to extract critical information from raw files, including metadata, event markers (types and timestamps), channel configuration",SRC_PMC12627794,From preprocessing_methods.preprocessing_pipeline
-EVLINK_1728,EV_VBIT_0112,method_atom,,method_atom,high,motion correction,SRC_PMC12157042,From preprocessing_methods.motion_correction
-EVLINK_1729,EV_VBIT_0113,method_atom,,method_atom,high,"processing procedure was conducted in two distinct phases: one for EEG signals and the other for fNIRS signals. Due to the inherent temporal resolution of EEG signals, they ar",SRC_PMC12157042,From preprocessing_methods.preprocessing_pipeline
-EVLINK_1730,EV_VBIT_0114,method_atom,,method_atom,high,code are available at,SRC_PMC12407257,From analysis_methods.data_code_availability
-EVLINK_1731,EV_VBIT_0115,method_atom,,method_atom,high,leave-one-subject,SRC_PMC11110533,From analysis_methods.validation_unit
-EVLINK_1732,EV_VBIT_0116,method_atom,,method_atom,high,motion correction,SRC_PMC10942712,From preprocessing_methods.motion_correction
-EVLINK_1733,EV_VBIT_0117,method_atom,,method_atom,high,0.01-0.08 Hz band-pass,SRC_PMC10942712,From preprocessing_methods.filter_settings
-EVLINK_1734,EV_VBIT_0118,method_atom,,method_atom,high,leave-one-subject-out,SRC_PMC11154386,From analysis_methods.cv_scheme
-EVLINK_1735,EV_VBIT_0119,method_atom,,method_atom,high,leave-one-subject,SRC_PMC11154386,From analysis_methods.validation_unit
-EVLINK_1736,EV_VBIT_0120,method_atom,,method_atom,high,"processing steps were performed on a personal computer equipped with an Intel Core i7-12700F 4.9-GHz CPU, 512 GB of memory, and NVIDIA GEForce RTX 3080 Ti GPU. The models w",SRC_PMC10362671,From preprocessing_methods.preprocessing_pipeline
-EVLINK_1737,EV_VBIT_0121,method_atom,,method_atom,high,wavelet transform,SRC_PMC10137986,From preprocessing_methods.motion_correction
-EVLINK_1738,EV_VBIT_0122,method_atom,,method_atom,high,"preprocessing procedure included MeanFilt, MedFilt, and MAS to obtain the preprocessed data, which was then used for subsequent analyses. In addition, to more clearly observe the effe",SRC_PMC10137986,From preprocessing_methods.preprocessing_pipeline
-EVLINK_1739,EV_VBIT_0123,method_atom,,method_atom,high,spline interpolation,SRC_PMC9742284,From preprocessing_methods.motion_correction
+EVLINK_1719,EV_VBIT_0103,background_only,,background_only,high,short-channel regression,SRC_PMC13210414,From preprocessing_methods.short_channel_regression
+EVLINK_1720,EV_VBIT_0104,background_only,,background_only,high,"preprocessing pipeline was applied in the following order. First, noisy channels were detected and corrected. For each channel, the coefficient of variation (CV) was computed as",SRC_PMC13210414,From preprocessing_methods.preprocessing_pipeline
+EVLINK_1721,EV_VBIT_0105,background_only,,background_only,high,leave-one-subject-out,SRC_PMC13210414,From analysis_methods.cv_scheme
+EVLINK_1722,EV_VBIT_0106,background_only,,background_only,high,leave-one-subject,SRC_PMC13210414,From analysis_methods.validation_unit
+EVLINK_1723,EV_VBIT_0107,background_only,,background_only,high,motion correction,SRC_PMC12781209,From preprocessing_methods.motion_correction
+EVLINK_1724,EV_VBIT_0108,background_only,,background_only,high,spline correction,SRC_PMC12673338,From preprocessing_methods.motion_correction
+EVLINK_1725,EV_VBIT_0109,background_only,,background_only,high,short-channel regression,SRC_PMC12673338,From preprocessing_methods.short_channel_regression
+EVLINK_1726,EV_VBIT_0110,background_only,,background_only,high,Wavelet Transform,SRC_PMC12627794,From preprocessing_methods.motion_correction
+EVLINK_1727,EV_VBIT_0111,background_only,,background_only,high,"preprocessing pipeline was conducted using MATLAB to extract critical information from raw files, including metadata, event markers (types and timestamps), channel configuration",SRC_PMC12627794,From preprocessing_methods.preprocessing_pipeline
+EVLINK_1728,EV_VBIT_0112,background_only,,background_only,high,motion correction,SRC_PMC12157042,From preprocessing_methods.motion_correction
+EVLINK_1729,EV_VBIT_0113,background_only,,background_only,high,"processing procedure was conducted in two distinct phases: one for EEG signals and the other for fNIRS signals. Due to the inherent temporal resolution of EEG signals, they ar",SRC_PMC12157042,From preprocessing_methods.preprocessing_pipeline
+EVLINK_1730,EV_VBIT_0114,background_only,,background_only,high,code are available at,SRC_PMC12407257,From analysis_methods.data_code_availability
+EVLINK_1731,EV_VBIT_0115,background_only,,background_only,high,leave-one-subject,SRC_PMC11110533,From analysis_methods.validation_unit
+EVLINK_1732,EV_VBIT_0116,background_only,,background_only,high,motion correction,SRC_PMC10942712,From preprocessing_methods.motion_correction
+EVLINK_1733,EV_VBIT_0117,background_only,,background_only,high,0.01-0.08 Hz band-pass,SRC_PMC10942712,From preprocessing_methods.filter_settings
+EVLINK_1734,EV_VBIT_0118,background_only,,background_only,high,leave-one-subject-out,SRC_PMC11154386,From analysis_methods.cv_scheme
+EVLINK_1735,EV_VBIT_0119,background_only,,background_only,high,leave-one-subject,SRC_PMC11154386,From analysis_methods.validation_unit
+EVLINK_1736,EV_VBIT_0120,background_only,,background_only,high,"processing steps were performed on a personal computer equipped with an Intel Core i7-12700F 4.9-GHz CPU, 512 GB of memory, and NVIDIA GEForce RTX 3080 Ti GPU. The models w",SRC_PMC10362671,From preprocessing_methods.preprocessing_pipeline
+EVLINK_1737,EV_VBIT_0121,background_only,,background_only,high,wavelet transform,SRC_PMC10137986,From preprocessing_methods.motion_correction
+EVLINK_1738,EV_VBIT_0122,background_only,,background_only,high,"preprocessing procedure included MeanFilt, MedFilt, and MAS to obtain the preprocessed data, which was then used for subsequent analyses. In addition, to more clearly observe the effe",SRC_PMC10137986,From preprocessing_methods.preprocessing_pipeline
+EVLINK_1739,EV_VBIT_0123,background_only,,background_only,high,spline interpolation,SRC_PMC9742284,From preprocessing_methods.motion_correction
 EVLINK_1740,EV_VBIT_0124,method_atom,ATOM_motion_correction,method_atom,high,Motion Artifact Correction,SRC_PMC9692288,From preprocessing_methods.motion_correction
-EVLINK_1741,EV_VBIT_0125,method_atom,,method_atom,high,leave-one-subject,SRC_PMC9692288,From analysis_methods.validation_unit
-EVLINK_1742,EV_VBIT_0126,method_atom,,method_atom,high,spline interpolation,SRC_PMC8263279,From preprocessing_methods.motion_correction
-EVLINK_1743,EV_VBIT_0127,method_atom,,method_atom,high,10-fold cross-validation,SRC_PMC7677412,From analysis_methods.cv_scheme
-EVLINK_1744,EV_VBIT_0128,method_atom,,method_atom,high,10-fold cross validation,SRC_PMC5829061,From analysis_methods.cv_scheme
+EVLINK_1741,EV_VBIT_0125,background_only,,background_only,high,leave-one-subject,SRC_PMC9692288,From analysis_methods.validation_unit
+EVLINK_1742,EV_VBIT_0126,background_only,,background_only,high,spline interpolation,SRC_PMC8263279,From preprocessing_methods.motion_correction
+EVLINK_1743,EV_VBIT_0127,background_only,,background_only,high,10-fold cross-validation,SRC_PMC7677412,From analysis_methods.cv_scheme
+EVLINK_1744,EV_VBIT_0128,background_only,,background_only,high,10-fold cross validation,SRC_PMC5829061,From analysis_methods.cv_scheme
 EVLINK_1745,EV_VBIT_0129,method_atom,ATOM_motion_correction,method_atom,high,motion artifact correction,SRC_PMC12714936,From preprocessing_methods.motion_correction
-EVLINK_1746,EV_VBIT_0130,method_atom,,method_atom,high,short-channel regression,SRC_PMC12714936,From preprocessing_methods.short_channel_regression
-EVLINK_1747,EV_VBIT_0131,method_atom,,method_atom,high,motion detection,SRC_PMC11314658,From preprocessing_methods.motion_correction
-EVLINK_1748,EV_VBIT_0132,method_atom,,method_atom,high,Short-channel regression,SRC_PMC9555616,From preprocessing_methods.short_channel_regression
-EVLINK_1749,EV_VBIT_0133,method_atom,,method_atom,high,short channel regression,SRC_PMC9386281,From preprocessing_methods.short_channel_regression
-EVLINK_1750,EV_VBIT_0134,method_atom,,method_atom,high,short channel regression,SRC_PMC9116886,From preprocessing_methods.short_channel_regression
-EVLINK_1751,EV_VBIT_0135,method_atom,,method_atom,high,data are available at,SRC_PMC9116886,From analysis_methods.data_code_availability
-EVLINK_1752,EV_VBIT_0136,method_atom,,method_atom,high,wavelet transform,SRC_PMC8093202,From preprocessing_methods.motion_correction
-EVLINK_1753,EV_VBIT_0137,method_atom,,method_atom,high,canonical hemodynamic response,SRC_PMC7829673,From analysis_methods.hrf_model
-EVLINK_1754,EV_VBIT_0138,method_atom,,method_atom,high,short channel regression,SRC_PMC7511246,From preprocessing_methods.short_channel_regression
-EVLINK_1755,EV_VBIT_0139,method_atom,,method_atom,high,spline interpolation,SRC_PMC5971219,From preprocessing_methods.motion_correction
-EVLINK_1756,EV_VBIT_0140,method_atom,,method_atom,high,motion correction,SRC_PMC4619753,From preprocessing_methods.motion_correction
-EVLINK_1757,EV_VBIT_0141,method_atom,,method_atom,high,canonical hemodynamic response,SRC_PMC3756568,From analysis_methods.hrf_model
-EVLINK_1758,EV_VBIT_0142,method_atom,,method_atom,high,short channel regression,SRC_PMC3665655,From preprocessing_methods.short_channel_regression
-EVLINK_1759,EV_VBIT_0143,method_atom,,method_atom,high,motion correction,SRC_PMC3348501,From preprocessing_methods.motion_correction
+EVLINK_1746,EV_VBIT_0130,background_only,,background_only,high,short-channel regression,SRC_PMC12714936,From preprocessing_methods.short_channel_regression
+EVLINK_1747,EV_VBIT_0131,background_only,,background_only,high,motion detection,SRC_PMC11314658,From preprocessing_methods.motion_correction
+EVLINK_1748,EV_VBIT_0132,background_only,,background_only,high,Short-channel regression,SRC_PMC9555616,From preprocessing_methods.short_channel_regression
+EVLINK_1749,EV_VBIT_0133,background_only,,background_only,high,short channel regression,SRC_PMC9386281,From preprocessing_methods.short_channel_regression
+EVLINK_1750,EV_VBIT_0134,background_only,,background_only,high,short channel regression,SRC_PMC9116886,From preprocessing_methods.short_channel_regression
+EVLINK_1751,EV_VBIT_0135,background_only,,background_only,high,data are available at,SRC_PMC9116886,From analysis_methods.data_code_availability
+EVLINK_1752,EV_VBIT_0136,background_only,,background_only,high,wavelet transform,SRC_PMC8093202,From preprocessing_methods.motion_correction
+EVLINK_1753,EV_VBIT_0137,background_only,,background_only,high,canonical hemodynamic response,SRC_PMC7829673,From analysis_methods.hrf_model
+EVLINK_1754,EV_VBIT_0138,background_only,,background_only,high,short channel regression,SRC_PMC7511246,From preprocessing_methods.short_channel_regression
+EVLINK_1755,EV_VBIT_0139,background_only,,background_only,high,spline interpolation,SRC_PMC5971219,From preprocessing_methods.motion_correction
+EVLINK_1756,EV_VBIT_0140,background_only,,background_only,high,motion correction,SRC_PMC4619753,From preprocessing_methods.motion_correction
+EVLINK_1757,EV_VBIT_0141,background_only,,background_only,high,canonical hemodynamic response,SRC_PMC3756568,From analysis_methods.hrf_model
+EVLINK_1758,EV_VBIT_0142,background_only,,background_only,high,short channel regression,SRC_PMC3665655,From preprocessing_methods.short_channel_regression
+EVLINK_1759,EV_VBIT_0143,background_only,,background_only,high,motion correction,SRC_PMC3348501,From preprocessing_methods.motion_correction
 EVLINK_1760,EV_VBIT_0144,method_atom,ATOM_data_import,method_atom,high,28 channels were,SRC_PMC3288700,From acquisition.channels_n
 EVLINK_1761,EV_VBIT_0145,method_atom,ATOM_data_import,method_atom,high,Shimadzu Corporation,SRC_PMC13030481,From acquisition.device_brand_model
 EVLINK_1762,EV_VBIT_0146,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC12912286,From acquisition.wavelengths_nm
 EVLINK_1763,EV_VBIT_0147,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 7.81 Hz,SRC_PMC12912286,From acquisition.sampling_rate_hz
 EVLINK_1764,EV_VBIT_0148,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC11945418,From acquisition.wavelengths_nm
-EVLINK_1765,EV_VBIT_0149,method_atom,,method_atom,high,wavelet transform,SRC_PMC11945418,From preprocessing_methods.motion_correction
+EVLINK_1765,EV_VBIT_0149,background_only,,background_only,high,wavelet transform,SRC_PMC11945418,From preprocessing_methods.motion_correction
 EVLINK_1766,EV_VBIT_0150,method_atom,ATOM_data_import,method_atom,high,24 channels were,SRC_PMC12179319,From acquisition.channels_n
 EVLINK_1767,EV_VBIT_0151,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC11125330,From acquisition.wavelengths_nm
 EVLINK_1768,EV_VBIT_0152,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 10 Hz,SRC_PMC11125330,From acquisition.sampling_rate_hz
@@ -1772,84 +1772,84 @@ EVLINK_1770,EV_VBIT_0154,method_atom,ATOM_data_import,method_atom,high,685 nm an
 EVLINK_1771,EV_VBIT_0155,method_atom,ATOM_data_import,method_atom,high,50 channels in total,SRC_PMC8831678,From acquisition.channels_n
 EVLINK_1772,EV_VBIT_0156,method_atom,ATOM_data_import,method_atom,high,acquired at 0.33 Hz,SRC_PMC8170390,From acquisition.sampling_rate_hz
 EVLINK_1773,EV_VBIT_0157,method_atom,ATOM_data_import,method_atom,high,695 nm and 830 nm,SRC_PMC7745044,From acquisition.wavelengths_nm
-EVLINK_1774,EV_VBIT_0158,method_atom,,method_atom,high,wavelet transform,SRC_PMC7745044,From preprocessing_methods.motion_correction
+EVLINK_1774,EV_VBIT_0158,background_only,,background_only,high,wavelet transform,SRC_PMC7745044,From preprocessing_methods.motion_correction
 EVLINK_1775,EV_VBIT_0159,method_atom,ATOM_data_import,method_atom,high,690 nm and 830 nm,SRC_PMC7703677,From acquisition.wavelengths_nm
 EVLINK_1776,EV_VBIT_0160,method_atom,ATOM_data_import,method_atom,high,acquired at 50 Hz,SRC_PMC7703677,From acquisition.sampling_rate_hz
 EVLINK_1777,EV_VBIT_0161,method_atom,ATOM_data_import,method_atom,high,wavelengths 760 and 850,SRC_PMC6769087,From acquisition.wavelengths_nm
 EVLINK_1778,EV_VBIT_0162,method_atom,ATOM_data_import,method_atom,high,785 nm and 830 nm,SRC_PMC6191612,From acquisition.wavelengths_nm
 EVLINK_1779,EV_VBIT_0163,method_atom,ATOM_data_import,method_atom,high,48 channels in total,SRC_PMC6191612,From acquisition.channels_n
-EVLINK_1780,EV_VBIT_0164,method_atom,,method_atom,high,wavelet transform,SRC_PMC6191612,From preprocessing_methods.motion_correction
+EVLINK_1780,EV_VBIT_0164,background_only,,background_only,high,wavelet transform,SRC_PMC6191612,From preprocessing_methods.motion_correction
 EVLINK_1781,EV_VBIT_0165,method_atom,ATOM_data_import,method_atom,high,Hamamatsu Photonics,SRC_PMC6323003,From acquisition.device_brand_model
-EVLINK_1782,EV_VBIT_0166,method_atom,,method_atom,high,wavelet transform,SRC_PMC6323003,From preprocessing_methods.motion_correction
+EVLINK_1782,EV_VBIT_0166,background_only,,background_only,high,wavelet transform,SRC_PMC6323003,From preprocessing_methods.motion_correction
 EVLINK_1783,EV_VBIT_0167,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC5766679,From acquisition.wavelengths_nm
 EVLINK_1784,EV_VBIT_0168,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC5175555,From acquisition.wavelengths_nm
-EVLINK_1785,EV_VBIT_0169,method_atom,,method_atom,high,data accessible in,SRC_PMC5175555,From acquisition.data_code_availability
+EVLINK_1785,EV_VBIT_0169,background_only,,background_only,high,data accessible in,SRC_PMC5175555,From acquisition.data_code_availability
 EVLINK_1786,EV_VBIT_0170,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC3859838,From acquisition.wavelengths_nm
 EVLINK_1787,EV_VBIT_0171,method_atom,ATOM_data_import,method_atom,high,690 nm and 830 nm,SRC_PMC13199322,From acquisition.wavelengths_nm
 EVLINK_1788,EV_VBIT_0172,method_atom,ATOM_data_import,method_atom,high,785 nm and 830 nm,SRC_PMC12717063,From acquisition.wavelengths_nm
-EVLINK_1789,EV_VBIT_0173,method_atom,,method_atom,high,wavelet transform,SRC_PMC12634216,From preprocessing_methods.motion_correction
+EVLINK_1789,EV_VBIT_0173,background_only,,background_only,high,wavelet transform,SRC_PMC12634216,From preprocessing_methods.motion_correction
 EVLINK_1790,EV_VBIT_0174,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 25 Hz,SRC_PMC12319887,From acquisition.sampling_rate_hz
-EVLINK_1791,EV_VBIT_0175,method_atom,,method_atom,high,wavelet transform,SRC_PMC12319887,From preprocessing_methods.motion_correction
+EVLINK_1791,EV_VBIT_0175,background_only,,background_only,high,wavelet transform,SRC_PMC12319887,From preprocessing_methods.motion_correction
 EVLINK_1792,EV_VBIT_0176,method_atom,ATOM_data_import,method_atom,high,690 nm and 830 nm,SRC_PMC11679141,From acquisition.wavelengths_nm
-EVLINK_1793,EV_VBIT_0177,method_atom,,method_atom,high,wavelet transform,SRC_PMC11679141,From preprocessing_methods.motion_correction
-EVLINK_1794,EV_VBIT_0178,method_atom,,method_atom,high,wavelet transform,SRC_PMC11059326,From preprocessing_methods.motion_correction
+EVLINK_1793,EV_VBIT_0177,background_only,,background_only,high,wavelet transform,SRC_PMC11679141,From preprocessing_methods.motion_correction
+EVLINK_1794,EV_VBIT_0178,background_only,,background_only,high,wavelet transform,SRC_PMC11059326,From preprocessing_methods.motion_correction
 EVLINK_1795,EV_VBIT_0179,method_atom,ATOM_data_import,method_atom,high,759 nm and 841 nm,SRC_PMC10199511,From acquisition.wavelengths_nm
 EVLINK_1796,EV_VBIT_0180,method_atom,ATOM_data_import,method_atom,high,wavelengths of 760 and 850,SRC_PMC10146128,From acquisition.wavelengths_nm
 EVLINK_1797,EV_VBIT_0181,method_atom,ATOM_data_import,method_atom,high,wavelengths of 760 and 850,SRC_PMC9775029,From acquisition.wavelengths_nm
 EVLINK_1798,EV_VBIT_0182,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 50 Hz,SRC_PMC9775029,From acquisition.sampling_rate_hz
 EVLINK_1799,EV_VBIT_0183,method_atom,ATOM_data_import,method_atom,high,wavelengths of 695 and 830,SRC_PMC7985709,From acquisition.wavelengths_nm
-EVLINK_1800,EV_VBIT_0184,method_atom,,method_atom,high,wavelet transform,SRC_PMC7985709,From preprocessing_methods.motion_correction
-EVLINK_1801,EV_VBIT_0185,method_atom,,method_atom,high,wavelet transform,SRC_PMC6824917,From preprocessing_methods.motion_correction
-EVLINK_1802,EV_VBIT_0186,method_atom,,method_atom,high,wavelet transform,SRC_PMC6387909,From preprocessing_methods.motion_correction
+EVLINK_1800,EV_VBIT_0184,background_only,,background_only,high,wavelet transform,SRC_PMC7985709,From preprocessing_methods.motion_correction
+EVLINK_1801,EV_VBIT_0185,background_only,,background_only,high,wavelet transform,SRC_PMC6824917,From preprocessing_methods.motion_correction
+EVLINK_1802,EV_VBIT_0186,background_only,,background_only,high,wavelet transform,SRC_PMC6387909,From preprocessing_methods.motion_correction
 EVLINK_1803,EV_VBIT_0187,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 100 Hz,SRC_PMC5562388,From acquisition.sampling_rate_hz
-EVLINK_1804,EV_VBIT_0188,method_atom,,method_atom,high,wavelet transform,SRC_PMC5565675,From preprocessing_methods.motion_correction
+EVLINK_1804,EV_VBIT_0188,background_only,,background_only,high,wavelet transform,SRC_PMC5565675,From preprocessing_methods.motion_correction
 EVLINK_1805,EV_VBIT_0189,method_atom,ATOM_data_import,method_atom,high,sampling at 0.1 Hz,SRC_PMC5772737,From acquisition.sampling_rate_hz
 EVLINK_1806,EV_VBIT_0190,method_atom,ATOM_data_import,method_atom,high,695 nm and 830 nm,SRC_PMC5026156,From acquisition.wavelengths_nm
 EVLINK_1807,EV_VBIT_0191,method_atom,ATOM_data_import,method_atom,high,384 channels were,SRC_PMC4408240,From acquisition.channels_n
 EVLINK_1808,EV_VBIT_0192,method_atom,ATOM_data_import,method_atom,high,Hamamatsu Photonics,SRC_PMC4258229,From acquisition.device_brand_model
 EVLINK_1809,EV_VBIT_0193,method_atom,ATOM_data_import,method_atom,high,830 nm and 690 nm,SRC_PMC2806654,From acquisition.wavelengths_nm
-EVLINK_1810,EV_VBIT_0194,method_atom,,method_atom,high,wavelet transform,SRC_PMC2806654,From preprocessing_methods.motion_correction
-EVLINK_1811,EV_VBIT_0195,method_atom,,method_atom,high,general linear model was used,SRC_PMC2806654,From analysis_methods.glm_model
+EVLINK_1810,EV_VBIT_0194,background_only,,background_only,high,wavelet transform,SRC_PMC2806654,From preprocessing_methods.motion_correction
+EVLINK_1811,EV_VBIT_0195,background_only,,background_only,high,general linear model was used,SRC_PMC2806654,From analysis_methods.glm_model
 EVLINK_1812,EV_VBIT_0196,method_atom,ATOM_data_import,method_atom,high,730 nm and 850 nm,SRC_PMC13291108,From acquisition.wavelengths_nm
 EVLINK_1813,EV_VBIT_0197,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 256 Hz,SRC_PMC12290587,From acquisition.sampling_rate_hz
-EVLINK_1814,EV_VBIT_0198,method_atom,,method_atom,high,code are available at,SRC_PMC12290587,From acquisition.data_code_availability
+EVLINK_1814,EV_VBIT_0198,background_only,,background_only,high,code are available at,SRC_PMC12290587,From acquisition.data_code_availability
 EVLINK_1815,EV_VBIT_0199,method_atom,ATOM_data_import,method_atom,high,735 nm and 850 nm,SRC_PMC10961353,From acquisition.wavelengths_nm
 EVLINK_1816,EV_VBIT_0200,method_atom,ATOM_data_import,method_atom,high,sampling at 0.067 Hz,SRC_PMC10676135,From acquisition.sampling_rate_hz
-EVLINK_1817,EV_VBIT_0201,method_atom,,method_atom,high,wavelet transform,SRC_PMC9205639,From preprocessing_methods.motion_correction
-EVLINK_1818,EV_VBIT_0202,method_atom,,method_atom,high,wavelet transform,SRC_PMC8973170,From preprocessing_methods.motion_correction
-EVLINK_1819,EV_VBIT_0203,method_atom,,method_atom,high,wavelet transform,SRC_PMC8778041,From preprocessing_methods.motion_correction
+EVLINK_1817,EV_VBIT_0201,background_only,,background_only,high,wavelet transform,SRC_PMC9205639,From preprocessing_methods.motion_correction
+EVLINK_1818,EV_VBIT_0202,background_only,,background_only,high,wavelet transform,SRC_PMC8973170,From preprocessing_methods.motion_correction
+EVLINK_1819,EV_VBIT_0203,background_only,,background_only,high,wavelet transform,SRC_PMC8778041,From preprocessing_methods.motion_correction
 EVLINK_1820,EV_VBIT_0204,method_atom,ATOM_data_import,method_atom,high,acquired at 5 Hz,SRC_PMC7966407,From acquisition.sampling_rate_hz
-EVLINK_1821,EV_VBIT_0205,method_atom,,method_atom,high,data available at,SRC_PMC7966407,From acquisition.data_code_availability
-EVLINK_1822,EV_VBIT_0206,method_atom,,method_atom,high,wavelet transform,SRC_PMC7927423,From preprocessing_methods.motion_correction
+EVLINK_1821,EV_VBIT_0205,background_only,,background_only,high,data available at,SRC_PMC7966407,From acquisition.data_code_availability
+EVLINK_1822,EV_VBIT_0206,background_only,,background_only,high,wavelet transform,SRC_PMC7927423,From preprocessing_methods.motion_correction
 EVLINK_1823,EV_VBIT_0207,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 0.209 Hz,SRC_PMC7280505,From acquisition.sampling_rate_hz
-EVLINK_1824,EV_VBIT_0208,method_atom,,method_atom,high,wavelet transform,SRC_PMC7280505,From preprocessing_methods.motion_correction
-EVLINK_1825,EV_VBIT_0209,method_atom,,method_atom,high,wavelet transform,SRC_PMC6412154,From preprocessing_methods.motion_correction
-EVLINK_1826,EV_VBIT_0210,method_atom,,method_atom,high,wavelet transform,SRC_PMC5424771,From preprocessing_methods.motion_correction
-EVLINK_1827,EV_VBIT_0211,method_atom,,method_atom,high,wavelet transform,SRC_PMC4753811,From preprocessing_methods.motion_correction
+EVLINK_1824,EV_VBIT_0208,background_only,,background_only,high,wavelet transform,SRC_PMC7280505,From preprocessing_methods.motion_correction
+EVLINK_1825,EV_VBIT_0209,background_only,,background_only,high,wavelet transform,SRC_PMC6412154,From preprocessing_methods.motion_correction
+EVLINK_1826,EV_VBIT_0210,background_only,,background_only,high,wavelet transform,SRC_PMC5424771,From preprocessing_methods.motion_correction
+EVLINK_1827,EV_VBIT_0211,background_only,,background_only,high,wavelet transform,SRC_PMC4753811,From preprocessing_methods.motion_correction
 EVLINK_1828,EV_VBIT_0212,method_atom,ATOM_data_import,method_atom,high,861 nm and 765 nm,SRC_PMC4750083,From acquisition.wavelengths_nm
 EVLINK_1829,EV_VBIT_0213,method_atom,ATOM_data_import,method_atom,high,"wavelengths 689, 797",SRC_PMC3865602,From acquisition.wavelengths_nm
-EVLINK_1830,EV_VBIT_0214,method_atom,,method_atom,high,wavelet transform,SRC_PMC3865602,From preprocessing_methods.motion_correction
+EVLINK_1830,EV_VBIT_0214,background_only,,background_only,high,wavelet transform,SRC_PMC3865602,From preprocessing_methods.motion_correction
 EVLINK_1831,EV_VBIT_0215,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 7.8 Hz,SRC_PMC3762942,From acquisition.sampling_rate_hz
 EVLINK_1832,EV_VBIT_0216,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 1.6 Hz,SRC_PMC2846950,From acquisition.sampling_rate_hz
 EVLINK_1833,EV_VBIT_0217,method_atom,ATOM_data_import,method_atom,high,690 nm and 830 nm,SRC_PMC2692693,From acquisition.wavelengths_nm
-EVLINK_1834,EV_VBIT_0218,method_atom,,method_atom,high,wavelet transform,SRC_PMC13259229,From preprocessing_methods.motion_correction
+EVLINK_1834,EV_VBIT_0218,background_only,,background_only,high,wavelet transform,SRC_PMC13259229,From preprocessing_methods.motion_correction
 EVLINK_1835,EV_VBIT_0219,method_atom,ATOM_data_import,method_atom,high,48 channels were,SRC_PMC13249213,From acquisition.channels_n
 EVLINK_1836,EV_VBIT_0220,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC10681683,From acquisition.wavelengths_nm
 EVLINK_1837,EV_VBIT_0221,method_atom,ATOM_data_import,method_atom,high,695 nm and 830 nm,SRC_PMC10957543,From acquisition.wavelengths_nm
 EVLINK_1838,EV_VBIT_0222,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC11548208,From acquisition.wavelengths_nm
 EVLINK_1839,EV_VBIT_0223,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 800 Hz,SRC_PMC11762704,From acquisition.sampling_rate_hz
 EVLINK_1840,EV_VBIT_0224,method_atom,ATOM_data_import,method_atom,high,730 nm and 850 nm,SRC_PMC12947967,From acquisition.wavelengths_nm
-EVLINK_1841,EV_VBIT_0225,method_atom,,method_atom,high,Data are available on,SRC_PMC12990250,From acquisition.data_code_availability
+EVLINK_1841,EV_VBIT_0225,background_only,,background_only,high,Data are available on,SRC_PMC12990250,From acquisition.data_code_availability
 EVLINK_1842,EV_VBIT_0226,method_atom,ATOM_data_import,method_atom,high,Shimadzu Corporation,SRC_PMC3759001,From acquisition.device_brand_model
 EVLINK_1843,EV_VBIT_0227,method_atom,ATOM_data_import,method_atom,high,"wavelengths of 780, 805",SRC_PMC3759001,From acquisition.wavelengths_nm
 EVLINK_1844,EV_VBIT_0228,method_atom,ATOM_data_import,method_atom,high,750 nm and 850 nm,SRC_PMC4524535,From acquisition.wavelengths_nm
 EVLINK_1845,EV_VBIT_0229,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 10 Hz,SRC_PMC4913108,From acquisition.sampling_rate_hz
 EVLINK_1846,EV_VBIT_0230,method_atom,ATOM_data_import,method_atom,high,recorded at 7.8125 Hz,SRC_PMC5788966,From acquisition.sampling_rate_hz
-EVLINK_1847,EV_VBIT_0231,method_atom,,method_atom,high,wavelet transform,SRC_PMC5788966,From preprocessing_methods.motion_correction
+EVLINK_1847,EV_VBIT_0231,background_only,,background_only,high,wavelet transform,SRC_PMC5788966,From preprocessing_methods.motion_correction
 EVLINK_1848,EV_VBIT_0232,method_atom,ATOM_data_import,method_atom,high,acquired at 7.8 Hz,SRC_PMC6953699,From acquisition.sampling_rate_hz
-EVLINK_1849,EV_VBIT_0233,method_atom,,method_atom,high,Wavelet Transform,SRC_PMC7040364,From preprocessing_methods.motion_correction
+EVLINK_1849,EV_VBIT_0233,background_only,,background_only,high,Wavelet Transform,SRC_PMC7040364,From preprocessing_methods.motion_correction
 EVLINK_1850,EV_VBIT_0234,method_atom,ATOM_data_import,method_atom,high,760 nm and 850 nm,SRC_PMC8231828,From acquisition.wavelengths_nm
-EVLINK_1851,EV_VBIT_0235,method_atom,,method_atom,high,Wavelet Transform,SRC_PMC8231828,From preprocessing_methods.motion_correction
+EVLINK_1851,EV_VBIT_0235,background_only,,background_only,high,Wavelet Transform,SRC_PMC8231828,From preprocessing_methods.motion_correction
 EVLINK_1852,EV_VBIT_0236,method_atom,ATOM_data_import,method_atom,high,wavelength 690 and 850,SRC_PMC9587749,From acquisition.wavelengths_nm
 EVLINK_1853,EV_VBIT_0237,method_atom,ATOM_data_import,method_atom,high,acquired at 7 Hz,SRC_PMC9587749,From acquisition.sampling_rate_hz
 EVLINK_1854,EV_VBIT_0238,method_atom,ATOM_data_import,method_atom,high,695 nm and 830 nm,SRC_PMC9593203,From acquisition.wavelengths_nm
@@ -1858,90 +1858,90 @@ EVLINK_1856,EV_VBIT_0240,method_atom,ATOM_data_import,method_atom,high,wavelengt
 EVLINK_1857,EV_VBIT_0241,method_atom,ATOM_data_import,method_atom,high,48 channels were,SRC_PMC9910791,From acquisition.channels_n
 EVLINK_1858,EV_VBIT_0242,method_atom,ATOM_data_import,method_atom,high,Artinis Medical,SRC_PMC10342995,From acquisition.device_brand_model
 EVLINK_1859,EV_VBIT_0243,method_atom,ATOM_data_import,method_atom,high,ISS Centre,SRC_PMC10683641,From acquisition.device_brand_model
-EVLINK_1860,EV_VBIT_0244,method_atom,,method_atom,high,kalman filter,SRC_PMC10683641,From preprocessing_methods.motion_correction
+EVLINK_1860,EV_VBIT_0244,background_only,,background_only,high,kalman filter,SRC_PMC10683641,From preprocessing_methods.motion_correction
 EVLINK_1861,EV_VBIT_0245,method_atom,ATOM_data_import,method_atom,high,64-channel,SRC_PMC10765727,From acquisition.channels_n
-EVLINK_1862,EV_VBIT_0246,method_atom,,method_atom,high,Kalman filter,SRC_PMC10765727,From preprocessing_methods.motion_correction
-EVLINK_1863,EV_VBIT_0247,method_atom,,method_atom,high,CBSI method,SRC_PMC11188482,From preprocessing_methods.motion_correction
+EVLINK_1862,EV_VBIT_0246,background_only,,background_only,high,Kalman filter,SRC_PMC10765727,From preprocessing_methods.motion_correction
+EVLINK_1863,EV_VBIT_0247,background_only,,background_only,high,CBSI method,SRC_PMC11188482,From preprocessing_methods.motion_correction
 EVLINK_1864,EV_VBIT_0248,method_atom,ATOM_data_import,method_atom,high,Kernel flow,SRC_PMC11221108,From acquisition.device_brand_model
 EVLINK_1865,EV_VBIT_0249,method_atom,ATOM_data_import,method_atom,high,iss effect,SRC_PMC11633644,From acquisition.device_brand_model
 EVLINK_1866,EV_VBIT_0250,method_atom,ATOM_data_import,method_atom,high,2 channels,SRC_PMC11652482,From acquisition.channels_n
-EVLINK_1867,EV_VBIT_0251,method_atom,,method_atom,high,wavelet filter,SRC_PMC11652482,From preprocessing_methods.motion_correction
-EVLINK_1868,EV_VBIT_0252,method_atom,,method_atom,high,Kalman Filter,SRC_PMC11679405,From preprocessing_methods.motion_correction
+EVLINK_1867,EV_VBIT_0251,background_only,,background_only,high,wavelet filter,SRC_PMC11652482,From preprocessing_methods.motion_correction
+EVLINK_1868,EV_VBIT_0252,background_only,,background_only,high,Kalman Filter,SRC_PMC11679405,From preprocessing_methods.motion_correction
 EVLINK_1869,EV_VBIT_0253,method_atom,ATOM_data_import,method_atom,high,17 channel,SRC_PMC11892370,From acquisition.channels_n
 EVLINK_1870,EV_VBIT_0254,method_atom,ATOM_data_import,method_atom,high,48 channels,SRC_PMC11946344,From acquisition.channels_n
 EVLINK_1871,EV_VBIT_0255,method_atom,ATOM_data_import,method_atom,high,48 channels was,SRC_PMC12110038,From acquisition.channels_n
-EVLINK_1872,EV_VBIT_0256,method_atom,,method_atom,high,wavelet filter,SRC_PMC12110038,From preprocessing_methods.motion_correction
+EVLINK_1872,EV_VBIT_0256,background_only,,background_only,high,wavelet filter,SRC_PMC12110038,From preprocessing_methods.motion_correction
 EVLINK_1873,EV_VBIT_0257,method_atom,ATOM_data_import,method_atom,high,52 channels,SRC_PMC12517182,From acquisition.channels_n
 EVLINK_1874,EV_VBIT_0258,method_atom,ATOM_data_import,method_atom,high,32-channel,SRC_PMC12592382,From acquisition.channels_n
-EVLINK_1875,EV_VBIT_0259,method_atom,,method_atom,high,ICA method,SRC_PMC12592382,From preprocessing_methods.motion_correction
+EVLINK_1875,EV_VBIT_0259,background_only,,background_only,high,ICA method,SRC_PMC12592382,From preprocessing_methods.motion_correction
 EVLINK_1876,EV_VBIT_0260,method_atom,ATOM_data_import,method_atom,high,35 Channels,SRC_PMC12818463,From acquisition.channels_n
 EVLINK_1877,EV_VBIT_0261,method_atom,ATOM_data_import,method_atom,high,32 channels,SRC_PMC12944262,From acquisition.channels_n
 EVLINK_1878,EV_VBIT_0262,method_atom,ATOM_data_import,method_atom,high,Cephalogics,SRC_PMC2914577,From acquisition.device_brand_model
 EVLINK_1879,EV_VBIT_0263,method_atom,ATOM_data_import,method_atom,high,8 channels,SRC_PMC3085546,From acquisition.channels_n
-EVLINK_1880,EV_VBIT_0264,method_atom,,method_atom,high,Kalman filter,SRC_PMC3085546,From preprocessing_methods.motion_correction
-EVLINK_1881,EV_VBIT_0265,method_atom,,method_atom,high,GLM was used,SRC_PMC3085546,From analysis_methods.glm_model
+EVLINK_1880,EV_VBIT_0264,background_only,,background_only,high,Kalman filter,SRC_PMC3085546,From preprocessing_methods.motion_correction
+EVLINK_1881,EV_VBIT_0265,background_only,,background_only,high,GLM was used,SRC_PMC3085546,From analysis_methods.glm_model
 EVLINK_1882,EV_VBIT_0266,method_atom,ATOM_data_import,method_atom,high,TechEn CW6,SRC_PMC3254723,From acquisition.device_brand_model
-EVLINK_1883,EV_VBIT_0267,method_atom,,method_atom,high,Kalman filter,SRC_PMC3254723,From preprocessing_methods.motion_correction
+EVLINK_1883,EV_VBIT_0267,background_only,,background_only,high,Kalman filter,SRC_PMC3254723,From preprocessing_methods.motion_correction
 EVLINK_1884,EV_VBIT_0268,method_atom,ATOM_data_import,method_atom,high,3 channels,SRC_PMC3468891,From acquisition.channels_n
-EVLINK_1885,EV_VBIT_0269,method_atom,,method_atom,high,Kalman filter,SRC_PMC3468891,From preprocessing_methods.motion_correction
+EVLINK_1885,EV_VBIT_0269,background_only,,background_only,high,Kalman filter,SRC_PMC3468891,From preprocessing_methods.motion_correction
 EVLINK_1886,EV_VBIT_0270,method_atom,ATOM_data_import,method_atom,high,52-channel,SRC_PMC3524243,From acquisition.channels_n
 EVLINK_1887,EV_VBIT_0271,method_atom,ATOM_data_import,method_atom,high,12-channel,SRC_PMC3593078,From acquisition.channels_n
 EVLINK_1888,EV_VBIT_0272,method_atom,ATOM_data_import,method_atom,high,TechEn CW6,SRC_PMC4211632,From acquisition.device_brand_model
-EVLINK_1889,EV_VBIT_0273,method_atom,,method_atom,high,PCA filter,SRC_PMC4211632,From preprocessing_methods.motion_correction
+EVLINK_1889,EV_VBIT_0273,background_only,,background_only,high,PCA filter,SRC_PMC4211632,From preprocessing_methods.motion_correction
 EVLINK_1890,EV_VBIT_0274,method_atom,ATOM_data_import,method_atom,high,Cephalogics,SRC_PMC4478749,From acquisition.device_brand_model
 EVLINK_1891,EV_VBIT_0275,method_atom,ATOM_data_import,method_atom,high,265 channels,SRC_PMC4478749,From acquisition.channels_n
-EVLINK_1892,EV_VBIT_0276,method_atom,,method_atom,high,Kalman filter,SRC_PMC4478749,From preprocessing_methods.motion_correction
-EVLINK_1893,EV_VBIT_0277,method_atom,,method_atom,high,Kalman filter,SRC_PMC4719469,From preprocessing_methods.motion_correction
-EVLINK_1894,EV_VBIT_0278,method_atom,,method_atom,high,Kalman filter,SRC_PMC4773699,From preprocessing_methods.motion_correction
+EVLINK_1892,EV_VBIT_0276,background_only,,background_only,high,Kalman filter,SRC_PMC4478749,From preprocessing_methods.motion_correction
+EVLINK_1893,EV_VBIT_0277,background_only,,background_only,high,Kalman filter,SRC_PMC4719469,From preprocessing_methods.motion_correction
+EVLINK_1894,EV_VBIT_0278,background_only,,background_only,high,Kalman filter,SRC_PMC4773699,From preprocessing_methods.motion_correction
 EVLINK_1895,EV_VBIT_0279,method_atom,ATOM_data_import,method_atom,high,50 channels,SRC_PMC4893204,From acquisition.channels_n
-EVLINK_1896,EV_VBIT_0280,method_atom,,method_atom,high,ICA method,SRC_PMC4893204,From preprocessing_methods.motion_correction
+EVLINK_1896,EV_VBIT_0280,background_only,,background_only,high,ICA method,SRC_PMC4893204,From preprocessing_methods.motion_correction
 EVLINK_1897,EV_VBIT_0281,method_atom,ATOM_data_import,method_atom,high,24 channels,SRC_PMC5563303,From acquisition.channels_n
 EVLINK_1898,EV_VBIT_0282,method_atom,ATOM_data_import,method_atom,high,Shimadzu Corp,SRC_PMC5592780,From acquisition.device_brand_model
 EVLINK_1899,EV_VBIT_0283,method_atom,ATOM_data_import,method_atom,high,98 channels,SRC_PMC5592780,From acquisition.channels_n
-EVLINK_1900,EV_VBIT_0284,method_atom,,method_atom,high,PCA filter,SRC_PMC5592780,From preprocessing_methods.motion_correction
+EVLINK_1900,EV_VBIT_0284,background_only,,background_only,high,PCA filter,SRC_PMC5592780,From preprocessing_methods.motion_correction
 EVLINK_1901,EV_VBIT_0285,method_atom,ATOM_data_import,method_atom,high,TechEn CW6,SRC_PMC5963607,From acquisition.device_brand_model
 EVLINK_1902,EV_VBIT_0286,method_atom,ATOM_data_import,method_atom,high,36 channels,SRC_PMC5963607,From acquisition.channels_n
-EVLINK_1903,EV_VBIT_0287,method_atom,,method_atom,high,wavelet filter,SRC_PMC5963607,From preprocessing_methods.motion_correction
+EVLINK_1903,EV_VBIT_0287,background_only,,background_only,high,wavelet filter,SRC_PMC5963607,From preprocessing_methods.motion_correction
 EVLINK_1904,EV_VBIT_0288,method_atom,ATOM_data_import,method_atom,high,12-channel,SRC_PMC6166233,From acquisition.channels_n
 EVLINK_1905,EV_VBIT_0289,method_atom,ATOM_data_import,method_atom,high,32 channels,SRC_PMC6230489,From acquisition.channels_n
-EVLINK_1906,EV_VBIT_0290,method_atom,,method_atom,high,TDDR algorithm,SRC_PMC6230489,From preprocessing_methods.motion_correction
+EVLINK_1906,EV_VBIT_0290,background_only,,background_only,high,TDDR algorithm,SRC_PMC6230489,From preprocessing_methods.motion_correction
 EVLINK_1907,EV_VBIT_0291,method_atom,ATOM_data_import,method_atom,high,40 channels,SRC_PMC6278088,From acquisition.channels_n
-EVLINK_1908,EV_VBIT_0292,method_atom,,method_atom,high,Kalman filter,SRC_PMC6278088,From preprocessing_methods.motion_correction
+EVLINK_1908,EV_VBIT_0292,background_only,,background_only,high,Kalman filter,SRC_PMC6278088,From preprocessing_methods.motion_correction
 EVLINK_1909,EV_VBIT_0293,method_atom,ATOM_data_import,method_atom,high,128-channel,SRC_PMC6960208,From acquisition.channels_n
 EVLINK_1910,EV_VBIT_0294,method_atom,ATOM_data_import,method_atom,high,Shimadzu Corp,SRC_PMC7047008,From acquisition.device_brand_model
 EVLINK_1911,EV_VBIT_0295,method_atom,ATOM_data_import,method_atom,high,134 channels,SRC_PMC7047008,From acquisition.channels_n
-EVLINK_1912,EV_VBIT_0296,method_atom,,method_atom,high,wavelet method,SRC_PMC7125097,From preprocessing_methods.motion_correction
-EVLINK_1913,EV_VBIT_0297,method_atom,,method_atom,high,kalman filter,SRC_PMC7373176,From preprocessing_methods.motion_correction
+EVLINK_1912,EV_VBIT_0296,background_only,,background_only,high,wavelet method,SRC_PMC7125097,From preprocessing_methods.motion_correction
+EVLINK_1913,EV_VBIT_0297,background_only,,background_only,high,kalman filter,SRC_PMC7373176,From preprocessing_methods.motion_correction
 EVLINK_1914,EV_VBIT_0298,method_atom,ATOM_data_import,method_atom,high,Hitachi High,SRC_PMC7642297,From acquisition.device_brand_model
 EVLINK_1915,EV_VBIT_0299,method_atom,ATOM_data_import,method_atom,high,8 channels,SRC_PMC7881368,From acquisition.channels_n
-EVLINK_1916,EV_VBIT_0300,method_atom,,method_atom,high,wavelet filter,SRC_PMC8022277,From preprocessing_methods.motion_correction
-EVLINK_1917,EV_VBIT_0301,method_atom,,method_atom,high,wavelet method,SRC_PMC8113412,From preprocessing_methods.motion_correction
+EVLINK_1916,EV_VBIT_0300,background_only,,background_only,high,wavelet filter,SRC_PMC8022277,From preprocessing_methods.motion_correction
+EVLINK_1917,EV_VBIT_0301,background_only,,background_only,high,wavelet method,SRC_PMC8113412,From preprocessing_methods.motion_correction
 EVLINK_1918,EV_VBIT_0302,method_atom,ATOM_data_import,method_atom,high,690nm and 830nm,SRC_PMC8202129,From acquisition.wavelengths_nm
 EVLINK_1919,EV_VBIT_0303,method_atom,ATOM_data_import,method_atom,high,42 channels,SRC_PMC8202129,From acquisition.channels_n
 EVLINK_1920,EV_VBIT_0304,method_atom,ATOM_data_import,method_atom,high,56-channel,SRC_PMC8484538,From acquisition.channels_n
-EVLINK_1921,EV_VBIT_0305,method_atom,,method_atom,high,wavelet filter,SRC_PMC8871689,From preprocessing_methods.motion_correction
+EVLINK_1921,EV_VBIT_0305,background_only,,background_only,high,wavelet filter,SRC_PMC8871689,From preprocessing_methods.motion_correction
 EVLINK_1922,EV_VBIT_0306,method_atom,ATOM_data_import,method_atom,high,121 channels,SRC_PMC8957952,From acquisition.channels_n
-EVLINK_1923,EV_VBIT_0307,method_atom,,method_atom,high,wavelet filter,SRC_PMC9301871,From preprocessing_methods.motion_correction
-EVLINK_1924,EV_VBIT_0308,method_atom,,method_atom,high,Kalman filter,SRC_PMC9366124,From preprocessing_methods.motion_correction
+EVLINK_1923,EV_VBIT_0307,background_only,,background_only,high,wavelet filter,SRC_PMC9301871,From preprocessing_methods.motion_correction
+EVLINK_1924,EV_VBIT_0308,background_only,,background_only,high,Kalman filter,SRC_PMC9366124,From preprocessing_methods.motion_correction
 EVLINK_1925,EV_VBIT_0309,method_atom,ATOM_data_import,method_atom,high,306-channel,SRC_PMC9505443,From acquisition.channels_n
-EVLINK_1926,EV_VBIT_0310,method_atom,,method_atom,high,Kalman filter,SRC_PMC9576156,From preprocessing_methods.motion_correction
+EVLINK_1926,EV_VBIT_0310,background_only,,background_only,high,Kalman filter,SRC_PMC9576156,From preprocessing_methods.motion_correction
 EVLINK_1927,EV_VBIT_0311,method_atom,ATOM_data_import,method_atom,high,409 channels,SRC_PMC9587758,From acquisition.channels_n
-EVLINK_1928,EV_VBIT_0312,method_atom,,method_atom,high,wavelet filter,SRC_PMC9587758,From preprocessing_methods.motion_correction
-EVLINK_1929,EV_VBIT_0313,method_atom,,method_atom,high,wavelet method,SRC_PMC9900395,From preprocessing_methods.motion_correction
-EVLINK_1930,EV_VBIT_0314,method_atom,,method_atom,high,GLM is applied,SRC_PMC9950900,From analysis_methods.glm_model
+EVLINK_1928,EV_VBIT_0312,background_only,,background_only,high,wavelet filter,SRC_PMC9587758,From preprocessing_methods.motion_correction
+EVLINK_1929,EV_VBIT_0313,background_only,,background_only,high,wavelet method,SRC_PMC9900395,From preprocessing_methods.motion_correction
+EVLINK_1930,EV_VBIT_0314,background_only,,background_only,high,GLM is applied,SRC_PMC9950900,From analysis_methods.glm_model
 EVLINK_1931,EV_VBIT_0315,method_atom,ATOM_data_import,method_atom,high,Shimadzu Portable,SRC_PMC10338804,From acquisition.device_brand_model
 EVLINK_1932,EV_VBIT_0316,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 10 Hz,SRC_PMC10338804,From acquisition.sampling_rate_hz
 EVLINK_1933,EV_VBIT_0317,method_atom,ATOM_data_import,method_atom,high,20 channels,SRC_PMC10338804,From acquisition.channels_n
 EVLINK_1934,EV_VBIT_0318,method_atom,ATOM_data_import,method_atom,high,730 nm and 850 nm,SRC_PMC11752877,From acquisition.wavelengths_nm
 EVLINK_1935,EV_VBIT_0319,method_atom,ATOM_data_import,method_atom,high,41-channel,SRC_PMC11752877,From acquisition.channels_n
-EVLINK_1936,EV_VBIT_0320,method_atom,,method_atom,high,wavelet transform,SRC_PMC11752877,From preprocessing_methods.motion_correction
+EVLINK_1936,EV_VBIT_0320,background_only,,background_only,high,wavelet transform,SRC_PMC11752877,From preprocessing_methods.motion_correction
 EVLINK_1937,EV_VBIT_0321,method_atom,ATOM_data_import,method_atom,high,106 channels,SRC_PMC12306464,From acquisition.channels_n
 EVLINK_1938,EV_VBIT_0322,method_atom,ATOM_data_import,method_atom,high,730 nm and 850 nm,SRC_PMC12425098,From acquisition.wavelengths_nm
 EVLINK_1939,EV_VBIT_0323,method_atom,ATOM_data_import,method_atom,high,55 channels,SRC_PMC12425098,From acquisition.channels_n
 EVLINK_1940,EV_VBIT_0324,method_atom,ATOM_data_import,method_atom,high,2 channels,SRC_PMC12425317,From acquisition.channels_n
 EVLINK_1941,EV_VBIT_0325,method_atom,ATOM_data_import,method_atom,high,Artinis Medical,SRC_PMC13183809,From acquisition.device_brand_model
 EVLINK_1942,EV_VBIT_0326,method_atom,ATOM_data_import,method_atom,high,16 channels,SRC_PMC13183809,From acquisition.channels_n
-EVLINK_1943,EV_VBIT_0327,method_atom,,method_atom,high,leave-one-subject-out,SRC_PMC13183809,From analysis_methods.cv_scheme
+EVLINK_1943,EV_VBIT_0327,background_only,,background_only,high,leave-one-subject-out,SRC_PMC13183809,From analysis_methods.cv_scheme
 EVLINK_1944,EV_VBIT_0328,method_atom,ATOM_data_import,method_atom,high,iss subtle,SRC_PMC13189826,From acquisition.device_brand_model
 EVLINK_1945,EV_VBIT_0329,method_atom,ATOM_data_import,method_atom,high,89 channels,SRC_PMC13189826,From acquisition.channels_n
 EVLINK_1946,EV_VBIT_0330,method_atom,ATOM_data_import,method_atom,high,53-channel,SRC_PMC13191380,From acquisition.channels_n
@@ -1950,9 +1950,9 @@ EVLINK_1948,EV_VBIT_0332,method_atom,ATOM_data_import,method_atom,high,45 channe
 EVLINK_1949,EV_VBIT_0333,method_atom,ATOM_data_import,method_atom,high,695 nm and 830 nm,SRC_PMC13317487,From acquisition.wavelengths_nm
 EVLINK_1950,EV_VBIT_0334,method_atom,ATOM_data_import,method_atom,high,52 channels,SRC_PMC13317487,From acquisition.channels_n
 EVLINK_1951,EV_VBIT_0335,method_atom,ATOM_data_import,method_atom,high,102 channels,SRC_PMC7364176,From acquisition.channels_n
-EVLINK_1952,EV_VBIT_0336,method_atom,,method_atom,high,Kalman filter,SRC_PMC7364176,From preprocessing_methods.motion_correction
+EVLINK_1952,EV_VBIT_0336,background_only,,background_only,high,Kalman filter,SRC_PMC7364176,From preprocessing_methods.motion_correction
 EVLINK_1953,EV_VBIT_0337,method_atom,ATOM_data_import,method_atom,high,sampling frequency of 7.8125 Hz,SRC_PMC8901827,From acquisition.sampling_rate_hz
-EVLINK_1954,EV_VBIT_0338,method_atom,,method_atom,high,GLM was applied,SRC_PMC8901827,From analysis_methods.glm_model
+EVLINK_1954,EV_VBIT_0338,background_only,,background_only,high,GLM was applied,SRC_PMC8901827,From analysis_methods.glm_model
 EVLINK_1955,EV_19154918_01,background_only,,background_only,high,We performed a systematic review of the scientific literature on near-infrared spectroscopy in congenital heart disease. We identified 54 manuscripts and 13 reviews.,SRC_19154918,From studies.article_type
 EVLINK_1956,EV_20542078_01,background_only,,background_only,high,We conducted a systematic review and meta-regression analysis to quantify effects of exercise on brain hemodynamics measured by near-infrared spectroscopy (NIRS).,SRC_20542078,From studies.article_type
 EVLINK_1957,EV_23774396_01,background_only,ATOM_motion_correction,background_only,high,"In this paper, we provide an extensive review of historical developments of statistical analyses of fNIRS signal, which include motion artifact correction, short source-detector separation correction,",SRC_23774396,From studies.article_type
@@ -2025,39 +2025,39 @@ EVLINK_2023,EV_41025408_01,background_only,,background_only,medium,Placeholder e
 EVLINK_2024,EQ_23891905_001,background_only,ATOM_methods_report,background_only,high,"Comprehensive review of fNIRS spatial registration methods including MNI/Talairach coordinate systems, 10-20 system, probabilistic registration, virtual registration, and software implementations.",SRC_23891905,From studies.key_contribution
 EVLINK_2025,EQ_23891905_002,method_atom,ATOM_methods_report,method_atom,high,"NIRS-SPM, NFRI tools, Homer, BrainVision Analyzer mentioned as software for spatial registration",SRC_23891905,From preprocessing_methods.software_function_or_package
 EVLINK_2026,EQ_23891905_003,method_atom,ATOM_data_import,method_atom,high,10-20 system with 81 electrode locations (10-10 system) and 300+ locations (10-5 system) for standardized scalp positioning,SRC_23891905,From acquisition.optode_localization
-EVLINK_2027,EQ_24897940_001,method_atom,,method_atom,high,"Pooled mean standardized difference for oxyHb was -0.74 (95% CI: -0.97 to -0.52), indicating attenuated increase in oxyHb during cognitive activation in prefrontal regions in MDD patients",SRC_24897940,From analysis_methods.ml_features
-EVLINK_2028,EQ_24897940_002,method_atom,,method_atom,high,NIRS measures oxygenated [oxyHb] and deoxygenated [deoxyHb] hemoglobin using modified Lambert-Beer law,SRC_24897940,From preprocessing_methods.chromophores
+EVLINK_2027,EQ_24897940_001,background_only,,background_only,high,"Pooled mean standardized difference for oxyHb was -0.74 (95% CI: -0.97 to -0.52), indicating attenuated increase in oxyHb during cognitive activation in prefrontal regions in MDD patients",SRC_24897940,From analysis_methods.ml_features
+EVLINK_2028,EQ_24897940_002,background_only,,background_only,high,NIRS measures oxygenated [oxyHb] and deoxygenated [deoxyHb] hemoglobin using modified Lambert-Beer law,SRC_24897940,From preprocessing_methods.chromophores
 EVLINK_2029,EQ_PMID_33512913_01,background_only,,background_only,high,Two studies (n = 218) used NIRS to measure cerebral oximetry during CF-LVAD implantation surgery.,SRC_PMID_33512913,From results_claims.CLM_PMID_33512913_01
 EVLINK_2030,EQ_PMID_33512913_02,background_only,,background_only,high,"Ghosal et al. found that a higher rSO2 before CF-LVAD surgery (median 52%, IQR 42–59) was associated with a lower 30-day mortality (OR = 0.94).",SRC_PMID_33512913,From results_claims.CLM_PMID_33512913_04
-EVLINK_2031,EQ_PMID_33512913_03,risk_rule,,risk_rule,high,"Significant heterogeneity exists in timing, frequency, and types of neuromonitoring tools.",SRC_PMID_33512913,From risk_register.RSK_PMID_33512913_01
+EVLINK_2031,EQ_PMID_33512913_03,background_only,,background_only,high,"Significant heterogeneity exists in timing, frequency, and types of neuromonitoring tools.",SRC_PMID_33512913,From risk_register.RSK_PMID_33512913_01
 EVLINK_2032,EQ_PMID_33512913_04,background_only,,background_only,high,No studies investigated the long-term effect of continuous blood flow and its impact on cerebral autoregulation. Only 2 studies used NIRS for cerebral oximetry during surgery.,SRC_PMID_33512913,From results_claims.CLM_PMID_33512913_03
 EVLINK_2033,EQ_PMID_34284934_01,background_only,,background_only,high,"The meta-analysis obtained a partial area under the summary receiver operating characteristic curve for diagnosing brain ischaemia of 0.646, with a summary sensitivity of 72.0% (95% CI 58.1–82.7) and ",SRC_PMID_34284934,From results_claims.CLM_PMID_34284934_01
 EVLINK_2034,EQ_PMID_34284934_02,background_only,,background_only,high,"Higher frequency of arterial hypertension (z score = -2.15; p = .032) and diabetes (z score = -2.12; p = .034) were associated with lower summary sensitivity, while a higher frequency of symptomatic c",SRC_PMID_34284934,From results_claims.CLM_PMID_34284934_02
 EVLINK_2035,EQ_PMID_34284934_03,background_only,,background_only,high,The results of this study suggest that NIRS as a cerebral monitoring technique does not have sufficiently high sensitivity or specificity to be used alone in the neurological monitoring of patients un,SRC_PMID_34284934,From results_claims.CLM_PMID_34284934_01
-EVLINK_2036,EQ_PMID_34284934_04,risk_rule,,risk_rule,high,The main concern was related to risk of bias in the index test and reference standard in all studies as no study stated whether there was blinding to the results of the tests.,SRC_PMID_34284934,From risk_register.RSK_PMID_34284934_01
+EVLINK_2036,EQ_PMID_34284934_04,background_only,,background_only,high,The main concern was related to risk of bias in the index test and reference standard in all studies as no study stated whether there was blinding to the results of the tests.,SRC_PMID_34284934,From risk_register.RSK_PMID_34284934_01
 EVLINK_2037,EQ_PMID_34284934_05,background_only,,background_only,high,"Currently, the hypoxic threshold based on cerebral NIRS monitoring for intervention is poorly defined, although eight of 11 studies reported an optimal value of a 15%–20% relative decrease.",SRC_PMID_34284934,From results_claims.CLM_PMID_34284934_04
 EVLINK_2038,EQ_PMID_34284934_06,background_only,,background_only,high,The INVOS cerebral oximeter appears more sensitive to changes in skin blood flow than the Foresight cerebral oximeter. No study has yet compared both devices in patients undergoing CEA.,SRC_PMID_34284934,From results_claims.CLM_PMID_34284934_05
 EVLINK_2039,EQ_PMID_34411803_01,background_only,,background_only,high,Meta-analysis demonstrated that GrSO2 (p < 0.01) and CSOR (p < 0.01) were significantly lower in neonates with bowel pathology associated with ischaemia than controls.,SRC_PMID_34411803,From results_claims.CLM_PMID_34411803_01
 EVLINK_2040,EQ_PMID_34411803_02,background_only,,background_only,high,"For CSOR, area under the curve is 0.89, with Youden's index highest (0.69) at 0.76 (specificity of 80%, sensitivity 90%).",SRC_PMID_34411803,From results_claims.CLM_PMID_34411803_02
 EVLINK_2041,EQ_PMID_34411803_03,background_only,,background_only,high,Values below 42% correlate strongly with ischaemia while values above 52% are more suggestive of patients without bowel pathology. CSOR of below 0.76 is strongly suggestive of ischaemia.,SRC_PMID_34411803,From results_claims.CLM_PMID_34411803_04
 EVLINK_2042,EQ_PMID_34411803_04,background_only,,background_only,high,"In almost all studies, neonates with intestinal pathology were found to have lower GrSO2 when compared to controls. Actual GrSO2 values were highly variable between studies.",SRC_PMID_34411803,From results_claims.CLM_PMID_34411803_01
-EVLINK_2043,EQ_PMID_34411803_05,risk_rule,,risk_rule,high,"As it relies on cerebral measurements as well as bowel, this method will be less reliable in neonates with global hypoperfusion (such has the case reported in Fortune et al.) or where cerebral autoreg",SRC_PMID_34411803,From risk_register.RSK_PMID_34411803_03
+EVLINK_2043,EQ_PMID_34411803_05,background_only,,background_only,high,"As it relies on cerebral measurements as well as bowel, this method will be less reliable in neonates with global hypoperfusion (such has the case reported in Fortune et al.) or where cerebral autoreg",SRC_PMID_34411803,From risk_register.RSK_PMID_34411803_03
 EVLINK_2044,EQ_PMID_34411803_06,background_only,,background_only,high,There is variability in GrSO2 (I2 = 64%) with a standard mean difference between controls and neonates with pathology of -1.02 (95% confidence interval -1.79 to -0.25).,SRC_PMID_34411803,From results_claims.CLM_PMID_34411803_03
-EVLINK_2045,EQ_PMID_35065956_01,risk_rule,,risk_rule,high,This technique is in a moment of expansion due to the growing knowledge of its physiological effects and the enormous potential of combining TMS with other techniques such as TMS and neural bases as e,SRC_PMID35065956,From risk_register.RSK_PMID35065956_01
-EVLINK_2046,EQ_PMID_36404217_01,risk_rule,,risk_rule,high,"Nakamura et al. (2021) conducted a longitudinal fNIRS study on ten patients with MDD, BD, and SSD, most of them treated with psychotropic drugs, at the time of onset and of the resolution of catatonia",SRC_PMID36404217,From risk_register.RSK_PMID36404217_01
-EVLINK_2047,EQ_PMID_39667979_01,risk_rule,,risk_rule,high,"This systematic review indicates that surfactant administration is associated with a transient decrease in crSO2 followed by a return to baseline levels, whereby differences between the LISA and INSUR",SRC_PMID39667979,From risk_register.RSK_PMID39667979_01
+EVLINK_2045,EQ_PMID_35065956_01,background_only,,background_only,high,This technique is in a moment of expansion due to the growing knowledge of its physiological effects and the enormous potential of combining TMS with other techniques such as TMS and neural bases as e,SRC_PMID35065956,From risk_register.RSK_PMID35065956_01
+EVLINK_2046,EQ_PMID_36404217_01,background_only,,background_only,high,"Nakamura et al. (2021) conducted a longitudinal fNIRS study on ten patients with MDD, BD, and SSD, most of them treated with psychotropic drugs, at the time of onset and of the resolution of catatonia",SRC_PMID36404217,From risk_register.RSK_PMID36404217_01
+EVLINK_2047,EQ_PMID_39667979_01,background_only,,background_only,high,"This systematic review indicates that surfactant administration is associated with a transient decrease in crSO2 followed by a return to baseline levels, whereby differences between the LISA and INSUR",SRC_PMID39667979,From risk_register.RSK_PMID39667979_01
 EVLINK_2048,EQ_PMID_39667979_02,background_only,,background_only,high,"Bertini et al. [33] observed a significant decrease in crSO2 during the LISA procedure to 45.5 ± 10.6% compared to the baseline of 75.6 ± 7.9%. Sixty minutes after the surfactant administration, the c",SRC_PMID39667979,From results_claims.CLM_PMID39667979_01
 EVLINK_2049,EQ_PMID_39667979_03,background_only,,background_only,high,"Dorrepaal et al. [16] reported that following surfactant instillation, cerebral blood volume (CBV) increased rapidly by 21%, then returned consecutively to baseline and remained stable after ten minut",SRC_PMID39667979,From results_claims.CLM_PMID39667979_02
 EVLINK_2050,EQ_PMID_39734141_01,background_only,,background_only,high,"Seven out of nine papers affirmed that an association between bradycardia and cerebral desaturation existed, but no author indicated the cut-off of HR under which cerebral desaturations occur.",SRC_PMID39734141,From results_claims.CLM_PMID39734141_01
 EVLINK_2051,EQ_PMID_39734141_02,background_only,,background_only,high,"Authors did not provide an equal definition of bradycardia. Schmid, Pichler, and Farooqui defined it as HR<80 bpm; Mayer did not report a fixed value; Petrova HR<90 bpm; Walter HR drop to 60-80% basel",SRC_PMID39734141,From results_claims.CLM_PMID39734141_02
 EVLINK_2052,EQ_PMID_39734141_03,background_only,,background_only,high,No study focused on long-term outcome related to cerebral desaturation.,SRC_PMID39734141,From results_claims.CLM_PMID39734141_04
 EVLINK_2053,EQ_PMID_39734141_04,background_only,,background_only,high,Continuous monitoring of HR and cerebral saturation by non-invasive tools could play a key role in the assessment of newborns.,SRC_PMID39734141,From results_claims.CLM_PMID39734141_05
-EVLINK_2054,EQ_PMID_39734141_05,risk_rule,ATOM_motion_correction,risk_rule,high,"NIRS itself shows some limitations, such as light interference, movement artifacts, and underestimation of cerebral StO2 in some conditions (haematoma or significant oedema of the layers between skin ",SRC_PMID39734141,From risk_register.RSK_PMID39734141_04
+EVLINK_2054,EQ_PMID_39734141_05,method_atom,ATOM_motion_correction,risk_rule,high,"NIRS itself shows some limitations, such as light interference, movement artifacts, and underestimation of cerebral StO2 in some conditions (haematoma or significant oedema of the layers between skin ",SRC_PMID39734141,From risk_register.RSK_PMID39734141_04
 EVLINK_2055,EQ_PMID_40306761_01,background_only,,background_only,high,The limited available evidence could not rule out benefit or harm from delivery room monitoring of cerebral oxygen saturation using NIRS with a dedicated treatment guideline in preterm infants.,SRC_PMID40306761,From results_claims.CLM_PMID40306761_01
 EVLINK_2056,EQ_PMID_40306761_02,background_only,,background_only,high,"Low certainty evidence, downgraded for very serious imprecision due to optimal information size not met, from two RCTs enrolling 667 patients did not detect any difference in survival (RR 1.02, 95% CI",SRC_PMID40306761,From results_claims.CLM_PMID40306761_02
 EVLINK_2057,EQ_PMID_40306761_03,background_only,,background_only,high,"No study addressed the primary outcome of survival without NDI or the secondary outcome, NDI using a diagnostic test for NDI.",SRC_PMID40306761,From results_claims.CLM_PMID40306761_03
-EVLINK_2058,EQ_PMID_40306761_04,risk_rule,,risk_rule,high,More than two thirds of eligible infants were not enrolled as a result of imminent birth or unavailability of the research team. The proportion of caesarean births was attributed by the authors to a w,SRC_PMID40306761,From risk_register.RSK_PMID40306761_02
-EVLINK_2059,EQ_PMID_40306761_05,risk_rule,,risk_rule,high,The authors of the multicentre RCT speculated that the lack of improvement in the crSO2 during the first 15 min in the intervention group might reflect the lack of effective interventions to improve c,SRC_PMID40306761,From risk_register.RSK_PMID40306761_04
+EVLINK_2058,EQ_PMID_40306761_04,background_only,,background_only,high,More than two thirds of eligible infants were not enrolled as a result of imminent birth or unavailability of the research team. The proportion of caesarean births was attributed by the authors to a w,SRC_PMID40306761,From risk_register.RSK_PMID40306761_02
+EVLINK_2059,EQ_PMID_40306761_05,background_only,,background_only,high,The authors of the multicentre RCT speculated that the lack of improvement in the crSO2 during the first 15 min in the intervention group might reflect the lack of effective interventions to improve c,SRC_PMID40306761,From risk_register.RSK_PMID40306761_04
 EVLINK_2060,EQ_PMID_41196800_01,background_only,,background_only,high,Only 3% of the studies have considered data augmentation.,SRC_PMID41196800,From results_claims.CLM_PMID41196800_01
 EVLINK_2061,EQ_PMID_41196800_02,background_only,,background_only,high,Almost 99% of the studies have not explicitly considered the ratio between data-size and trainable model parameter size.,SRC_PMID41196800,From results_claims.CLM_PMID41196800_01
 EVLINK_2062,EQ_PMID_41196800_03,background_only,,background_only,high,Only 19% of the studies we found have used LOSO evaluations to assess performance.,SRC_PMID41196800,From results_claims.CLM_PMID41196800_01
@@ -2067,42 +2067,42 @@ EVLINK_2065,EQ_PMID_41196800_06,background_only,,background_only,high,"Pre-train
 EVLINK_2066,EQ_PMID_40629211_01,method_atom,ATOM_data_import,method_atom,high,"Regional oxygen saturation (rSO2), defined as the percentage of oxygenated hemoglobin relative to the total hemoglobin, was measured with near infrared spectroscopy (NIRS) using optodes (Foresight Eli",SRC_PMID40629211,From acquisition.device_brand_model
 EVLINK_2067,EQ_PMID_40629211_02,method_atom,ATOM_methods_report,method_atom,high,"The MAP and NIRS waveforms were acquired at 0.5 Hz and temporally synchronized for analysis using ICM+ software (Cambridge, UK). The first hour of monitoring during the calibration period was excluded",SRC_PMID40629211,From preprocessing_methods.filter_settings
 EVLINK_2068,EQ_PMID_40629211_03,background_only,,background_only,high,"Higher BPV correlated with more time spent outside either limit. (R=0.71, p<0.001), including time above the upper limit (R=0.56, p=0.012) but not below the lower limit (R=0.31, p=0.200).",SRC_PMID40629211,From results_claims.CLM_PMID40629211_01
-EVLINK_2069,EQ_PMID_40629211_04,method_atom,,method_atom,high,"We measured autoregulation by calculating a time-correlation coefficient known as the cerebral oximetry index (COx) between MAP and rSO2. First, we averaged each waveform every 10 s. We computed COx a",SRC_PMID40629211,From analysis_methods.primary_outcome
-EVLINK_2070,EQ_PMID_40629211_05,risk_rule,,risk_rule,high,"Our study has limitations. The study lacks a control group, and we cannot determine whether BPV correlates with time outside the limits of CA in normotensive postpartum patients. Our sample size is sm",SRC_PMID40629211,From risk_register.RSK_PMID40629211_01
+EVLINK_2069,EQ_PMID_40629211_04,background_only,,background_only,high,"We measured autoregulation by calculating a time-correlation coefficient known as the cerebral oximetry index (COx) between MAP and rSO2. First, we averaged each waveform every 10 s. We computed COx a",SRC_PMID40629211,From analysis_methods.primary_outcome
+EVLINK_2070,EQ_PMID_40629211_05,background_only,,background_only,high,"Our study has limitations. The study lacks a control group, and we cannot determine whether BPV correlates with time outside the limits of CA in normotensive postpartum patients. Our sample size is sm",SRC_PMID40629211,From risk_register.RSK_PMID40629211_01
 EVLINK_2071,EQ_PMID_40816923_01,method_atom,ATOM_data_import,method_atom,high,"Cerebral oxygen saturation (SctO2) was measured using near-infrared spectroscope (NIRS) Fore-Sight 2030 MS (CAS Medical Systems Inc., Branford, CT, USA) in the frontal lobes simultaneously with PCT or",SRC_PMID40816923,From acquisition.device_brand_model
-EVLINK_2072,EQ_PMID_40816923_02,method_atom,,method_atom,high,Data were not normally distributed and expressed as median (interquartile range) or n (%). The statistical analysis was performed using nonparametric statistics and Spearman rank correlation analysis.,SRC_PMID40816923,From analysis_methods.primary_outcome
+EVLINK_2072,EQ_PMID_40816923_02,background_only,,background_only,high,Data were not normally distributed and expressed as median (interquartile range) or n (%). The statistical analysis was performed using nonparametric statistics and Spearman rank correlation analysis.,SRC_PMID40816923,From analysis_methods.primary_outcome
 EVLINK_2073,EQ_PMID_40816923_03,background_only,,background_only,high,"Compared to the low-NWU group, the high-NWU group showed significantly lower CBF (11.0 vs 17.7 mL 100 g-1min-1, p<0.0001), lower CBV (1.25 vs 1.70 mL/100 g, p<0.001), lower SctO2; 62.6% vs 67.4%, p = ",SRC_PMID40816923,From results_claims.CLM_PMID40816923_01
-EVLINK_2074,EQ_PMID_40816923_04,risk_rule,,risk_rule,high,The authors note that a further constraint was the small region-of-interest used for CT attenuation to minimize volume-averaging during perfusion calculations; multiple samplings within a single lobe ,SRC_PMID40816923,From risk_register.RSK_PMID40816923_01
+EVLINK_2074,EQ_PMID_40816923_04,background_only,,background_only,high,The authors note that a further constraint was the small region-of-interest used for CT attenuation to minimize volume-averaging during perfusion calculations; multiple samplings within a single lobe ,SRC_PMID40816923,From risk_register.RSK_PMID40816923_01
 EVLINK_2075,EQ_PMID_40843107_01,method_atom,ATOM_data_import,method_atom,high,"EEG was collected using EEG device for 16 leads (Mipower UC, EEG Collection V2, Tsinghua University Neural-engineering Experiment), with sampling frequency of 1000 Hz, and 24-bits A/D converter, and n",SRC_PMID40843107,From acquisition.device_brand_model
 EVLINK_2076,EQ_PMID_40843107_02,method_atom,ATOM_data_import,method_atom,high,"The device of fNIRS acquisition was a portable 16 channel (China Danyang Huichuang Nir Smart) with a sampling frequency of 20 Hz and a 24-bits A/D converter, and a communication interface of WIFI",SRC_PMID40843107,From acquisition.device_brand_model
 EVLINK_2077,EQ_PMID_40843107_03,method_atom,ATOM_bandpass_filter,method_atom,high,"the EEG was preprocessed using a first-order Butterworth bandpass filter (with a bandpass of 0.1-40 Hz), and artifacts are removed by ICA, followed by down sampling to 128 Hz",SRC_PMID40843107,From preprocessing_methods.filter_settings
 EVLINK_2078,EQ_PMID_40843107_04,method_atom,ATOM_bandpass_filter,method_atom,high,"preprocessing the fNIRS signal and use a first-order Butterworth bandpass filter (with a bandpass of 0.02-0.1 Hz) to remove physiological noise caused by respiration (0.15-0.3 Hz), heartbeat (1.2-1.6 ",SRC_PMID40843107,From preprocessing_methods.filter_settings
-EVLINK_2079,EQ_PMID_40843107_05,method_atom,,method_atom,high,"70% of the aligned dataset is selected as the training set, and 30% of the aligned dataset is selected as the testing set",SRC_PMID40843107,From analysis_methods.ml_split_strategy
+EVLINK_2079,EQ_PMID_40843107_05,background_only,,background_only,high,"70% of the aligned dataset is selected as the training set, and 30% of the aligned dataset is selected as the testing set",SRC_PMID40843107,From analysis_methods.ml_split_strategy
 EVLINK_2080,EQ_PMID_40843107_06,background_only,ATOM_ml_classification,background_only,high,"the average classification accuracy of LTVA-HWI and HTVA-HWI performed on 20 subjects was 90.90% and 92.28%, respectively, with no statistical difference (t-test, p = 0.6894)",SRC_PMID40843107,From results_claims.CLM_PMID40843107_01
 EVLINK_2081,EQ_PMID_40843107_07,background_only,,background_only,high,"The average fuzzy entropy of the subjects during HTVA-HWI was 9.49% lower than that of LTVA-HWI (t-test, p < 0.001); 55.02% less standard deviation (t-test, p = 0.01)",SRC_PMID40843107,From results_claims.CLM_PMID40843107_02
 EVLINK_2082,EQ_PMID_40843107_08,background_only,,background_only,high,"all classifications and tests were conducted independently for each participant. As the primary aim of this study was to evaluate paradigms and to control for variables influencing the evaluation, cro",SRC_PMID40843107,From results_claims.CLM_PMID40843107_04
-EVLINK_2083,EQ_PMID_42255351_01,method_atom,,method_atom,high,"We performed 10-fold cross-validation on the logistic regression model using channels 4 and 5. The data was randomly divided into 10 subsets, with the model trained on 9 subsets and validated on the r",SRC_PMID42255351,From analysis_methods.ml_split_strategy
+EVLINK_2083,EQ_PMID_42255351_01,background_only,,background_only,high,"We performed 10-fold cross-validation on the logistic regression model using channels 4 and 5. The data was randomly divided into 10 subsets, with the model trained on 9 subsets and validated on the r",SRC_PMID42255351,From analysis_methods.ml_split_strategy
 EVLINK_2084,EQ_PMID_42255351_02,method_atom,ATOM_motion_correction,method_atom,high,Preprocessing steps included: (1) Converting raw data into optical density (OD); (2) Motion artifact detection and identification... (3) Motion artifact correction using spline correction... (4) Filte,SRC_PMID42255351,From analysis_methods.preprocessing_inside_cv
-EVLINK_2085,EQ_PMID_42255351_03,method_atom,,method_atom,high,"The logistic regression model established with HbO from alcohol cues in channels 4 and 5 showed a robust and generalizable predictive performance, with an average accuracy of 62.5% and an average AUC ",SRC_PMID42255351,From analysis_methods.leakage_risk
+EVLINK_2085,EQ_PMID_42255351_03,background_only,,background_only,high,"The logistic regression model established with HbO from alcohol cues in channels 4 and 5 showed a robust and generalizable predictive performance, with an average accuracy of 62.5% and an average AUC ",SRC_PMID42255351,From analysis_methods.leakage_risk
 EVLINK_2086,EQ_PMID_42255351_04,background_only,,background_only,high,"channel 4's HbO value was a prognostic factor for acute attack groups (OR=5.587, 95%CI=1.101-28.351, p=0.038), while channel 5's HbO value served as an adverse factor (OR=0.162, 95%CI=0.027-0.988, p=0",SRC_PMID42255351,From results_claims.CLM_PMID42255351_01
-EVLINK_2087,EQ_PMID_42255351_05,risk_rule,,risk_rule,high,"The Variance Inflation Factor (VIF) values for variables in both multiple linear regression and logistic regression exceeded 10, indicating significant multicollinearity between variables.",SRC_PMID42255351,From risk_register.RSK_PMID42255351_01
+EVLINK_2087,EQ_PMID_42255351_05,background_only,,background_only,high,"The Variance Inflation Factor (VIF) values for variables in both multiple linear regression and logistic regression exceeded 10, indicating significant multicollinearity between variables.",SRC_PMID42255351,From risk_register.RSK_PMID42255351_01
 EVLINK_2088,EQ_PMID_42255351_06,method_atom,ATOM_data_import,method_atom,high,"The fNIRS measurements were conducted using a 24-channel continuous-wave fNIRS system (Artinis, Netherlands).",SRC_PMID42255351,From acquisition.device_brand_model
 EVLINK_2089,EQ_PMID_42255351_07,method_atom,ATOM_data_import,method_atom,high,The device's sampling frequency was 25 Hz.,SRC_PMID42255351,From acquisition.sampling_rate_hz
 EVLINK_2090,EQ_PMID_42255351_08,method_atom,ATOM_bandpass_filter,method_atom,high,"Filtering using bandpass filters (hpf=0.01, lpf=0.1) to remove noise across frequency bands",SRC_PMID42255351,From preprocessing_methods.filter_settings
 EVLINK_2091,EQ_PMID_42255351_09,method_atom,ATOM_motion_correction,method_atom,high,"Motion artifact detection and identification, performing motion artifact detection on all 24 channels (tMotion=0.5, tMask=3.0, STDEVthresh=20, AMPthresh=5); Motion artifact correction using spline cor",SRC_PMID42255351,From preprocessing_methods.motion_correction
 EVLINK_2092,EQ_PMID_42313692_01,background_only,,background_only,high,"crSO2 increased following transfusion in both the restrictive (6.40% 95% CI [3.85, 8.95], p<0.001) and liberal (2.75% 95% CI [0.35, 5.14], p=0.03) groups. However, the magnitude of change was greater ",SRC_PMID42313692,From results_claims.CLM_PMID42313692_01
 EVLINK_2093,EQ_PMID_42313692_02,background_only,,background_only,high,"The restrictive group also demonstrated a greater transfusion-related decrease in cerebral fractional oxygen extraction than the liberal group (Q=8.30, df=1, p<0.001).",SRC_PMID42313692,From results_claims.CLM_PMID42313692_02
-EVLINK_2094,EQ_PMID_42313692_03,risk_rule,,risk_rule,high,Seventeen of these had either no formal transfusion protocol or did not provide sufficient information to be classified. This likely reflects existing variation and inconsistency in current clinical p,SRC_PMID42313692,From risk_register.RSK_PMID42313692_01
+EVLINK_2094,EQ_PMID_42313692_03,background_only,,background_only,high,Seventeen of these had either no formal transfusion protocol or did not provide sufficient information to be classified. This likely reflects existing variation and inconsistency in current clinical p,SRC_PMID42313692,From risk_register.RSK_PMID42313692_01
 EVLINK_2095,EQ_PMID_42313692_04,background_only,,background_only,high,Outcomes selected for GRADE assessment were all rated as low certainty of evidence due to serious risk of bias and inconsistency.,SRC_PMID42313692,From results_claims.CLM_PMID42313692_03
 EVLINK_2096,EQ_PMID_42313692_05,method_atom,ATOM_data_import,method_atom,high,"Several NIRS monitors including Sensmart X-100 (Nonin Medical), INVOS-4100 (Medtronic), INVOS-5100C (Medtronic), and EGOS (EnginMed) were used.",SRC_PMID42313692,From acquisition.device_brand_model
 EVLINK_2097,EQ_PMID_42313692_06,background_only,ATOM_methods_report,background_only,high,Considerable variation in reporting of transfusion guidelines should also be noted.,SRC_PMID42313692,From results_claims.CLM_PMID42313692_04
 EVLINK_2098,EQ_PMID_41771364_01,background_only,,background_only,high,"Parent-infant synchrony emerges as a dynamic, context-dependent process.",SRC_PMID41771364,From results_claims.CLM_PMID41771364_01
 EVLINK_2099,EQ_PMID_41771364_02,method_atom,ATOM_resting_connectivity,method_atom,high,Interbrain synchrony is consistently quantified using wavelet transform coherence applied to oxygenated hemoglobin signals.,SRC_PMID41771364,From analysis_methods.ml_features
-EVLINK_2100,EQ_PMID_41771364_03,risk_rule,,risk_rule,high,"Methodological challenges persist, such as disentangling synchrony from shared responses.",SRC_PMID41771364,From risk_register.RSK_PMID41771364_01
-EVLINK_2101,EQ_PMID_41771364_04,risk_rule,,risk_rule,high,Nearly all studies have focused exclusively on mothers.,SRC_PMID41771364,From risk_register.RSK_PMID41771364_03
-EVLINK_2102,EQ_PMID_40605912_01,method_atom,,method_atom,high,We divided the dataset into training and test sets in an 80-20 split.,SRC_PMID40605912,From analysis_methods.ml_split_strategy
-EVLINK_2103,EQ_PMID_40605912_02,method_atom,,method_atom,high,db4 with four decomposition levels provided the best balance.,SRC_PMID40605912,From preprocessing_methods.notes
-EVLINK_2104,EQ_PMID_40605912_03,risk_rule,,risk_rule,high,The model achieved accuracy of 99.96% by the 46th epoch.,SRC_PMID40605912,From risk_register.RSK_PMID40605912_01
+EVLINK_2100,EQ_PMID_41771364_03,background_only,,background_only,high,"Methodological challenges persist, such as disentangling synchrony from shared responses.",SRC_PMID41771364,From risk_register.RSK_PMID41771364_01
+EVLINK_2101,EQ_PMID_41771364_04,background_only,,background_only,high,Nearly all studies have focused exclusively on mothers.,SRC_PMID41771364,From risk_register.RSK_PMID41771364_03
+EVLINK_2102,EQ_PMID_40605912_01,background_only,,background_only,high,We divided the dataset into training and test sets in an 80-20 split.,SRC_PMID40605912,From analysis_methods.ml_split_strategy
+EVLINK_2103,EQ_PMID_40605912_02,background_only,,background_only,high,db4 with four decomposition levels provided the best balance.,SRC_PMID40605912,From preprocessing_methods.notes
+EVLINK_2104,EQ_PMID_40605912_03,background_only,,background_only,high,The model achieved accuracy of 99.96% by the 46th epoch.,SRC_PMID40605912,From risk_register.RSK_PMID40605912_01
 EVLINK_2105,EQ_PMID_42025243_01,background_only,ATOM_first_level_glm,background_only,high,Individuals with UCDs show blunted cortical activation patterns during executive function tasks.,SRC_PMID42025243,From results_claims.CLM_PMID42025243_01
 EVLINK_2106,EQ_PMID_42025243_02,background_only,,background_only,high,fNIRS offers advantages for imaging in children who cannot tolerate scanner environment.,SRC_PMID42025243,From results_claims.CLM_PMID42025243_02
 EVLINK_2108,EQ_PMC11833346_03,reporting_requirement,REQ_acquisition_params,reporting_requirement,medium,Reporting gap identified in literature,SRC_PMC11833346,Supports requirement REQ_acquisition_params
@@ -3107,3 +3107,139 @@ EVLINK_9005,ComBatHarmonization_R,method_atom,ATOM_combat_harmonization,method_a
 EVLINK_9006,ComBatHarmonization_MATLAB,method_atom,ATOM_combat_harmonization,method_atom,high,MATLAB implementation of ComBat harmonization,builtin,ComBat harmonization reference
 EVLINK_9007,NIRS_SPM_UsersGuide_v4_spatial_registration,method_atom,ATOM_nirs_spm_spatial_registration_projection,method_atom,high,"NIRS-SPM v4 spatial registration supports MRI and standalone MNI/NFRI routes, projects optodes/channels to rendered brain, hypothetical head surface, and cortical surface, and reports anatomical labels and probabilistic boundaries.",SRC_NIRS_SPM_USER_GUIDE_V4,NIRS-SPM v4 user guide spatial registration workflow
 EVLINK_9008,SpatialRegistration_fNIRS_Review_23891905,method_atom,ATOM_nirs_spm_spatial_registration_projection,method_atom,high,"Review evidence that NIRS-SPM and NFRI tools are used for fNIRS spatial registration with MNI/Talairach coordinates, 10-20/10-10 systems, probabilistic registration, and software implementations.",SRC_23891905,Spatial registration review support for NIRS-SPM/NFRI method atom
+EVLINK_LIB_3109,synthesis_of_extracted_literature,method_atom,ATOM_data_import,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3110,synthesis_of_extracted_literature,method_atom,ATOM_optical_density,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3111,synthesis_of_extracted_literature,method_atom,ATOM_motion_correction,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3112,synthesis_of_extracted_literature,method_atom,ATOM_bandpass_filter,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3113,synthesis_of_extracted_literature,method_atom,ATOM_short_channel_regression,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3114,synthesis_of_extracted_literature,method_atom,ATOM_mbll_conversion,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3115,synthesis_of_extracted_literature,method_atom,ATOM_signal_qc,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3116,synthesis_of_extracted_literature,method_atom,ATOM_first_level_glm,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3117,synthesis_of_extracted_literature,method_atom,ATOM_resting_connectivity,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3118,synthesis_of_extracted_literature,method_atom,ATOM_ml_feature_extraction,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3119,synthesis_of_extracted_literature,method_atom,ATOM_ml_classification,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3120,synthesis_of_extracted_literature,method_atom,ATOM_methods_report,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3121,synthesis_of_extracted_literature,method_atom,ATOM_data_export,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3122,synthesis_of_statistical_practices,method_atom,ATOM_descriptive_statistics,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3123,synthesis_of_statistical_practices,method_atom,ATOM_group_comparison,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3124,synthesis_of_statistical_practices,method_atom,ATOM_effect_size,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3125,synthesis_of_statistical_practices,method_atom,ATOM_multiple_comparison_correction,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3126,synthesis_of_statistical_practices,method_atom,ATOM_roi_analysis,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3127,synthesis_of_statistical_practices,method_atom,ATOM_laterality_index,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3128,synthesis_of_statistical_practices,method_atom,ATOM_correlation_analysis,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3129,synthesis_of_statistical_practices,method_atom,ATOM_permutation_test,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3130,synthesis_of_statistical_practices,method_atom,ATOM_group_level_glm,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3131,synthesis_of_statistical_practices,method_atom,ATOM_reliability_analysis,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3132,Homer3_hmrR_MotionCorrectSpline,method_atom,ATOM_spline_motion_correction,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3133,Homer3_hmrR_MotionArtifactByChannel,method_atom,ATOM_artifact_detection,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3134,Homer3_hmrR_PCAFilter,method_atom,ATOM_pca_denoising,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3135,Homer3_hmrR_BlockAvg,method_atom,ATOM_block_average,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3136,Homer3_hmrR_GLM,method_atom,ATOM_glm_with_drift,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3137,NIRS_SPM_detrend_wavelet_MDL,method_atom,ATOM_detrending,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3138,NIRS_SPM_spm_filter_HPF_LPF,method_atom,ATOM_hpf_lpf_filter,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3139,NIRS_SPM_precoloring,method_atom,ATOM_precoloring,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3140,NIRS_SPM_nirs_spm_group,method_atom,ATOM_group_glm_nirs_spm,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3141,SPM_DCM_fnirs_sensitivity,method_atom,ATOM_sensitivity_analysis,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3142,SPM_DCM_fnirs_estimate,method_atom,ATOM_dcm_fnirs,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3143,Homer3_hmrR_CrossCorrelation,method_atom,ATOM_cross_correlation,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3144,NIRS_SPM_NIRS_Data_Conversion,method_atom,ATOM_hardware_import,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3145,MNE_ttest_1samp,method_atom,ATOM_one_sample_ttest,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3146,MNE_ttest_ind,method_atom,ATOM_independent_ttest,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3147,Homer3_hmrG_t_paired,method_atom,ATOM_paired_ttest,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3148,scipy_welch,method_atom,ATOM_welch_ttest,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3149,MNE_f_oneway,method_atom,ATOM_one_way_anova,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3150,MNE_f_mway_rm,method_atom,ATOM_repeated_measures_anova,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3151,pingouin_mixed_anova,method_atom,ATOM_mixed_anova,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3152,scipy_two_way_anova,method_atom,ATOM_two_way_anova,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3153,scipy_wilcoxon,method_atom,ATOM_wilcoxon_signed_rank,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3154,scipy_mannwhitneyu,method_atom,ATOM_mann_whitney_u,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3155,scipy_kruskal,method_atom,ATOM_kruskal_wallis,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3156,scipy_friedmanchisquare,method_atom,ATOM_friedman_test,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3157,scipy_shapiro,method_atom,ATOM_normality_test,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3158,scipy_levene,method_atom,ATOM_levene_test,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3159,scipy_tukey_hsd,method_atom,ATOM_post_hoc_tukey,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3160,pingouin_games_howell,method_atom,ATOM_post_hoc_games_howell,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3161,scipy_bonferroni,method_atom,ATOM_bonferroni_correction,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3162,scipy_fdr_bh,method_atom,ATOM_fdr_bh_correction,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3163,scipy_fdr_by,method_atom,ATOM_fdr_by_correction,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3164,MNE_permutation_cluster_test,method_atom,ATOM_cluster_permutation_test,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3165,MNE_spatiotemporal_cluster,method_atom,ATOM_spatiotemporal_cluster_test,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3166,MNE_bootstrap_ci,method_atom,ATOM_bootstrap_ci,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3167,MNE_linear_regression,method_atom,ATOM_linear_regression,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3168,sklearn_logistic,method_atom,ATOM_logistic_regression,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3169,Cohen1988,method_atom,ATOM_cohens_d,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3170,Cohen1988,method_atom,ATOM_eta_squared,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3171,scipy_pointbiserialr,method_atom,ATOM_point_biserial_r,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3172,statsmodels_power,method_atom,ATOM_power_analysis,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3173,Zalesky2010_NBS,method_atom,ATOM_network_based_statistic,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3174,Smith2009_TFCE,method_atom,ATOM_tfce_enhancement,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3175,Jeffreys1961,method_atom,ATOM_bayes_factor,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3176,fnirs_cnn_classification,method_atom,ATOM_1d_cnn,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3177,node_templates_CNN,method_atom,ATOM_1d_cnn,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3178,fnirs_2d_cnn,method_atom,ATOM_2d_cnn,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3179,Lawhern2018_EEGNet,method_atom,ATOM_eegnet,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3180,Schirrmeister2017_ShallowConvNet,method_atom,ATOM_shallow_convnet,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3181,Hochreiter1997_LSTM,method_atom,ATOM_lstm,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3182,node_templates_LSTM,method_atom,ATOM_lstm,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3183,Cho2014_GRU,method_atom,ATOM_gru,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3184,Schuster1997_BiLSTM,method_atom,ATOM_bidirectional_lstm,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3185,Vaswani2017_Transformer,method_atom,ATOM_transformer_encoder,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3186,node_templates_Transformer,method_atom,ATOM_transformer_encoder,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3187,Transformer_LSTM_fnirs_Parkinson,method_atom,ATOM_temporal_transformer,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3188,CNN_LSTM_hybrid_fnirs,method_atom,ATOM_cnn_lstm_hybrid,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3189,CNN_Transformer_hybrid,method_atom,ATOM_cnn_transformer_hybrid,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3190,Kingma2014_VAE,method_atom,ATOM_vae,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3191,Wen2020_Augmentation,method_atom,ATOM_time_series_augmentation,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3192,Um2017_DataAugmentation,method_atom,ATOM_time_series_augmentation,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3193,transfer_learning_fnirs,method_atom,ATOM_transfer_learning,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3194,BayesianOptimization,method_atom,ATOM_hyperparameter_optimization,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3195,GradCAM_Selvaraju2017,method_atom,ATOM_model_interpretability,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3196,SHAP_Lundberg2017,method_atom,ATOM_model_interpretability,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3197,nested_cv_fnirs,method_atom,ATOM_subject_wise_cv,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3198,Transformer_fNIRS_short_channel,method_atom,ATOM_dl_short_channel_regression,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3199,DANN_Ganin2016,method_atom,ATOM_domain_adaptation,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3200,MMD_Distance,method_atom,ATOM_domain_adaptation,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3201,NIRS_KIT_ICA,method_atom,ATOM_ica_denoising,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3202,Hyvarinen1999_FastICA,method_atom,ATOM_ica_denoising,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3203,Belouchrani1997_SOBI,method_atom,ATOM_ica_denoising,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3204,Zang2007_ALFF,method_atom,ATOM_alff_falff,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3205,NIRS_KIT_ALFF,method_atom,ATOM_alff_falff,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3206,Tan2009_CBSI,method_atom,ATOM_cbsi_correction,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3207,NIRS_KIT_CBSI,method_atom,ATOM_cbsi_correction,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3208,NIRS_KIT_TBA,method_atom,ATOM_3d_mni_registration,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3209,nfri_mni_estimation,method_atom,ATOM_3d_mni_registration,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3210,NIRS_KIT_InfoTheory,method_atom,ATOM_mutual_information,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3211,Kraskov2004_KernelMI,method_atom,ATOM_mutual_information,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3212,NIRS_KIT_CalcDPF,method_atom,ATOM_dpf_calculation,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3213,Scholkmann2014_DPF,method_atom,ATOM_dpf_calculation,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3214,NIRS_KIT_graph,method_atom,ATOM_graph_theory_metrics,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3215,Rubinov2010_GraphMetrics,method_atom,ATOM_graph_theory_metrics,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3216,NIRS_KIT_fisherz,method_atom,ATOM_fisher_z_transform,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3217,Fisher1921,method_atom,ATOM_fisher_z_transform,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3218,Yamada2012_SignalSeparation,method_atom,ATOM_signal_separation,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3219,NIRS_KIT_Yamada,method_atom,ATOM_signal_separation,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3220,Cedalion_TwoSurfaceHeadModel,method_atom,ATOM_dot_head_model,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3221,Cedalion_ForwardModel,method_atom,ATOM_dot_forward_model,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3222,Fang2009_MCX,method_atom,ATOM_dot_forward_model,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3223,Cedalion_ImageRecon,method_atom,ATOM_dot_image_recon,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3224,Carlton2026,method_atom,ATOM_dot_image_recon,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3225,Cedalion_TissueProperties,method_atom,ATOM_dot_tissue_properties,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3226,Cedalion_Photogrammetry,method_atom,ATOM_photogrammetry_coregistration,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3227,Jenko2023,method_atom,ATOM_photogrammetry_coregistration,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3228,Cedalion_SpOC,method_atom,ATOM_spoc_decomposition,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3229,Dahne2014,method_atom,ATOM_spoc_decomposition,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3230,Cedalion_ICA_EBM,method_atom,ATOM_ica_signal_decomposition,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3231,Cedalion_ICA_ERBM,method_atom,ATOM_ica_signal_decomposition,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3232,Cedalion_MSPoC,method_atom,ATOM_multimodal_signal_decomposition,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3233,Cedalion_tCCA,method_atom,ATOM_multimodal_signal_decomposition,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3234,Dahne2014,method_atom,ATOM_multimodal_signal_decomposition,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3235,Cedalion_SyntheticHRF,method_atom,ATOM_synthetic_hrf_generation,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3236,Cedalion_SyntheticArtifact,method_atom,ATOM_synthetic_artifact_generation,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3237,Cedalion_EpochFeatures,method_atom,ATOM_epoch_feature_extraction,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3238,Cedalion_GLM_BasisFunctions,method_atom,ATOM_glm_basis_functions,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3239,Cedalion_GLM_DesignMatrix,method_atom,ATOM_glm_design_matrix,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3240,Cedalion_GLM_Fit,method_atom,ATOM_glm_fit_with_uncertainty,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3241,Cedalion_PSP,method_atom,ATOM_psp_quality_metric,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3242,Pollonini2014,method_atom,ATOM_psp_quality_metric,method_atom,high,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3243,Cedalion_ChannelDistances,method_atom,ATOM_channel_distance_computation,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.
+EVLINK_LIB_3244,Cedalion_ExtinctionCoefficients,method_atom,ATOM_extinction_coefficients,method_atom,medium,Bundled MethodAtom evidence reference; full metadata requires source review.,SRC_BUILTIN,Materialized from method_atoms.csv evidence_refs for traceability.

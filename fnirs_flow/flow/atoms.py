@@ -36,6 +36,8 @@ PROVENANCE_CONFIG_KEYS = {
     "confidence",
     "review_required",
     "verification_status",
+    "parameter_candidates",
+    "parameter_status",
     "method_note",
     "accuracy_caveat",
 }

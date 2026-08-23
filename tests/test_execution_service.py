@@ -105,9 +105,7 @@ class TestParseBidsEventsTsv:
         path = self._write_events_tsv(tmp_path, [[0.0, "Left"], [5.0, "Unexpected"]])
 
         with pytest.raises(ValueError, match="EVENT_CONDITION_MISMATCH"):
-            ExecutionService()._parse_bids_events_tsv(
-                str(path), sfreq=10.0, expected_conditions=["Left", "Right"]
-            )
+            ExecutionService()._parse_bids_events_tsv(str(path), sfreq=10.0, expected_conditions=["Left", "Right"])
 
     def test_explicit_excluded_event_label_is_removed_before_validation(self, tmp_path):
         path = self._write_events_tsv(tmp_path, [[0.0, "15.0"], [5.0, "Left"], [10.0, "Right"]])
@@ -242,14 +240,29 @@ class TestDispatchPreprocessing:
             def to_optical_density(self, raw):
                 return {"type": "od"}
 
-            def compute_qc(self, raw):
+            def compute_qc(self, raw, **kwargs):
                 return {"sci": 0.9}
 
             def apply_motion_correction(self, raw, method="tddr", **kwargs):
                 return {"corrected": True, "method": method, "kwargs": kwargs}
 
-            def apply_filter(self, raw, l_freq=0.01, h_freq=0.2, method="bandpass", **kwargs):
-                return {"filtered": True, "method": method, "l_freq": l_freq, "h_freq": h_freq, "kwargs": kwargs}
+            def apply_filter(
+                self,
+                raw,
+                l_freq=0.01,
+                h_freq=0.2,
+                filter_type="bandpass",
+                implementation="fir",
+                **kwargs,
+            ):
+                return {
+                    "filtered": True,
+                    "filter_type": filter_type,
+                    "implementation": implementation,
+                    "l_freq": l_freq,
+                    "h_freq": h_freq,
+                    "kwargs": kwargs,
+                }
 
             def to_haemoglobin(self, raw, ppf=6.0):
                 return {"hb": True}
@@ -287,7 +300,7 @@ class TestDispatchPreprocessing:
             def __init__(self):
                 self.converted = False
 
-            def compute_qc(self, raw):
+            def compute_qc(self, raw, **kwargs):
                 if raw == "raw":
                     raise RuntimeError("Scalp coupling index must operate on optical density data, but none was found.")
                 return {"sci": 0.9, "raw": raw}
@@ -319,14 +332,15 @@ class TestDispatchPreprocessing:
         service = ExecutionService()
         adapter = self._make_mock_adapter()
         result = service._dispatch_preprocessing(adapter, "raw", "filtering", {"l_freq": 0.01, "h_freq": 0.5})
-        assert result["method"] == "bandpass"
+        assert result["filter_type"] == "bandpass"
+        assert result["implementation"] == "fir"
         assert result["h_freq"] == 0.5
 
     def test_dispatch_filter_template_alias_preserves_method(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
         result = service._dispatch_preprocessing(adapter, "raw", "notch", {"freqs": [60.0]})
-        assert result["method"] == "notch"
+        assert result["filter_type"] == "notch"
         assert result["kwargs"]["freqs"] == [60.0]
 
     def test_dispatch_beer_lambert(self):
@@ -341,11 +355,11 @@ class TestDispatchPreprocessing:
         result = service._dispatch_preprocessing(adapter, "raw", "mbll", {"ppf": 6.0})
         assert result == {"hb": True}
 
-    def test_dispatch_combat_alias_passes_input_through(self):
+    def test_dispatch_combat_alias_fails_closed(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
-        result = service._dispatch_preprocessing(adapter, "raw", "multi_site_harmonization", {})
-        assert result == "raw"
+        with pytest.raises(ValueError, match="no registered preprocessing handler"):
+            service._dispatch_preprocessing(adapter, "raw", "multi_site_harmonization", {})
 
     def test_dispatch_unknown_raises(self):
         service = ExecutionService()
@@ -362,7 +376,14 @@ class TestDispatchPreprocessing:
 class TestDispatchAnalysis:
     def _make_mock_adapter(self):
         class MockAdapter:
-            def block_averaging(self, raw, baseline_window=(-5, 0), response_window=(0, 20)):
+            def block_averaging(
+                self,
+                raw,
+                baseline_window=(-5, 0),
+                response_window=(0, 20),
+                baseline_correction="mean",
+                events=None,
+            ):
                 return {"n_trials": 10}
 
             def build_design_matrix(self, raw, events, event_id, hrf_model="glover", drift_order=1, high_pass=0.01):
@@ -377,7 +398,7 @@ class TestDispatchAnalysis:
             def channel_output(self, contrast_result):
                 return {"channels": []}
 
-            def roi_output(self, channel_results, atlas="mni", roi_mapping=None):
+            def roi_output(self, channel_results, atlas="mni", roi_mapping=None, aggregation="mean"):
                 return {"rois": []}
 
         return MockAdapter()
@@ -387,6 +408,18 @@ class TestDispatchAnalysis:
         adapter = self._make_mock_adapter()
         result = service._dispatch_analysis(adapter, "raw", "block_averaging", {})
         assert result == {"n_trials": 10}
+
+    def test_block_averaging_injects_run_events(self, tmp_path):
+        events_path = tmp_path / "events.tsv"
+        events_path.write_text("onset\tduration\ttrial_type\n1\t2\ttask\n", encoding="utf-8")
+        service = ExecutionService()
+        params = {}
+        service._inject_dependencies(
+            {"operation": "block_averaging", "parameters": {}},
+            params,
+            {"events_path": str(events_path), "raw": None},
+        )
+        assert params["events"].tolist() == [[10, 20, 1]]
 
     def test_dispatch_build_design_matrix(self):
         service = ExecutionService()
@@ -416,17 +449,17 @@ class TestDispatchAnalysis:
         )
         assert result == {"n_conditions": 1, "hrf_model": "glover"}
 
-    def test_dispatch_template_advanced_glm_aliases(self):
+    def test_advanced_glms_require_explicit_design_inputs(self):
         service = ExecutionService()
         adapter = self._make_mock_adapter()
         for operation in ("linear_mixed_effects_glm", "nuisance_glm", "site_covariate_glm"):
-            result = service._dispatch_analysis(
-                adapter,
-                "raw",
-                operation,
-                {"design_matrix": {"columns": ["condA"]}},
-            )
-            assert result == {"n_channels": 10}
+            with pytest.raises((ValueError, TypeError), match="requires X|NoneType"):
+                service._dispatch_analysis(
+                    adapter,
+                    [1.0, 2.0, 3.0],
+                    operation,
+                    {},
+                )
 
     def test_dispatch_legacy_canonical_hrf_maps_to_glover(self):
         service = ExecutionService()
@@ -568,13 +601,11 @@ class TestOperationRegistry:
         assert "beer_lambert_law" in ops
         assert "mbll" in ops
         assert "combat_harmonization" in ops
-        assert "multi_site_harmonization" in ops
         # Analysis
         assert "build_design_matrix" in ops
         assert "design_matrix" in ops
         assert "first_level_glm" in ops
         assert "linear_mixed_effects_glm" in ops
-        assert "mixed_effects_glm" in ops
         assert "nuisance_glm" in ops
         assert "site_covariate_glm" in ops
         assert "estimate_contrast" in ops
@@ -609,6 +640,40 @@ class TestOperationRegistry:
         with pytest.raises(ValueError, match="Duplicate"):
             registry.register(OperationSpec(operation_id="op1", category="test"))
 
+    def test_cedalion_handlers_only_cover_implemented_run_operations(self):
+        from fnirs_flow.execution.operations import create_default_registry
+
+        registry = create_default_registry()
+        for operation in ("read_run", "optical_density", "optical_density_conversion", "beer_lambert_law", "mbll"):
+            assert registry.get(operation).handler_factory_for("cedalion") is not None
+        for operation in ("compute_qc", "motion_correction", "filtering", "first_level_glm", "block_averaging"):
+            assert registry.get(operation).handler_factory_for("cedalion") is None
+
+    def test_verified_cedalion_method_atoms_have_real_handlers(self):
+        from fnirs_flow.execution.operations import create_default_registry
+
+        registry = create_default_registry()
+        assert registry.get("channel_distance_computation").handler_factory_for("cedalion") is not None
+        assert registry.get("extinction_coefficients").handler_factory_for("cedalion") is not None
+        assert registry.get("head_model_construction").handler_factory_for("cedalion") is not None
+
+    @pytest.mark.parametrize(
+        "operation",
+        [
+            "combat_harmonization",
+            "linear_mixed_effects_glm",
+            "nuisance_glm",
+            "site_covariate_glm",
+            "cbsi",
+        ],
+    )
+    def test_scientific_atoms_have_registered_handlers(self, operation):
+        from fnirs_flow.execution.operations import create_default_registry
+
+        spec = create_default_registry().get(operation)
+        assert spec is not None
+        assert spec.handler_factory_for("mne_nirs") is not None
+
     def test_executable_node_template_operations_have_runtime_aliases(self):
         from fnirs_flow.execution.operations import canonical_operation
         from fnirs_flow.registry.node_templates import ALL_NODE_TEMPLATES
@@ -620,7 +685,6 @@ class TestOperationRegistry:
             "wavelet_motion_correction": "motion_correction",
             "ica_motion_correction": "motion_correction",
             "pca_motion_correction": "motion_correction",
-            "cbsi_motion_correction": "motion_correction",
             "bandpass_filter": "filtering",
             "notch_filter": "filtering",
             "lowpass_filter": "filtering",
@@ -633,9 +697,6 @@ class TestOperationRegistry:
             "design_matrix": "build_design_matrix",
             "first_level_glm": "first_level_glm",
             "contrast": "estimate_contrast",
-            "nuisance_glm": "first_level_glm",
-            "linear_mixed_effects_glm": "first_level_glm",
-            "site_covariate_glm": "first_level_glm",
             "channel_output": "channel_output",
             "roi_output": "roi_output",
         }
@@ -707,9 +768,7 @@ class TestExecutionRequest:
             ),
         )
 
-        assert [(run.subject, run.session, run.task, run.run) for run in runs] == [
-            ("01", "pre", "covert", "01")
-        ]
+        assert [(run.subject, run.session, run.task, run.run) for run in runs] == [("01", "pre", "covert", "01")]
 
 
 class TestExecutionFailureAggregation:
@@ -853,6 +912,10 @@ class TestValidationQcExecution:
             self.qc_inputs.append((raw, kwargs))
             return {"sci": 0.9}
 
+        def compute_sci_qc(self, raw, **kwargs):
+            self.qc_inputs.append((raw, kwargs))
+            return {"sci": 0.9}
+
     class _Registry:
         def __init__(self):
             self.adapter = TestValidationQcExecution._Adapter()
@@ -889,7 +952,7 @@ class TestValidationQcExecution:
 
         assert result.status == "completed"
         assert [(item.atom_id, item.status) for item in result.atom_results] == [("sci", "completed")]
-        assert registry.adapter.qc_inputs[0][1]["sci_threshold"] == 0.75
+        assert registry.adapter.qc_inputs[0][1]["threshold"] == 0.75
 
 
 class TestEmptyMarkerExecution:
@@ -981,7 +1044,7 @@ class TestDagBranchIsolation:
         def channel_output(self, contrast_result):
             return {"channels": [{"channel_idx": 1, "task_beta": contrast_result.get("beta", 1.0)}]}
 
-        def roi_output(self, channel_results, atlas="mni", roi_mapping=None):
+        def roi_output(self, channel_results, atlas="mni", roi_mapping=None, aggregation="mean"):
             self.roi_inputs.append(channel_results)
             return {"rois": [{"roi_name": "motor", "task_beta_mean": 2.0, "n_channels": 1}]}
 
@@ -1456,11 +1519,8 @@ class TestDagBranchIsolation:
             )
 
         assert result.status == "completed"
-        assert result.channel_results == [
-            {"channel_idx": 1, "task_beta": 2.5, "source_atom_id": "channels"}
-        ]
+        assert result.channel_results == [{"channel_idx": 1, "task_beta": 2.5, "source_atom_id": "channels"}]
         assert (tmp_path / "derivatives/channel/sub-01_channel_results.csv").exists()
-
 
     def test_dual_channel_and_roi_outputs_are_accumulated_by_branch(self, tmp_path):
         from fnirs_flow.execution.engine import RunContext
@@ -1508,7 +1568,7 @@ class TestDagBranchIsolation:
         from fnirs_flow.execution.engine import RunContext
 
         class EmptyRoiAdapter(TestDagBranchIsolation._Adapter):
-            def roi_output(self, channel_results, atlas="mni", roi_mapping=None):
+            def roi_output(self, channel_results, atlas="mni", roi_mapping=None, aggregation="mean"):
                 return {
                     "rois": [],
                     "n_rois": 0,
