@@ -59,3 +59,21 @@ def test_unexpected_target_file_is_rejected(tmp_path):
     plan = [module.CopyItem(source, target / "source.md")]
     with pytest.raises(SystemExit, match=r"cache\.pyc"):
         module.audit_unexpected_target_files(target, plan, dry_run=False)
+
+
+def test_manifest_uses_public_project_name(tmp_path):
+    module = _load_sync_module()
+    source_root = tmp_path / "private-checkout-name"
+    target_root = tmp_path / "public-checkout-name"
+    source_root.mkdir()
+    source = source_root / "README.md"
+    source.write_text("public\n", encoding="utf-8")
+
+    manifest = module.build_manifest(
+        source_root,
+        target_root,
+        [module.CopyItem(source, target_root / "README.md")],
+    )
+
+    assert manifest["source_root_name"] == "fnirs-flow"
+    assert manifest["target_root_name"] == "fnirs-flow"
