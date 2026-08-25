@@ -426,6 +426,18 @@ class TestRerunPackage:
             json.dumps({"read_only": True, "quarantined_atoms": ["custom-1"]}),
             encoding="utf-8",
         )
+        (tmp_path / "execution_dag.json").write_text(
+            json.dumps({"atoms": [{"atom_id": "custom-1", "security_status": "quarantined"}]}),
+            encoding="utf-8",
+        )
+        (tmp_path / "method_atom_manifest.json").write_text(
+            json.dumps({"atoms": [{"atom_id": "custom-1", "security_status": "quarantined"}]}),
+            encoding="utf-8",
+        )
+        (tmp_path / "flow.json").write_text(
+            json.dumps({"flow_atoms": [{"id": "custom-1", "security_status": "quarantined"}]}),
+            encoding="utf-8",
+        )
 
         result = trust_atom(tmp_path, "custom-1")
         metadata = json.loads((tmp_path / "import_metadata.json").read_text())
@@ -433,3 +445,9 @@ class TestRerunPackage:
         assert result["status"] == "trusted"
         assert metadata["quarantined_atoms"] == []
         assert metadata["trust_decisions"][-1]["atom_id"] == "custom-1"
+        dag = json.loads((tmp_path / "execution_dag.json").read_text())
+        atom_manifest = json.loads((tmp_path / "method_atom_manifest.json").read_text())
+        flow = json.loads((tmp_path / "flow.json").read_text())
+        assert dag["atoms"][0]["security_status"] == "trusted"
+        assert atom_manifest["atoms"][0]["security_status"] == "trusted"
+        assert flow["flow_atoms"][0]["security_status"] == "trusted"

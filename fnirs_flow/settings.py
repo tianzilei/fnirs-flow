@@ -45,6 +45,7 @@ class Settings:
     webui_resource_package: str = "fnirs_flow.resources.webui"
     webui_resource_path: str = "dist"
     registry_cache_dir: Path = Path("outputs/api_projects/.cache/registry")
+    local_atom_dir: Path = Path.home() / ".fnirsflow" / "atoms"
     job_workers: int = 2
     run_workers: int = 1
     blas_threads: int | None = None
@@ -82,6 +83,9 @@ class Settings:
                     str(project_store_dir / ".cache" / "registry"),
                 )
             ),
+            local_atom_dir=Path(
+                os.environ.get("FNIRS_LOCAL_ATOM_DIR", str(Path.home() / ".fnirsflow" / "atoms"))
+            ).expanduser(),
             job_workers=_positive_int("FNIRS_JOB_WORKERS", 2),
             run_workers=_positive_int("FNIRS_RUN_WORKERS", 1),
             blas_threads=_optional_positive_int("FNIRS_BLAS_THREADS"),

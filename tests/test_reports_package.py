@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import warnings
 import zipfile
@@ -96,6 +97,72 @@ class TestPackageExportImport:
         result = import_package(pkg_path, import_dir)
         assert len(result["extracted_files"]) > 0
         assert (import_dir / "plan.json").exists()
+
+    def test_package_copies_and_quarantines_local_atom_definition(self, tmp_path):
+        outdir = tmp_path / "local-atom-output"
+        atom_dir = outdir / "method_atoms"
+        atom_dir.mkdir(parents=True)
+        definition = {"template_id": "local_known_op", "operation": "optical_density"}
+        definition_bytes = json.dumps(definition, sort_keys=True).encode("utf-8")
+        definition_name = "local_known_op.json"
+        (atom_dir / definition_name).write_bytes(definition_bytes)
+        (outdir / "plan.json").write_text(
+            json.dumps(
+                {
+                    "preprocessing_atoms": [
+                        {
+                            "atom_id": "local-1",
+                            "operation": "optical_density",
+                            "origin": "imported",
+                            "execution_trust_level": "imported_custom",
+                            "security_status": "quarantined",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        (outdir / "flow.json").write_text(
+            json.dumps({"flow_atoms": [{"id": "local-1", "security_status": "trusted"}]}),
+            encoding="utf-8",
+        )
+        (outdir / "execution_dag.json").write_text(
+            json.dumps({"atoms": [{"atom_id": "local-1", "security_status": "trusted"}]}),
+            encoding="utf-8",
+        )
+        (outdir / "method_atom_manifest.json").write_text(
+            json.dumps(
+                {
+                    "embedded_local_atoms": [
+                        {
+                            "template_id": "local_known_op",
+                            "path": f"method_atoms/{definition_name}",
+                            "sha256": hashlib.sha256(definition_bytes).hexdigest(),
+                        }
+                    ],
+                    "atoms": [{"atom_id": "local-1", "security_status": "trusted"}],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        package = tmp_path / "local.fnirsflow.zip"
+        export_package(outdir, package, profile_id="submission_package")
+        with zipfile.ZipFile(package) as archive:
+            assert "method_atom_manifest.json" in archive.namelist()
+            assert archive.read(f"method_atoms/{definition_name}") == definition_bytes
+
+        imported = tmp_path / "local-imported"
+        result = import_package(package, imported)
+        imported_plan = json.loads((imported / "plan.json").read_text(encoding="utf-8"))
+        imported_flow = json.loads((imported / "flow.json").read_text(encoding="utf-8"))
+        imported_manifest = json.loads(
+            (imported / "method_atom_manifest.json").read_text(encoding="utf-8")
+        )
+        assert result["quarantined_atoms"] == ["local-1"]
+        assert imported_plan["preprocessing_atoms"][0]["security_status"] == "quarantined"
+        assert imported_flow["flow_atoms"][0]["security_status"] == "quarantined"
+        assert imported_manifest["atoms"][0]["security_status"] == "quarantined"
 
     def test_fork_package_ignores_macos_metadata_sidecars(self, tmp_path):
         package_dir = tmp_path / "imported"

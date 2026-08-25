@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Boxes, CheckCircle2, ChevronDown, ChevronRight, Clock3, Copy, CopyCheck, FileJson, GitFork, Play, Radar, ShieldCheck, XCircle } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -10,7 +10,28 @@ import {
   selectRuns,
 } from '../features/execution/store';
 import { selectImportStatus } from '../features/packages/store';
-import type { AtomExecutionSummary } from '../api/client';
+import { getProjectResults, type AtomExecutionSummary } from '../api/client';
+
+interface ProcessedQcRow {
+  fnirs_record_id?: string;
+  model_id?: string;
+  channel?: string;
+  chromophore?: string;
+  solver_requested?: string;
+  solver_effective?: string;
+  ar1_rho?: string;
+  ar_iterations?: string;
+  ar_converged?: string;
+  irls_iterations?: string;
+  irls_converged?: string;
+  low_weight_fraction?: string;
+  rank?: string;
+  condition_number?: string;
+  residual_df?: string;
+  covariance_status?: string;
+  qc_status?: string;
+  reason_code?: string;
+}
 
 const statusIcons: Record<string, typeof Clock3> = {
   completed: CheckCircle2,
@@ -22,6 +43,8 @@ const statusIcons: Record<string, typeof Clock3> = {
 export function RunMonitor() {
   const navigate = useNavigate();
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [processedQcRows, setProcessedQcRows] = useState<ProcessedQcRow[]>([]);
+  const [processedQcFilter, setProcessedQcFilter] = useState<'all' | 'pass' | 'fail'>('all');
   const runs = useStore(selectRuns);
   const executeInfo = useStore(selectExecuteInfo);
   const currentAttempt = useStore(selectCurrentAttempt);
@@ -30,12 +53,42 @@ export function RunMonitor() {
   const loading = useStore((s) => s.loading);
   const validation = useStore((s) => s.validation);
   const dryRun = useStore((s) => s.dryRun);
+  const dryRunResult = useStore((s) => s.dryRunResult);
+  const flow = useStore((s) => s.flow);
+  const project = useStore((s) => s.project);
+  const processedHb = (((flow.data_semantics as Record<string, unknown>) || {}).branch === 'vendor_processed_hb');
+  const processedSummary = (dryRunResult?.summary?.processed_hb || dryRunResult?.summary || {}) as Record<string, unknown>;
   const execute = useStore((s) => s.execute);
   const cancelExecution = useStore((s) => s.cancelExecution);
   const fork = useStore((s) => s.fork);
   const trustAtom = useStore((s) => s.trustAtom);
   const projectStatus = useStore(useShallow((s) => s.projectStatus()));
-  const quarantined = (importStatus?.quarantined_atoms.length ?? 0) > 0;
+  const quarantinedAtoms = Array.from(new Set([
+    ...(importStatus?.quarantined_atoms ?? []),
+    ...projectStatus.quarantinedAtoms,
+  ]));
+  const quarantined = quarantinedAtoms.length > 0;
+
+  useEffect(() => {
+    if (!processedHb || !project?.id || runs.length === 0) return;
+    let active = true;
+    getProjectResults(project.id, 'qc').then((result) => {
+      if (!active) return;
+      const rows = result.files
+        .filter((file) => file.path.endsWith('residual_qc.csv') || file.path.endsWith('design_matrix_manifest.csv'))
+        .flatMap((file) => Array.isArray(file.data) ? file.data as ProcessedQcRow[] : []);
+      setProcessedQcRows(rows);
+    }).catch(() => {
+      if (active) setProcessedQcRows([]);
+    });
+    return () => { active = false; };
+  }, [processedHb, project?.id, runs.length, currentAttempt?.completed_at]);
+
+  const displayedProcessedQcRows = processedQcRows.filter((row) => {
+    if (processedQcFilter === 'pass') return (row.qc_status || 'pass') === 'pass';
+    if (processedQcFilter === 'fail') return row.qc_status === 'fail' || Boolean(row.reason_code);
+    return true;
+  });
 
   const handleFork = async () => {
     const newProject = await fork();
@@ -99,16 +152,18 @@ export function RunMonitor() {
         </div>
       </section>
 
-      {importStatus?.imported && (
+      {(importStatus?.imported || quarantined) && (
         <section className="notice-panel warning">
           <AlertTriangle size={18} />
           <div>
-            <strong>Imported package</strong>
-            <span>{importStatus.read_only ? 'Read-only package. Fork before editing.' : 'Editable imported project.'}</span>
+            <strong>{importStatus?.imported ? 'Imported package' : 'Local Atom review required'}</strong>
+            <span>{importStatus?.imported
+              ? (importStatus.read_only ? 'Read-only package. Fork before editing.' : 'Editable imported project.')
+              : 'Review each local Atom definition and capability manifest before execution.'}</span>
           </div>
-          {importStatus.quarantined_atoms.length > 0 && (
+          {quarantinedAtoms.length > 0 && (
             <div className="quarantine-actions">
-              {importStatus.quarantined_atoms.map((atomId) => (
+              {quarantinedAtoms.map((atomId) => (
                 <button key={atomId} onClick={() => trustAtom(atomId)} disabled={loading}>
                   <ShieldCheck size={14} />
                   Trust {atomId}
@@ -116,6 +171,46 @@ export function RunMonitor() {
               ))}
             </div>
           )}
+        </section>
+      )}
+
+      {processedHb && (
+        <section className="notice-panel warning processed-hb-monitor">
+          <AlertTriangle size={18} />
+          <div>
+            <strong>Experimental vendor-processed Hb</strong>
+            <span>Absolute units are unverified. Monitor requested/effective solver, AR and IRLS convergence, design rank, and covariance status for every channel/chromophore.</span>
+            {Object.keys(processedSummary).length > 0 && (
+              <ProcessedDryRunSummary summary={processedSummary} />
+            )}
+            {processedQcRows.length > 0 && (
+              <div className="processed-hb-details">
+                <div className="processed-hb-filter-row">
+                  <label htmlFor="processed-qc-filter">QC status</label>
+                  <select id="processed-qc-filter" value={processedQcFilter} onChange={(event) => setProcessedQcFilter(event.target.value as typeof processedQcFilter)}>
+                    <option value="all">All</option><option value="pass">Pass</option><option value="fail">Fail</option>
+                  </select>
+                </div>
+                <div className="metadata-table-scroll">
+                  <table className="runs-table processed-qc-table">
+                    <thead><tr><th>Record / model</th><th>Series</th><th>Solver</th><th>AR(1)</th><th>IRLS</th><th>Design</th><th>Covariance</th><th>QC</th></tr></thead>
+                    <tbody>{displayedProcessedQcRows.map((row, index) => (
+                      <tr key={`${row.fnirs_record_id}-${row.model_id}-${row.channel}-${row.chromophore}-${index}`}>
+                        <td><strong>{row.fnirs_record_id || '-'}</strong><span className="muted-cell">{row.model_id || '-'}</span></td>
+                        <td>{[row.channel, row.chromophore].filter(Boolean).join(' / ') || 'model'}</td>
+                        <td>{row.solver_requested ? `${row.solver_requested} → ${row.solver_effective}` : '-'}</td>
+                        <td>{row.ar1_rho ? `ρ ${row.ar1_rho}; ${row.ar_iterations || 0} iter; ${row.ar_converged}` : '-'}</td>
+                        <td>{row.irls_iterations ? `${row.irls_iterations} iter; ${row.irls_converged}; low ${row.low_weight_fraction}` : '-'}</td>
+                        <td>{row.rank ? `rank ${row.rank}; κ ${row.condition_number}; df ${row.residual_df}` : '-'}</td>
+                        <td>{row.covariance_status || '-'}</td>
+                        <td><span className={`status-chip ${row.qc_status || (row.reason_code ? 'failed' : 'completed')}`}>{row.qc_status || (row.reason_code ? 'fail' : 'pass')}</span>{row.reason_code && <span className="muted-cell">{row.reason_code}</span>}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       )}
 
@@ -257,6 +352,25 @@ export function RunMonitor() {
           </div>
         </aside>
       </section>
+    </div>
+  );
+}
+
+function ProcessedDryRunSummary({ summary }: { summary: Record<string, unknown> }) {
+  const counts = (summary.counts || {}) as Record<string, number>;
+  const estimands = (summary.estimands || {}) as Record<string, { eligible_record_pairs?: number }>;
+  return (
+    <div className="processed-hb-details">
+      <div className="metrics-grid compact-metrics">
+        <Metric icon={Boxes} label="Frozen total" value={counts.total || 0} />
+        <Metric icon={CheckCircle2} label="Eligible" value={counts.eligible || 0} />
+        <Metric icon={XCircle} label="Missing" value={counts.missing || 0} />
+      </div>
+      <div className="metadata-table-scroll">
+        <table className="runs-table"><thead><tr><th>Model</th><th>Eligible record pairs</th></tr></thead>
+          <tbody>{Object.entries(estimands).map(([model, value]) => <tr key={model}><td>{model}</td><td>{value.eligible_record_pairs ?? 0}</td></tr>)}</tbody>
+        </table>
+      </div>
     </div>
   );
 }

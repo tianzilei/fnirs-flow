@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import json
 import zipfile
 from datetime import datetime, timezone
@@ -45,6 +47,7 @@ PACKAGE_PROFILES: dict[str, PackageProfile] = {
             "plan.json",
             "flow.json",
             "execution_dag.json",
+            "method_atom_manifest.json",
             "adapter_manifest.json",
             "risk_register.json",
             "reporting_checklist.json",
@@ -61,6 +64,13 @@ PACKAGE_PROFILES: dict[str, PackageProfile] = {
             "execution_summary.json",
             "dependency_installation_record.json",
             "parameter_confirmation_record.json",
+            "analysis_manifest.json",
+            "processed_hb_preset.json",
+            "run_manifest.csv",
+            "event_ingestion_audit.csv",
+            "design_matrix_manifest.csv",
+            "input_provenance.csv",
+            "channel_map.csv",
         ],
         include_reports=True,
         include_provenance=True,
@@ -73,6 +83,7 @@ PACKAGE_PROFILES: dict[str, PackageProfile] = {
         include_patterns=[
             "plan.json",
             "flow.json",
+            "method_atom_manifest.json",
             "analysis_plan.md",
             "risk_register.json",
             "validation_report.md",
@@ -89,6 +100,7 @@ PACKAGE_PROFILES: dict[str, PackageProfile] = {
             "plan.json",
             "flow.json",
             "execution_dag.json",
+            "method_atom_manifest.json",
             "adapter_manifest.json",
             "risk_register.json",
             "reporting_checklist.json",
@@ -153,6 +165,21 @@ def _portable_data_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     portable["local_root"] = ""
     portable["external_data_uri_prefix"] = f"external-data://{dataset_id}/"
     portable["requires_data_binding"] = True
+    if portable.get("data_branch") == "vendor_processed_hb":
+        frozen_uri_fields = {
+            "signal_provenance_uri": "frozen_inputs/fnirs_signal_provenance.csv",
+            "population_manifest_uri": "frozen_inputs/analysis_population_manifest.csv",
+            "events_uri": "frozen_inputs/fnirs_events.tsv",
+            "contrast_matrix_uri": "frozen_inputs/contrast_matrix.csv",
+        }
+        for field, relative in frozen_uri_fields.items():
+            if portable.get(field):
+                portable[field] = relative
+        for run in portable.get("runs", []):
+            run.pop("runtime_signal_path", None)
+            signal_uri = str(run.get("signal_uri", ""))
+            if signal_uri and not signal_uri.startswith("external-data://"):
+                run["signal_uri"] = str(create_external_data_uri("vendor-processed-hb", Path(signal_uri).name))
     access_instructions = str(portable.get("access_instructions", ""))
     if old_root_text and old_root_text in access_instructions:
         portable["access_instructions"] = (
@@ -250,6 +277,34 @@ def export_package(
         raise ValueError("Raw signal data cannot be embedded in a .fnirsflow package")
 
     def add_portable_file(zf: zipfile.ZipFile, source: Path, arcname: str) -> None:
+        if source.name.upper().endswith("_RE.TXT"):
+            return
+        if source.name in {"input_provenance.csv", "run_manifest.csv"}:
+            with source.open(newline="", encoding="utf-8-sig") as stream:
+                reader = csv.DictReader(stream)
+                rows = list(reader)
+                fieldnames = list(reader.fieldnames or [])
+            for row in rows:
+                if "local_path" in row:
+                    row["local_path"] = ""
+                if source.name == "input_provenance.csv" and row.get("input_uri"):
+                    value = row["input_uri"]
+                    if not value.startswith("external-data://"):
+                        row["input_uri"] = str(
+                            create_external_data_uri("vendor-processed-hb", Path(value).name)
+                        )
+                if source.name == "run_manifest.csv" and row.get("fnirs_signal_uri"):
+                    value = row["fnirs_signal_uri"]
+                    if not value.startswith("external-data://"):
+                        row["fnirs_signal_uri"] = str(
+                            create_external_data_uri("vendor-processed-hb", Path(value).name)
+                        )
+            output = io.StringIO(newline="")
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+            zf.writestr(arcname, output.getvalue())
+            return
         if source.suffix.lower() in SIGNAL_OR_WORK_EXTENSIONS:
             return
         if source.suffix.lower() not in TRACKABLE_EXTENSIONS:
@@ -300,6 +355,28 @@ def export_package(
                         add_portable_file(
                             zf, result_file, result_file.relative_to(outdir).as_posix()
                         )
+            for frozen_root in (outdir / "frozen_inputs", outdir / "compiled" / "frozen_inputs"):
+                if frozen_root.exists():
+                    for frozen_file in sorted(frozen_root.iterdir()):
+                        add_portable_file(zf, frozen_file, f"frozen_inputs/{frozen_file.name}")
+                    break
+
+        # Carry normalized declarations for local Atoms used by this Flow.
+        # These files are provenance; package import never auto-installs them.
+        for atom_root in (outdir / "method_atoms", outdir / "compiled" / "method_atoms"):
+            if not atom_root.exists():
+                continue
+            for definition in sorted(atom_root.rglob("*.json")):
+                findings = find_absolute_path_records(definition)
+                if findings:
+                    raise ValueError(
+                        f"Local MethodAtom definition contains a machine-local path: {definition.name}"
+                    )
+                zf.write(
+                    definition,
+                    f"method_atoms/{definition.relative_to(atom_root).as_posix()}",
+                )
+            break
 
         # Add any .md reports if profile includes them
         if profile.include_reports:

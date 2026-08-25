@@ -54,7 +54,9 @@ export type ValidationResult = Generated.ValidationResult & {
 export type CompileResult = Omit<Generated.CompileResult, 'dag_layers'> & {
   dag_layers?: Array<Array<{ id: string; atom_type?: string; operation?: string }>>;
 };
-export type DiscoverResult = Generated.DiscoverResult & { source_url: string; metadata_tables: number };
+export type DiscoverResult = Generated.DiscoverResult & {
+  source_url: string; metadata_tables: number; processed_hb?: Record<string, unknown>;
+};
 
 export type ProjectDataFolder = Generated.FolderEntry;
 export type ProjectDataFolderList = Generated.ProjectDataFolderList & {
@@ -371,6 +373,10 @@ export type AtomTemplate = Generated.AtomTemplate & {
   parameter_options?: Record<string, unknown[]>;
   parameter_specs?: Record<string, Record<string, unknown>>;
   ports?: Array<Generated.PortDescription & { direction: 'in' | 'out' }>;
+  origin?: string;
+  reference?: string;
+  tags?: string[];
+  flow_atom_blueprint?: Record<string, unknown>;
 };
 
 export async function listAtomTemplates(): Promise<AtomTemplate[]> {

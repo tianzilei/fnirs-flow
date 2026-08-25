@@ -75,6 +75,23 @@ class TestSecurityValidation:
         fatal = [r for r in risks if r.severity == "fatal"]
         assert not any("network" in r.message for r in fatal)
 
+    def test_custom_operation_must_be_declared_in_manifest(self):
+        risks = validate_security(
+            FlowGraph(
+                flow_atoms=[
+                    FlowNode(
+                        id="n1",
+                        atom_type="x",
+                        operation="custom_execute",
+                        category=NodeCategory.DATA,
+                        execution_trust_level=ExecutableTrustLevel.PROJECT_CUSTOM,
+                        capability_manifest=CapabilityManifest(allowed_operations=["different_operation"]),
+                    )
+                ]
+            )
+        )
+        assert any(r.risk_id == "safety-operation-n1" and r.severity == "fatal" for r in risks)
+
     def test_imported_custom_network_fatal(self):
         risks = validate_security(
             FlowGraph(

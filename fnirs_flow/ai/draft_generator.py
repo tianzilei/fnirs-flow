@@ -236,7 +236,7 @@ def generate_draft_flow(
     # Build flow
     now = datetime.now(timezone.utc).isoformat()
     flow: dict[str, Any] = {
-        "schema_version": "0.3.0",
+        "schema_version": "0.4.0",
         "flow_id": f"draft-{scenario_id}-{uuid.uuid4().hex[:8]}",
         "name": study_name or f"AI Draft: {scenario.name}",
         "description": (

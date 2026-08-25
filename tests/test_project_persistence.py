@@ -258,8 +258,8 @@ class TestProjectPersistence:
                 results = list(pool.map(lambda _: store2.get_flow(project.id), range(2)))
 
         assert results == [
-            {"flow_id": "concurrent-flow", "flow_atoms": [], "edges": [], "schema_version": "0.3.0"},
-            {"flow_id": "concurrent-flow", "flow_atoms": [], "edges": [], "schema_version": "0.3.0"},
+            {"flow_id": "concurrent-flow", "flow_atoms": [], "edges": [], "schema_version": "0.4.0"},
+            {"flow_id": "concurrent-flow", "flow_atoms": [], "edges": [], "schema_version": "0.4.0"},
         ]
         assert calls == 1
 

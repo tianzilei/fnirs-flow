@@ -12,7 +12,7 @@ def test_packaged_schema_is_authoritative() -> None:
     schema = files("fnirs_flow.resources.schemas").joinpath("fnirs_flow.schema.json")
     assert schema.is_file()
     document = json.loads(schema.read_text(encoding="utf-8"))
-    assert document["properties"]["schema_version"]["enum"] == ["0.1.0", "0.2.0", "0.3.0"]
+    assert document["properties"]["schema_version"]["enum"] == ["0.1.0", "0.2.0", "0.3.0", "0.4.0"]
 
 
 def test_packaged_webui_has_entrypoint_and_asset() -> None:

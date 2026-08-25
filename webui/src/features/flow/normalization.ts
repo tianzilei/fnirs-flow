@@ -17,12 +17,12 @@ export function normalizeFlowPayload(payload: FlowPayload): FlowPayload {
     delete atom.type;
     return atom;
   });
-  const normalized = { ...payload, schema_version: payload.schema_version ?? '0.3.0', flow_atoms };
+  const normalized = { ...payload, schema_version: payload.schema_version ?? '0.4.0', flow_atoms };
   delete normalized.nodes;
   return normalized;
 }
 
-export function serializeFlowPayload(payload: FlowPayload, schemaVersion = '0.3.0'): FlowPayload {
+export function serializeFlowPayload(payload: FlowPayload, schemaVersion = '0.4.0'): FlowPayload {
   const canonical = normalizeFlowPayload(payload);
   if (schemaVersion === '0.1.0') {
     const nodes = (canonical.flow_atoms ?? []).map((value) => {

@@ -1,131 +1,19 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
-
-const project = {
-  id: 'p1',
-  name: 'Browser Project',
-  description: '',
-  flow_id: 'flow-1',
-  package_path: '/projects/p1.fnirsflow',
-  storage_format: 'fnirsflow_bundle',
-  revision: 3,
-  integrity_status: 'verified',
-};
-const readiness = {
-  flow_saved: true,
-  validated: true,
-  compiled: true,
-  data_discovered: true,
-  runnable_runs: 1,
-  executed: false,
-  flow_hash: 'flow-hash',
-  compiled_flow_hash: 'flow-hash',
-  last_attempt_id: '',
-  last_execution_status: '',
-  read_only: false,
-  quarantined_atoms: [],
-};
-
-const completedExecutionResult = {
-  attempt_id: 'attempt-1',
-  total_runs: 1,
-  successful: 1,
-  failed: 0,
-  failure_ids: [],
-  runs: [{
-    run_id: 'sub-01_task-tapping',
-    status: 'completed',
-    subject: 'sub-01',
-    session: '',
-    run: '01',
-    started_at: '2026-07-18T10:00:00Z',
-    completed_at: '2026-07-18T10:01:00Z',
-    atom_results: [
-      {
-        atom_id: 'dataset_discovery',
-        status: 'skipped',
-        output_handles: {},
-        artifacts: [],
-        warnings: ['Run-scope execution skips project-scope dataset discovery.'],
-      },
-      {
-        atom_id: 'channel_output',
-        status: 'completed',
-        output_handles: { result: 'dict' },
-        warnings: [],
-        artifacts: [{
-          artifact_id: 'a1',
-          type: 'json',
-          uri: 'project://outputs/derivatives/channel/sub-01_channel_results.json',
-          path: 'outputs/derivatives/channel/sub-01_channel_results.json',
-          resolved_path: '/tmp/sub-01_channel_results.json',
-          relative_path: 'derivatives/channel/sub-01_channel_results.json',
-          checksum: 'abc123',
-          exists: true,
-          atom_id: 'channel_output',
-          step_id: 'channel_output',
-        }],
-      },
-    ],
-    artifacts: [{
-      artifact_id: 'a1',
-      type: 'json',
-      uri: 'project://outputs/derivatives/channel/sub-01_channel_results.json',
-      path: 'outputs/derivatives/channel/sub-01_channel_results.json',
-      resolved_path: '/tmp/sub-01_channel_results.json',
-      relative_path: 'derivatives/channel/sub-01_channel_results.json',
-      checksum: 'abc123',
-      exists: true,
-      atom_id: 'channel_output',
-      step_id: 'channel_output',
-    }],
-  }],
-};
-
-function json(route: Route, body: unknown, status = 200) {
-  return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
-}
-
-async function installProjectApi(
-  page: Page,
-  flowState: { value: Record<string, unknown> },
-  examples: Array<{ id: string; label: string; flow: Record<string, unknown> }> = []
-) {
-  await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const path = url.pathname;
-    if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
-    if (path === '/api/atom-templates') return json(route, []);
-    if (path === '/api/example-flows' && request.method() === 'GET') {
-      return json(route, examples.map(({ id, label }) => ({ id, label })));
-    }
-    const exampleMatch = path.match(/^\/api\/example-flows\/([^/]+)$/);
-    if (exampleMatch && request.method() === 'GET') {
-      const example = examples.find((item) => item.id === exampleMatch[1]);
-      return json(route, example?.flow || {}, example ? 200 : 404);
-    }
-    if (path === '/api/projects/p1/flow' && request.method() === 'GET') return json(route, flowState.value);
-    if (path === '/api/projects/p1/flow' && request.method() === 'PUT') {
-      flowState.value = request.postDataJSON().flow;
-      return json(route, { status: 'updated' });
-    }
-    if (path === '/api/projects/p1/status') return json(route, readiness);
-    if (path === '/api/projects/p1/import-status') {
-      return json(route, { imported: false, read_only: false, quarantined_atoms: [] });
-    }
-    if (path === '/api/projects/p1/attempts') return json(route, []);
-    if (path === '/api/projects/p1/progress') {
-      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
-    }
-    return json(route, {});
-  });
-}
+import { expect, test } from '@playwright/test';
+import {
+  apiPath,
+  completedExecutionResult,
+  eventStream,
+  installProjectApi,
+  json,
+  project,
+  readiness,
+} from './support/apiMocks.ts';
 
 test('project creation accepts a typed local data folder path', async ({ page }) => {
   let createdBody: Record<string, unknown> | null = null;
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(route);
     if (path === '/api/projects' && request.method() === 'GET') return json(route, []);
     if (path === '/api/projects' && request.method() === 'POST') {
       createdBody = request.postDataJSON();
@@ -147,7 +35,7 @@ test('project creation accepts a typed local data folder path', async ({ page })
     }
     if (path === '/api/projects/typed-data-root/attempts') return json(route, []);
     if (path === '/api/projects/typed-data-root/progress') {
-      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+      return eventStream(route);
     }
     if (path === '/api/atom-templates') return json(route, []);
     return json(route, {});
@@ -296,7 +184,7 @@ test('imported package can be relinked, trusted, and forked', async ({ page }) =
   let forkFlowRequests = 0;
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(route);
     if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
     if (path === '/api/atom-templates') return json(route, []);
     if (path === '/api/projects/p1/flow') return json(route, { flow_id: 'flow-1', nodes: [], edges: [] });
@@ -316,12 +204,12 @@ test('imported package can be relinked, trusted, and forked', async ({ page }) =
     }
     if (path === '/api/projects/fork-1/attempts') return json(route, []);
     if (path === '/api/projects/fork-1/progress') {
-      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+      return eventStream(route);
     }
     if (path === '/api/projects/p1/status') return json(route, { ...readiness, read_only: imported });
     if (path === '/api/projects/p1/attempts') return json(route, []);
     if (path === '/api/projects/p1/progress') {
-      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+      return eventStream(route);
     }
     if (path === '/api/projects/p1/import-package' && request.method() === 'POST') {
       imported = true;
@@ -373,7 +261,7 @@ test('run monitor page actions work under toast overlay and atom rows expand', a
   let executeRequests = 0;
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(route);
     if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
     if (path === '/api/projects/p1/flow' && request.method() === 'GET') {
       return json(route, { flow_id: 'flow-1', nodes: [], edges: [] });
@@ -384,7 +272,7 @@ test('run monitor page actions work under toast overlay and atom rows expand', a
     }
     if (path === '/api/projects/p1/attempts') return json(route, []);
     if (path === '/api/projects/p1/progress') {
-      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+      return eventStream(route);
     }
     if (path === '/api/projects/p1/validate' && request.method() === 'POST') {
       return json(route, { is_valid: true, errors: [], warnings: [], risks: [] });
@@ -428,12 +316,12 @@ test('run monitor page actions work under toast overlay and atom rows expand', a
   await expect(page.getByText('Validation passed')).toBeVisible();
   await page.getByRole('button', { name: 'Dry run project' }).click();
 
-  expect(dryRunRequests).toBe(1);
+  await expect.poll(() => dryRunRequests).toBe(1);
   await expect(page.getByText('sub-01_task-tapping_run-01')).toBeVisible();
   await expect(page.locator('.status-chip.planned')).toBeVisible();
 
   await page.getByRole('button', { name: 'Execute project' }).click();
-  expect(executeRequests).toBe(1);
+  await expect.poll(() => executeRequests).toBe(1);
   await expect(page.getByText('Execution Summary')).toBeVisible();
   await expect(page.getByText('sub-01_task-tapping')).toBeVisible();
 
@@ -445,7 +333,7 @@ test('run monitor page actions work under toast overlay and atom rows expand', a
 test('results tabs show their selected backend result panes', async ({ page }) => {
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(route);
     if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
     if (path === '/api/projects/p1/flow' && request.method() === 'GET') return json(route, { flow_id: 'flow-1', nodes: [], edges: [] });
     if (path === '/api/projects/p1/status') return json(route, { ...readiness, executed: true });
@@ -464,10 +352,18 @@ test('results tabs show their selected backend result panes', async ({ page }) =
       }]);
     }
     if (path === '/api/projects/p1/progress') {
-      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+      return eventStream(route);
     }
     if (path === '/api/projects/p1/results/qc') {
-      return json(route, { kind: 'qc', file_count: 1, files: [{ path: 'qc.json', data: { summaries: [{ metric: 'sci', value: 0.98 }] } }], figures: [] });
+      return json(route, {
+        kind: 'qc',
+        file_count: 1,
+        files: [{ path: 'qc.json', data: { summaries: [{ metric: 'sci', value: 0.98 }] } }],
+        figures: [{
+          path: 'qc.svg',
+          svg: '<svg xmlns="http://www.w3.org/2000/svg" OnLoad="window.__svgXss=1"><text ONCLICK="window.__svgXss=2">safe figure</text></svg>',
+        }],
+      });
     }
     if (path === '/api/projects/p1/results/channel') {
       return json(route, { kind: 'channel', file_count: 1, files: [{ path: 'channel.json', data: [{ channel: 'channel_0', beta: 1.2 }] }], figures: [] });
@@ -484,20 +380,26 @@ test('results tabs show their selected backend result panes', async ({ page }) =
   await page.goto('/projects/p1/results');
   await expect(page.getByText('Atom derivative locations')).toBeVisible();
 
-  await page.getByRole('button', { name: 'QC Results' }).click();
+  await page.getByRole('tab', { name: 'QC Results' }).click();
   await expect(page.getByRole('heading', { name: 'QC Results' })).toBeVisible();
   await expect(page.getByText('sci')).toBeVisible();
+  await expect(page.getByText('safe figure')).toBeVisible();
+  await expect(page.locator('.result-svg-frame [onload], .result-svg-frame [onclick]')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as Window & { __svgXss?: number }).__svgXss)).toBeUndefined();
   await expect(page.getByText('Atom derivative locations')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'ROI' }).click();
+  await page.getByRole('tab', { name: 'QC Results' }).press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Channel' })).toHaveAttribute('aria-selected', 'true');
+
+  await page.getByRole('tab', { name: 'ROI' }).click();
   await expect(page.getByRole('heading', { name: 'ROI Results' })).toBeVisible();
   await expect(page.getByText('No ROI result files are available. This can happen when the selected demo flow completes channel and group summaries without ROI-level exports.')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Channel' }).click();
+  await page.getByRole('tab', { name: 'Channel' }).click();
   await expect(page.getByRole('heading', { name: 'Channel Results' })).toBeVisible();
   await expect(page.getByText('channel_0')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Group' }).click();
+  await page.getByRole('tab', { name: 'Group' }).click();
   await expect(page.getByRole('heading', { name: 'Group Summary' })).toBeVisible();
   await expect(page.getByText('participant_id')).toBeVisible();
   await expect(page.getByText('sex')).toBeVisible();
@@ -506,13 +408,13 @@ test('results tabs show their selected backend result panes', async ({ page }) =
 test('export package success shows the generated package path', async ({ page }) => {
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(route);
     if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
     if (path === '/api/projects/p1/flow' && request.method() === 'GET') return json(route, { flow_id: 'flow-1', nodes: [], edges: [] });
     if (path === '/api/projects/p1/status') return json(route, readiness);
     if (path === '/api/projects/p1/import-status') return json(route, { imported: false, read_only: false, quarantined_atoms: [] });
     if (path === '/api/projects/p1/attempts') return json(route, []);
-    if (path === '/api/projects/p1/progress') return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+    if (path === '/api/projects/p1/progress') return eventStream(route);
     if (path === '/api/package-profiles') {
       return json(route, [{
         profile_id: 'reproducibility_package',
@@ -544,7 +446,7 @@ test('project version history requires confirmation and refreshes after restore'
   let restoreRequests = 0;
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(route);
     if (path === '/api/projects' && request.method() === 'GET') {
       return json(route, [{ ...project, revision: currentRevision }]);
     }
@@ -568,12 +470,16 @@ test('project version history requires confirmation and refreshes after restore'
   await page.getByRole('button', { name: 'Restore' }).click();
 
   await expect(page.getByRole('alertdialog', { name: 'Restore revision 2' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alertdialog', { name: 'Restore revision 2' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Restore' })).toBeFocused();
+  await page.getByRole('button', { name: 'Restore' }).click();
   expect(restoreRequests).toBe(0);
 
   await page.getByRole('button', { name: 'Confirm restore' }).click();
   await expect(page.getByRole('status')).toHaveText('Revision 2 restored as revision 4.');
   await expect(page.getByText('Verified .fnirsflow bundle · revision 4')).toBeVisible();
-  expect(restoreRequests).toBe(1);
+  await expect.poll(() => restoreRequests).toBe(1);
 });
 
 test('AI draft review isolates, validates, confirms, and discards candidates', async ({ page }) => {
@@ -609,14 +515,14 @@ test('AI draft review isolates, validates, confirms, and discards candidates', a
 
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(route);
     if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
     if (path === '/api/atom-templates') return json(route, []);
     if (path === '/api/projects/p1/flow' && request.method() === 'GET') return json(route, flowState.value);
     if (path === '/api/projects/p1/status') return json(route, readiness);
     if (path === '/api/projects/p1/import-status') return json(route, { imported: false, read_only: false, quarantined_atoms: [] });
     if (path === '/api/projects/p1/attempts') return json(route, []);
-    if (path === '/api/projects/p1/progress') return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+    if (path === '/api/projects/p1/progress') return eventStream(route);
     if (path === '/api/projects/p1/ai/draft' && request.method() === 'GET') {
       return pendingDraft ? json(route, { status: 'draft_exists', draft: pendingDraft }) : json(route, { detail: 'No pending draft' }, 404);
     }
@@ -670,6 +576,10 @@ test('AI draft review isolates, validates, confirms, and discards candidates', a
   await page.getByLabel('Reviewer').fill('reviewer@example.org');
   await page.getByRole('button', { name: 'Apply reviewed draft' }).click();
   await expect(page.getByRole('alertdialog', { name: 'Apply AI draft' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alertdialog', { name: 'Apply AI draft' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Apply reviewed draft' })).toBeFocused();
+  await page.getByRole('button', { name: 'Apply reviewed draft' }).click();
   await page.getByRole('button', { name: 'Confirm apply' }).click();
   await expect(page.getByText('Reviewed draft applied to the current flow. Validate before compiling.')).toBeVisible();
   expect(flowState.value.flow_id).toBe(draftFlow.flow_id);
@@ -852,7 +762,7 @@ test('flow checklist recommends, builds, skips, persists, and links validation r
 
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const path = apiPath(route);
     if (path === '/api/projects' && request.method() === 'GET') return json(route, [project]);
     if (path === '/api/projects/p1/flow' && request.method() === 'GET') return json(route, flowState.value);
     if (path === '/api/projects/p1/flow' && request.method() === 'PUT') {
@@ -862,7 +772,7 @@ test('flow checklist recommends, builds, skips, persists, and links validation r
     if (path === '/api/projects/p1/status') return json(route, readiness);
     if (path === '/api/projects/p1/import-status') return json(route, { imported: false, read_only: false, quarantined_atoms: [] });
     if (path === '/api/projects/p1/attempts') return json(route, []);
-    if (path === '/api/projects/p1/progress') return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
+    if (path === '/api/projects/p1/progress') return eventStream(route);
     if (path === '/api/atom-templates') return json(route, templates);
     if (path === '/api/empty-marker-specs') return json(route, emptySpecs);
     if (path === '/api/flow-checklists') return json(route, summaries);

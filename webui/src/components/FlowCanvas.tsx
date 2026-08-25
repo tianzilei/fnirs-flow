@@ -51,6 +51,7 @@ import {
   withChecklistChoice,
   withOrderPolicy,
 } from '../flow/atomFactory';
+import { useModalDialog } from '../utils/useModalDialog';
 import { ParameterPanel } from './ParameterPanel';
 import { useStore } from '../store';
 import {
@@ -348,6 +349,7 @@ export function FlowCanvas({
   onInspectingChange,
 }: FlowCanvasProps) {
   const project = useStore((s) => s.project);
+  const processedHb = ((flow.data_semantics as Record<string, unknown>) || {}).branch === 'vendor_processed_hb';
   const [nodes, setNodes] = useNodesState([]);
   const [edges, setEdges] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<NodeDetail | null>(null);
@@ -357,6 +359,8 @@ export function FlowCanvas({
   const [emptyMarkerSpecs, setEmptyMarkerSpecs] = useState<EmptyMarkerSpec[]>([]);
   const [atomTemplates, setAtomTemplates] = useState<AtomTemplate[]>([]);
   const [emptyRemovalPreview, setEmptyRemovalPreview] = useState<ReturnType<typeof previewEmptyRiskRemoval> | null>(null);
+  const closeEmptyRemovalPreview = useCallback(() => setEmptyRemovalPreview(null), []);
+  const emptyRemovalDialogRef = useModalDialog(emptyRemovalPreview !== null, closeEmptyRemovalPreview);
   const [searchParams] = useSearchParams();
   const nodesRef = useRef<Node[]>([]);
   const edgesRef = useRef<Edge[]>([]);
@@ -441,6 +445,14 @@ export function FlowCanvas({
   const onConnect = useCallback(
     (params: Connection) => {
       if (readOnly) return;
+      if (processedHb) {
+        const candidate = flowAtoms.find((atom) => String(atom.id) === String(params.target || ''));
+        const operation = String(candidate?.operation || candidate?.atom_type || '');
+        if (['optical_density', 'motion_correction', 'filtering', 'beer_lambert_law', 'mbll'].includes(operation)) {
+          setConnectionError('Processed-Hb recordings cannot connect to raw-intensity preprocessing atoms.');
+          return;
+        }
+      }
       const problem = connectionProblem(params, flowAtoms, edgesRef.current, orderPolicy);
       if (problem) {
         setConnectionError(problem);
@@ -472,13 +484,20 @@ export function FlowCanvas({
       setConnectionError('');
       onChange(syncFlow(flow, nodesRef.current, nextEdges));
     },
-    [flow, flowAtoms, onChange, orderPolicy, readOnly, setEdges]
+    [flow, flowAtoms, onChange, orderPolicy, processedHb, readOnly, setEdges]
   );
 
   const isValidConnection = useCallback(
-    (connection: Connection) =>
-      readOnly ? false : connectionProblem(connection, flowAtoms, edgesRef.current, orderPolicy) === null,
-    [flowAtoms, orderPolicy, readOnly]
+    (connection: Connection) => {
+      if (readOnly) return false;
+      if (processedHb) {
+        const candidate = flowAtoms.find((atom) => String(atom.id) === String(connection.target || ''));
+        const operation = String(candidate?.operation || candidate?.atom_type || '');
+        if (['optical_density', 'motion_correction', 'filtering', 'beer_lambert_law', 'mbll'].includes(operation)) return false;
+      }
+      return connectionProblem(connection, flowAtoms, edgesRef.current, orderPolicy) === null;
+    },
+    [flowAtoms, orderPolicy, processedHb, readOnly]
   );
 
   const toggleOrderRisk = useCallback(() => {
@@ -595,6 +614,10 @@ export function FlowCanvas({
       if (!payload) return;
 
       const template = JSON.parse(payload) as AtomTemplate;
+      if (processedHb && !['frozen_manifest_discovery', 'read_vendor_processed_hb', 'ingest_frozen_events', 'regularize_processed_hb_time', 'compile_processed_hb_designs', 'fit_processed_hb_first_level', 'estimate_full_contrasts', 'write_processed_hb_derivatives'].includes(template.operation || template.id)) {
+        setCanvasNotice('This atom is incompatible with the vendor processed-Hb branch.');
+        return;
+      }
       const position = reactFlowInstance.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
@@ -624,7 +647,7 @@ export function FlowCanvas({
       }
       onChange(nextFlow);
     },
-    [activeChecklistStep, flow, onChange, reactFlowInstance, readOnly]
+    [activeChecklistStep, flow, onChange, processedHb, reactFlowInstance, readOnly]
   );
 
   return (
@@ -692,15 +715,23 @@ export function FlowCanvas({
           </div>
         )}
         {emptyRemovalPreview && (
-          <div className="canvas-empty-removal-preview" role="dialog" aria-label="Disable Empty risk">
-            <strong>Disable Empty risk?</strong>
-            <span>
+          <div
+            ref={emptyRemovalDialogRef}
+            className="canvas-empty-removal-preview"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="empty-removal-title"
+            aria-describedby="empty-removal-description"
+            tabIndex={-1}
+          >
+            <strong id="empty-removal-title">Disable Empty risk?</strong>
+            <span id="empty-removal-description">
               Remove {emptyRemovalPreview.removed_atoms.length} empty atom{emptyRemovalPreview.removed_atoms.length === 1 ? '' : 's'}
               {emptyRemovalPreview.cleared_slots.length > 0 ? ` and clear ${emptyRemovalPreview.cleared_slots.length} skip marker${emptyRemovalPreview.cleared_slots.length === 1 ? '' : 's'}` : ''}.
             </span>
             <div>
               <button className="icon-text-button" onClick={applyEmptyRemoval} type="button">Apply</button>
-              <button className="icon-text-button subtle" onClick={() => setEmptyRemovalPreview(null)} type="button">Cancel</button>
+              <button className="icon-text-button subtle" onClick={closeEmptyRemovalPreview} type="button">Cancel</button>
             </div>
           </div>
         )}

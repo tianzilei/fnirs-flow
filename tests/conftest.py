@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Callable
+from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -33,9 +36,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "real_data: marks tests that use real local datasets")
 
 
-@pytest.fixture
-def minimal_flow_dict() -> dict:
-    """Minimal valid flow dict for testing."""
+def _minimal_flow_dict() -> dict[str, Any]:
+    """Build a fresh minimal legacy flow for each test."""
     return {
         "schema_version": "0.1.0",
         "flow_id": "test-flow-001",
@@ -84,3 +86,21 @@ def minimal_flow_dict() -> dict:
             "modified_at": "2026-01-01T00:00:00Z",
         },
     }
+
+
+@pytest.fixture
+def minimal_flow_factory() -> Callable[..., dict[str, Any]]:
+    """Return isolated minimal flows with optional top-level overrides."""
+
+    def build(**overrides: Any) -> dict[str, Any]:
+        flow = _minimal_flow_dict()
+        flow.update(deepcopy(overrides))
+        return flow
+
+    return build
+
+
+@pytest.fixture
+def minimal_flow_dict(minimal_flow_factory: Callable[..., dict[str, Any]]) -> dict[str, Any]:
+    """Minimal valid flow dict kept for tests that do not need customization."""
+    return minimal_flow_factory()

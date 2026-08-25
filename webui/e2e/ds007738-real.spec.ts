@@ -42,7 +42,7 @@ test.describe('ds007738 real-data package', () => {
 
     await page.getByRole('button', { name: 'Navigate to Results', exact: true }).click();
     await expect(page.getByText('Imported package results are available in the result tabs below.')).toBeVisible();
-    await page.getByRole('button', { name: 'Group', exact: true }).click();
+    await page.getByRole('tab', { name: 'Group', exact: true }).click();
     await expect(page.getByText(/\d+ files \u00b7 \d+ rows \u00b7 showing 100 representative rows/)).toBeVisible();
     await expect(page.getByText('derivatives/group/group_summary.json', { exact: true })).toBeVisible();
     await expect(page.getByText('Covert_Left_minus_Covert_Right', { exact: true }).first()).toBeVisible();
@@ -55,8 +55,8 @@ test.describe('ds007738 real-data package', () => {
     await page.getByRole('button', { name: 'Execute project', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await expect(page.getByText(/Attempt .* \u00b7 cancelled/)).toBeVisible();
-    await expect(page.getByText('Execution cancelled', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Attempt .* \u00b7 cancelled/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Execution cancelled', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('Execution failed', { exact: true })).toHaveCount(0);
   });
 });

@@ -129,6 +129,29 @@ cd webui && npm install && npm run dev               # Frontend :5173
 | `webui` | Start the WebUI server | `python cli.py webui` or `python cli.py webui --dev` |
 | `backends` | Show backend status and capabilities | `python cli.py backends` |
 | `verify-package` | Verify `.fnirsflow.zip` package integrity | `python cli.py verify-package package.fnirsflow.zip` |
+| `processed-hb-acceptance` | Write processed-Hb release-acceptance evidence | `python cli.py processed-hb-acceptance outputs/processed --output outputs/processed/acceptance.json` |
+
+### Vendor-Processed Hb Branch
+
+`vendor_processed_hb` is a data branch, not one MethodAtom. Its example flow is
+composed from eight generic MethodAtoms for manifest discovery, signal reading,
+event ingestion, time regularization, design compilation, first-level fitting,
+contrast estimation, and derivative writing.
+
+```bash
+python cli.py validate configs/vendor_processed_hb_flow.json
+python cli.py compile configs/vendor_processed_hb_flow.json --outdir outputs/processed
+python cli.py discover vendor-processed-hb --outdir outputs/processed --manifest-root /path/to/frozen-inputs
+python cli.py dry-run outputs/processed --outdir outputs/processed
+python cli.py run outputs/processed --outdir outputs/processed
+python cli.py processed-hb-acceptance outputs/processed --output outputs/processed/acceptance.json
+```
+
+This branch accepts already converted HbO/HbR data. It does not reconstruct or
+claim raw intensity, optical density, motion correction, filtering, or MBLL.
+The bundled preset is experimental; confirmatory use remains blocked until all
+scientific thresholds are explicitly supplied and frozen. See
+`docs/specs/vendor_processed_hb_analysis.md`.
 
 `run` supports filters:
 
@@ -181,6 +204,7 @@ Related documents:
 
 - `docs/README.md` is the public documentation index.
 - `docs/specs/` contains the stable public contracts.
+- `docs/specs/vendor_processed_hb_analysis.md` defines the generic processed-Hb branch.
 - Compatibility aliases such as `FlowNode`, `NodeTemplate`, and `NodeLibrary` are kept only for older flows and migration paths.
 
 ---

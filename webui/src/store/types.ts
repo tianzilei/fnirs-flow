@@ -68,6 +68,7 @@ export interface StoreState {
   participantTableResult: ParticipantTableImportResult | null;
   runs: Run[];
   executeInfo: ExecuteInfo | null;
+  dryRunResult: api.DryRunResult | null;
   currentAttempt: ExecutionJob | null;
   importStatus: ImportStatus | null;
   readiness: ProjectStatus | null;
@@ -83,8 +84,9 @@ export interface StoreState {
     validated: boolean;
     compiled: boolean;
     dataDiscovered: boolean;
-    executed: boolean;
-    hasFatalRisk: boolean;
+      executed: boolean;
+      hasFatalRisk: boolean;
+      quarantinedAtoms: string[];
   };
   loadProjects: () => Promise<void>;
   createProject: (name: string, description: string, dataRoot?: string) => Promise<Project>;

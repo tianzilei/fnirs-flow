@@ -72,7 +72,7 @@ export function createExecutionActions(set: StoreSet, get: StoreGet) {
       set({ loading: true, error: null });
       try {
         const data = await api.dryRun(project.id);
-        set({ runs: data.planned_runs || [], executeInfo: null, loading: false });
+        set({ runs: data.planned_runs || [], dryRunResult: data, executeInfo: null, loading: false });
       } catch (error: unknown) {
         set({ error: { message: 'Dry-run failed', detail: api.formatApiError(error) }, loading: false });
       }

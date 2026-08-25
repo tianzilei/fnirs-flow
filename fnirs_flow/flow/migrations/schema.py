@@ -35,6 +35,17 @@ MIGRATION_TABLE: list[MigrationEntry] = [
             "default backend_binding to null for backward compatibility",
         ],
     ),
+    MigrationEntry(
+        from_version="0.3.0",
+        to_version="0.4.0",
+        description="Data-semantics and solver-contract migration",
+        rewrites=[
+            "add data_semantics.branch=raw_intensity_or_snirf to legacy BIDS/SNIRF flows",
+            "migrate noise_model=ols to solver.requested=ols",
+            "require explicit confirmation before changing nominal ar1 to effective AR(1)",
+            "write migration_audit.json during project migration",
+        ],
+    ),
 ]
 
 

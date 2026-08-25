@@ -27,6 +27,8 @@ export function FlowBuilder() {
   const setFlow = useStore((s) => s.setFlow);
   const validation = useStore((s) => s.validation);
   const readOnly = useStore((s) => s.importStatus?.read_only ?? false);
+  const dataSemantics = (flow.data_semantics as Record<string, unknown>) || {};
+  const processedHb = dataSemantics.branch === 'vendor_processed_hb';
 
   useEffect(() => {
     let active = true;
@@ -80,8 +82,14 @@ export function FlowBuilder() {
         highlightedTemplateIds={activeChecklistStep?.templateIds || []}
         checklistRecommendations={activeChecklistStep?.recommendations || []}
         activeChecklistLabel={activeChecklistStep?.label || ''}
+        dataBranch={String(dataSemantics.branch || '')}
       />
       <div className="canvas-container">
+        {processedHb && (
+          <div className="warning processed-hb-warning" role="status">
+            Vendor-processed Hb · absolute units unverified · raw-intensity, optical-density, motion-correction, filtering, and MBLL claims are unavailable.
+          </div>
+        )}
         <FlowCanvas
           key={canvasResetVersion}
           flow={flow}

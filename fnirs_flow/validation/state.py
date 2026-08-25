@@ -468,6 +468,19 @@ def validate_custom_node_safety(node: FlowAtom) -> list[RiskItem]:
 
     manifest = node.capability_manifest
 
+    operation = str(node.operation or node.config.get("operation") or node.atom_type)
+    if operation not in manifest.allowed_operations:
+        risks.append(
+            RiskItem(
+                risk_id=f"safety-operation-{node.id}",
+                severity="fatal",
+                domain="security",
+                affected_object=f"atom:{node.id}",
+                message=f"Atom '{node.id}' operation '{operation}' is not declared in capability_manifest",
+                suggested_action="Add the exact operation to capability_manifest.allowed_operations",
+            )
+        )
+
     # Check for dangerous capabilities
     if manifest.network:
         risks.append(

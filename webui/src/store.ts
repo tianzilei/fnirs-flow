@@ -17,6 +17,7 @@ export const useStore = create<StoreState>((set, get) => ({
   participantTableResult: null,
   runs: [],
   executeInfo: null,
+  dryRunResult: null,
   currentAttempt: null,
   importStatus: null,
   readiness: null,

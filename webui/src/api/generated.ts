@@ -75,6 +75,14 @@ export interface AtomTemplate {
   "input_ports"?: Array<PortDescription>;
   "output_ports"?: Array<PortDescription>;
   "evidence_refs"?: Array<string>;
+  "origin"?: string;
+  "reference"?: string;
+  "tags"?: Array<string>;
+  "flow_atom_blueprint"?: Record<string, unknown>;
+  "implementation_module"?: string | null;
+  "implementation_callable"?: string | null;
+  "implementation_status"?: string;
+  "capability_manifest"?: Record<string, unknown> | null;
   "operation_contract"?: OperationContract | unknown;
 }
 
@@ -202,6 +210,7 @@ export interface DiscoverResult {
   "local_root": string;
   "source_url"?: string;
   "metadata_tables"?: number;
+  "processed_hb"?: Record<string, unknown>;
 }
 
 export interface DryRunResult {

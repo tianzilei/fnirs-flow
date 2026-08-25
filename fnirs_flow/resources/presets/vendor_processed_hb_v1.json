@@ -1,0 +1,34 @@
+{
+  "preset_id": "vendor_processed_hb_v1",
+  "analysis_version": "vendor_processed_hb_v1",
+  "status": "experimental_not_for_confirmatory_inference",
+  "scientific_parameters_frozen": false,
+  "encoding_candidates": ["utf-8-sig", "utf-8", "cp932", "gb18030"],
+  "delimiter": "tab",
+  "time_regularization": {
+    "max_duplicate_fraction": null,
+    "max_jitter_abs_s": null,
+    "max_jitter_relative": null,
+    "target_sfreq_policy": "median_native",
+    "interpolation_method": "linear",
+    "max_interpolation_deviation_s": null
+  },
+  "solver": {"requested": "ar1_irls", "fallback_policy": "forbid", "confirmatory": false},
+  "models": ["glm_conditions_canonical_td_v1", "fir_post_event_0_30_10s_v1", "glm_event_order_linear_canonical_td_v1"],
+  "fir_0_30_weights": [0.3333333333333333, 0.3333333333333333, 0.3333333333333333],
+  "design_gates": {"condition_number_max": null, "minimum_residual_df": null},
+  "solver_config": {
+    "rho_bound": null, "ar_max_iterations": null, "ar_tolerance": null,
+    "prais_winsten_first_row": true, "huber_c": null, "irls_max_iterations": null,
+    "irls_beta_tolerance": null, "irls_weight_tolerance": null, "minimum_effective_weight": null
+  },
+  "covariance_config": {
+    "robust_covariance": "HC0_sandwich", "covariance_symmetry_atol": null,
+    "covariance_symmetry_rtol": null, "covariance_psd_tolerance": null
+  },
+  "qc_gates": {
+    "hbt_absolute_tolerance": null, "hbt_exceedance_fraction_max": null,
+    "whitening_improvement_min": null, "low_weight_fraction_max": null,
+    "event_coverage_tolerance_s": null
+  }
+}

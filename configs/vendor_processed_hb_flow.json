@@ -1,0 +1,42 @@
+{
+  "schema_version": "0.4.0",
+  "flow_id": "vendor-processed-hb",
+  "name": "Vendor processed-Hb first-level analysis",
+  "description": "Experimental manifest-driven processed-Hb branch; not for confirmatory inference until every scientific threshold is frozen.",
+  "data_semantics": {"branch": "vendor_processed_hb", "signal_level": "haemoglobin_vendor_processed", "absolute_unit_verified": false},
+  "solver": {"requested": "ar1_irls", "fallback_policy": "forbid", "confirmatory": false},
+  "processed_hb": {
+    "preset_id": "vendor_processed_hb_v1",
+    "status": "experimental_not_for_confirmatory_inference",
+    "scientific_parameters_frozen": false,
+    "parser": {"encoding_candidates": ["utf-8-sig", "utf-8", "cp932", "gb18030"], "delimiter": "tab", "replacement_character_policy": "fail"},
+    "time_regularization": {"max_duplicate_fraction": null, "max_jitter_abs_s": null, "max_jitter_relative": null, "target_sfreq_policy": "median_native", "interpolation_method": "linear", "max_interpolation_deviation_s": null},
+    "design": {"models": ["glm_conditions_canonical_td_v1", "fir_post_event_0_30_10s_v1", "glm_event_order_linear_canonical_td_v1"], "fir_0_30_weights": [0.3333333333333333, 0.3333333333333333, 0.3333333333333333], "condition_number_max": null, "minimum_residual_df": null, "saturated_and_trend_same_model": false},
+    "solver": {"rho_bound": null, "rho_estimator": "bounded_yule_walker", "ar_max_iterations": null, "ar_convergence_tolerance": null, "prais_winsten_first_row": true, "huber_c": null, "scale_estimator": "mad", "irls_max_iterations": null, "irls_beta_tolerance": null, "irls_weight_tolerance": null, "minimum_effective_weight": null},
+    "covariance": {"robust_method": "HC0_sandwich", "symmetry_absolute_tolerance": null, "symmetry_relative_tolerance": null, "psd_eigenvalue_tolerance": null},
+    "qc": {"hbt_absolute_tolerance": null, "hbt_exceedance_fraction_max": null, "whitening_improvement_min": null, "low_weight_fraction_max": null, "event_coverage_tolerance_s": null},
+    "roi_mapping": null
+  },
+  "flow_atoms": [
+    {"id": "discover-frozen-manifest", "atom_type": "processed_hb_discovery", "template_id": "frozen_manifest_discovery", "operation": "frozen_manifest_discovery", "category": "data", "execution_scope": "project", "position": {"x": 0, "y": 100}, "readiness_status": "ready", "config": {"data_branch": "vendor_processed_hb"}, "ports": [{"name": "processed_hb_run", "direction": "out", "schema": "ProcessedHbRun"}, {"name": "processed_hb_manifest", "direction": "out", "schema": "ProcessedHbManifest"}]},
+    {"id": "read-processed-hb", "atom_type": "processed_hb_reader", "template_id": "read_vendor_processed_hb", "operation": "read_vendor_processed_hb", "category": "data", "position": {"x": 260, "y": 0}, "readiness_status": "ready", "config": {"data_branch": "vendor_processed_hb", "encoding": "auto"}, "ports": [{"name": "processed_hb_run", "direction": "in", "schema": "ProcessedHbRun"}, {"name": "processed_hb_recording", "direction": "out", "schema": "ProcessedHbRecording"}, {"name": "parser_qc", "direction": "out", "schema": "ParserQC"}]},
+    {"id": "ingest-events", "atom_type": "processed_hb_events", "template_id": "ingest_frozen_events", "operation": "ingest_frozen_events", "category": "design", "position": {"x": 260, "y": 210}, "readiness_status": "ready", "config": {"event_source": "fnirs_events.tsv"}, "ports": [{"name": "processed_hb_run", "direction": "in", "schema": "ProcessedHbRun"}, {"name": "frozen_event_set", "direction": "out", "schema": "FrozenEventSet"}]},
+    {"id": "regularize-time", "atom_type": "processed_hb_time_regularization", "template_id": "regularize_processed_hb_time", "operation": "regularize_processed_hb_time", "category": "design", "position": {"x": 520, "y": 0}, "readiness_status": "needs_attention", "config": {"target_sfreq_policy": "median_native", "interpolation_method": "linear"}, "ports": [{"name": "processed_hb_recording", "direction": "in", "schema": "ProcessedHbRecording"}, {"name": "regularized_hb_recording", "direction": "out", "schema": "RegularizedHbRecording"}]},
+    {"id": "compile-designs", "atom_type": "processed_hb_design", "template_id": "compile_processed_hb_designs", "operation": "compile_processed_hb_designs", "category": "design", "position": {"x": 780, "y": 100}, "readiness_status": "needs_attention", "config": {"models": ["glm_conditions_canonical_td_v1", "fir_post_event_0_30_10s_v1", "glm_event_order_linear_canonical_td_v1"]}, "ports": [{"name": "regularized_hb_recording", "direction": "in", "schema": "RegularizedHbRecording"}, {"name": "frozen_event_set", "direction": "in", "schema": "FrozenEventSet"}, {"name": "design_bundle_set", "direction": "out", "schema": "DesignBundleSet"}]},
+    {"id": "fit-first-level", "atom_type": "processed_hb_first_level", "template_id": "fit_processed_hb_first_level", "operation": "fit_processed_hb_first_level", "category": "analysis", "position": {"x": 1040, "y": 50}, "readiness_status": "needs_attention", "config": {"solver_requested": "ar1_irls", "fallback_policy": "forbid"}, "ports": [{"name": "regularized_hb_recording", "direction": "in", "schema": "RegularizedHbRecording"}, {"name": "design_bundle_set", "direction": "in", "schema": "DesignBundleSet"}, {"name": "first_level_fit_set", "direction": "out", "schema": "FirstLevelFitSet"}]},
+    {"id": "estimate-contrasts", "atom_type": "processed_hb_contrasts", "template_id": "estimate_full_contrasts", "operation": "estimate_full_contrasts", "category": "analysis", "position": {"x": 1300, "y": 50}, "readiness_status": "ready", "config": {}, "ports": [{"name": "first_level_fit_set", "direction": "in", "schema": "FirstLevelFitSet"}, {"name": "contrast_set", "direction": "out", "schema": "ContrastSet"}]},
+    {"id": "write-derivatives", "atom_type": "processed_hb_derivatives", "template_id": "write_processed_hb_derivatives", "operation": "write_processed_hb_derivatives", "category": "output", "execution_scope": "project", "position": {"x": 1560, "y": 50}, "readiness_status": "ready", "config": {"derivatives_contract": "1.0.0"}, "ports": [{"name": "contrast_set", "direction": "in", "schema": "ContrastSet"}, {"name": "processed_hb_derivatives", "direction": "out", "schema": "ProcessedHbDerivatives"}]}
+  ],
+  "edges": [
+    {"id": "e01", "source": "discover-frozen-manifest", "target": "read-processed-hb", "source_handle": "processed_hb_run", "target_handle": "processed_hb_run"},
+    {"id": "e02", "source": "discover-frozen-manifest", "target": "ingest-events", "source_handle": "processed_hb_run", "target_handle": "processed_hb_run"},
+    {"id": "e03", "source": "read-processed-hb", "target": "regularize-time", "source_handle": "processed_hb_recording", "target_handle": "processed_hb_recording"},
+    {"id": "e04", "source": "regularize-time", "target": "compile-designs", "source_handle": "regularized_hb_recording", "target_handle": "regularized_hb_recording"},
+    {"id": "e05", "source": "ingest-events", "target": "compile-designs", "source_handle": "frozen_event_set", "target_handle": "frozen_event_set"},
+    {"id": "e06", "source": "regularize-time", "target": "fit-first-level", "source_handle": "regularized_hb_recording", "target_handle": "regularized_hb_recording"},
+    {"id": "e07", "source": "compile-designs", "target": "fit-first-level", "source_handle": "design_bundle_set", "target_handle": "design_bundle_set"},
+    {"id": "e08", "source": "fit-first-level", "target": "estimate-contrasts", "source_handle": "first_level_fit_set", "target_handle": "first_level_fit_set"},
+    {"id": "e09", "source": "estimate-contrasts", "target": "write-derivatives", "source_handle": "contrast_set", "target_handle": "contrast_set"}
+  ],
+  "metadata": {"tags": ["processed_hb", "experimental", "not_for_confirmatory_inference"]}
+}

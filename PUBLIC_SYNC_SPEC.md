@@ -26,7 +26,8 @@ Included content:
   `docs/specs/fnirs_flow_public_api.md`,
   `docs/specs/method_atom_parameter_ui_contract.md`,
   `docs/specs/package_profile_spec.md`, and
-  `docs/specs/mvp_task_glm_acceptance_checklist.md`
+  `docs/specs/mvp_task_glm_acceptance_checklist.md`, and
+  `docs/specs/vendor_processed_hb_analysis.md`
 - Public scripts listed in `PUBLIC_SCRIPT_FILES` inside
   `scripts/sync_public_release.py`
 - Public CI and release tools listed in `PUBLIC_TOOL_FILES` inside
@@ -61,6 +62,27 @@ docstrings must not introduce Chinese text. If upstream private notes contain
 Chinese descriptions, translate them to clear English before syncing or
 committing the public repository.
 
+## Generic Naming Policy
+
+The public package is a general-purpose fNIRS analysis system. Public paths,
+identifiers, configuration values, examples, documentation, comments,
+docstrings, bundled evidence, generated assets, and user-facing strings must
+not contain names tied to a particular research project, dataset, intervention,
+condition sequence, clinical indication, or local analysis freeze.
+
+`scripts/sync_public_release.py` applies a case-insensitive naming denylist to
+both selected source paths and UTF-8 text before any target content is removed
+or written. The denylist is maintained in `FORBIDDEN_DOMAIN_TERMS`; prohibited
+terms are assembled from neutral fragments so the policy implementation does
+not reproduce them verbatim. A new project-specific naming leak must be removed
+from the source and added to this denylist with regression coverage.
+
+Generic terms such as `processed_hb`, `vendor_processed_hb`, `condition`,
+`participant`, `record_pair`, and standard method names are allowed when their
+semantics are reusable across studies. A method or preset that encodes one
+study's fixed condition labels, event count, timing, or contrast must be renamed
+and generalized before public release.
+
 ## Sync Command
 
 Run from the development repository root.
@@ -92,6 +114,9 @@ public verification surface.
   current and supported by the latest validation run.
 - Documentation, comments, and docstrings in public files have been reviewed for
   English-only wording.
+- Public filenames and selected source text pass the generic naming gate; no
+  research-specific project, dataset, intervention, condition, freeze, or model
+  name remains.
 
 ## Post-Sync Audit
 
@@ -160,6 +185,8 @@ Commit or push the public repository only when:
 - The post-sync audit is complete.
 - Required public Markdown has been reviewed and updated.
 - Public documentation and code comments use English only.
+- The case-insensitive generic naming gate passes for filenames, source text,
+  bundled evidence, and generated WebUI assets.
 - `git status --short` contains only intentional release changes.
 - The public repository can be understood without access to the private
   development repository.

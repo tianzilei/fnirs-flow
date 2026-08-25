@@ -111,6 +111,7 @@ class TestCompiler:
         # MethodAtom-first chains are canonical.
         assert "preprocessing_atoms" in plan
         assert "analysis_atoms" in plan
+        assert len(plan["method_atoms"]) == len(result.execution_dag.atoms)
         assert len(plan["preprocessing_atoms"]) > 0
         first_atom = plan["preprocessing_atoms"][0]
         assert "atom_id" in first_atom
@@ -139,6 +140,50 @@ class TestCompiler:
         assert (result.outdir / "reporting_checklist.json").exists()
         assert (result.outdir / "artifact_manifest.json").exists()
         assert (result.outdir / "reproducibility_manifest.json").exists()
+        assert (result.outdir / "method_atom_manifest.json").exists()
+
+    def test_compilation_embeds_used_local_atom_declaration(self, tmp_path, minimal_flow_factory):
+        flow = minimal_flow_factory()
+        local_atom = flow["nodes"][1]
+        local_atom.update(
+            {
+                "template_id": "local_optical_density",
+                "origin": "imported",
+                "execution_trust_level": "imported_custom",
+                "security_status": "quarantined",
+                "capability_manifest": {
+                    "allowed_operations": ["optical_density"],
+                    "network": False,
+                    "shell": False,
+                },
+                "template_snapshot": {
+                    "template_id": "local_optical_density",
+                    "name": "Local optical density",
+                    "category": "preprocessing",
+                    "atom_type": "optical_density",
+                    "operation": "optical_density",
+                    "implementation_module": "workshop_atoms.optical_density",
+                    "implementation_callable": "execute",
+                    "metadata": {
+                        "local_atom_file": "C:/Users/example/.fnirsflow/atoms/local.py",
+                    },
+                },
+            }
+        )
+
+        result = compile_flow(flow, tmp_path / "local-output")
+        manifest = json.loads((result.outdir / "method_atom_manifest.json").read_text())
+        record = next(item for item in manifest["atoms"] if item["atom_id"] == "node-2")
+        definition_path = result.outdir / record["embedded_definition"]
+        definition = json.loads(definition_path.read_text(encoding="utf-8"))
+        plan = json.loads((result.outdir / "plan.json").read_text(encoding="utf-8"))
+        dag = json.loads((result.outdir / "execution_dag.json").read_text(encoding="utf-8"))
+
+        assert manifest["embedded_local_atom_count"] == 1
+        assert definition["implementation_module"] == "workshop_atoms.optical_density"
+        assert definition["metadata"]["local_atom_file"] == "local.py"
+        assert plan["preprocessing_atoms"][0]["execution_trust_level"] == "imported_custom"
+        assert dag["atoms"][1]["security_status"] == "quarantined"
 
     def test_deterministic_output(self, tmp_path):
         demo_path = Path(__file__).parent.parent / "configs" / "demo_task_flow.json"
@@ -171,22 +216,20 @@ class TestCompiler:
                     f"Node {dag_node.step_id} (layer {node_layer}) depends on {dep} (layer {dep_layer})"
                 )
 
-    def test_ai_draft_pending_confirmation_blocks_compile(self, tmp_path, minimal_flow_dict):
-        flow = dict(minimal_flow_dict)
-        flow["metadata"] = {
+    def test_ai_draft_pending_confirmation_blocks_compile(self, tmp_path, minimal_flow_factory):
+        flow = minimal_flow_factory(metadata={
             "ai_generation": {
                 "requires_user_confirmation": ["contrast"],
                 "confirmed_parameters": [],
                 "not_used_for_execution": True,
             }
-        }
+        })
 
         with pytest.raises(ValueError, match="fatal risks"):
             compile_flow(flow, tmp_path / "blocked")
 
-    def test_ai_confirmation_and_metadata_are_preserved(self, tmp_path, minimal_flow_dict):
-        flow = dict(minimal_flow_dict)
-        flow["metadata"] = {
+    def test_ai_confirmation_and_metadata_are_preserved(self, tmp_path, minimal_flow_factory):
+        flow = minimal_flow_factory(metadata={
             "ai_generation": {
                 "model": "test-model",
                 "requires_user_confirmation": ["contrast"],
@@ -195,7 +238,7 @@ class TestCompiler:
                 "confirmed_at": "2026-07-13T12:00:00+08:00",
                 "not_used_for_execution": True,
             }
-        }
+        })
 
         result = compile_flow(flow, tmp_path / "confirmed")
         plan = json.loads((result.outdir / "plan.json").read_text())

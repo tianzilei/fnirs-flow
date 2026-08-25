@@ -19,12 +19,14 @@ from fnirs_flow.flow.atoms import (
     PROVENANCE_CONFIG_KEYS,
     AtomPort,
     BackendBinding,
+    CapabilityManifest,
     ExecutableTrustLevel,
     FlowAtom,
     MethodAtomCategory,
     MethodAtomOrigin,
     Position,
     ReadinessStatus,
+    SecurityStatus,
 )
 
 
@@ -46,6 +48,16 @@ def _split_non_user_config(
         str(readiness_status) if readiness_status not in (None, "") else None,
         str(execution_scope) if execution_scope not in (None, "") else None,
     )
+
+
+def _portable_template_record(template: MethodAtomTemplate) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Remove machine-local source locations before a template enters a Flow."""
+    snapshot = template.model_dump(mode="json", by_alias=True, exclude_none=True)
+    metadata = dict(template.metadata)
+    for record in (metadata, snapshot.get("metadata", {})):
+        if isinstance(record, dict) and record.get("local_atom_file"):
+            record["local_atom_file"] = Path(str(record["local_atom_file"])).name
+    return snapshot, metadata
 
 
 class MethodAtomTemplate(BaseModel):
@@ -73,6 +85,13 @@ class MethodAtomTemplate(BaseModel):
     dependency_profile_id: str | None = None
     required_capabilities: list[str] = Field(default_factory=list)
     dependency_optional: bool = False
+    implementation_module: str | None = None
+    implementation_callable: str | None = None
+    implementation_status: str = Field(
+        default="managed",
+        pattern="^(managed|implemented|delegated|dependency_gated|contract_test_required|metadata_only)$",
+    )
+    capability_manifest: CapabilityManifest | None = None
 
     @model_validator(mode="after")
     def _move_non_user_defaults_out_of_config(self) -> MethodAtomTemplate:
@@ -121,6 +140,8 @@ class MethodAtomLibrary:
 
     def register(self, template: MethodAtomTemplate) -> None:
         """Register a MethodAtom template."""
+        if template.template_id in self._templates:
+            raise ValueError(f"Duplicate MethodAtom template id: {template.template_id}")
         self._templates[template.template_id] = template
 
     def register_many(self, templates: list[MethodAtomTemplate]) -> int:
@@ -205,11 +226,26 @@ class MethodAtomLibrary:
         except ValueError:
             readiness_status = ReadinessStatus.NOT_CONFIGURED
 
+        execution_trust_level = (
+            ExecutableTrustLevel.IMPORTED_CUSTOM
+            if template.origin == MethodAtomOrigin.IMPORTED
+            else ExecutableTrustLevel.BUILTIN_MANAGED
+        )
+        security_status = (
+            SecurityStatus.QUARANTINED
+            if template.origin == MethodAtomOrigin.IMPORTED
+            else SecurityStatus.TRUSTED
+        )
+        template_snapshot, metadata = _portable_template_record(template)
         return FlowAtom(
             id=atom_id,
             atom_type=template.atom_type,
             template_id=template.template_id,
             operation=template.operation or config.get("operation"),
+            description=template.description,
+            reference=template.reference,
+            tags=list(template.tags),
+            template_snapshot=template_snapshot,
             evidence_refs=list(template.evidence_refs),
             category=template.category,
             origin=template.origin,
@@ -221,7 +257,13 @@ class MethodAtomLibrary:
             required_capabilities=set(template.required_capabilities),
             dependency_optional=template.dependency_optional,
             execution_scope=execution_scope,
-            execution_trust_level=ExecutableTrustLevel.BUILTIN_MANAGED,
+            execution_trust_level=execution_trust_level,
+            security_status=security_status,
+            capability_manifest=(
+                template.capability_manifest.model_copy(deep=True)
+                if template.capability_manifest
+                else None
+            ),
             readiness_status=readiness_status,
             metadata=metadata,
         )
@@ -265,10 +307,37 @@ class MethodAtomLibrary:
         return len(templates)
 
 
+def discover_method_atom_templates(namespace: dict[str, Any]) -> list[MethodAtomTemplate]:
+    """Discover declared templates in definition order and reject ID collisions.
+
+    Keeping discovery here makes module-level template declarations self-registering:
+    adding a ``MethodAtomTemplate`` constant is enough to include it in the built-in
+    registry. Container values such as ``ALL_NODE_TEMPLATES`` are intentionally
+    ignored, so discovery cannot register the same objects a second time.
+    """
+    templates: list[MethodAtomTemplate] = []
+    names_by_id: dict[str, str] = {}
+    object_ids: set[int] = set()
+    for name, value in namespace.items():
+        if not isinstance(value, MethodAtomTemplate) or id(value) in object_ids:
+            continue
+        previous_name = names_by_id.get(value.template_id)
+        if previous_name is not None:
+            raise ValueError(
+                "Duplicate MethodAtom template id "
+                f"{value.template_id!r} declared as {previous_name} and {name}"
+            )
+        names_by_id[value.template_id] = name
+        object_ids.add(id(value))
+        templates.append(value)
+    return templates
+
+
 def create_builtin_library() -> MethodAtomLibrary:
     """Create a MethodAtomLibrary with all built-in templates."""
-    from fnirs_flow.registry.atom_templates import ALL_METHOD_ATOM_TEMPLATES
+    from fnirs_flow.registry.atom_templates import ALL_METHOD_ATOM_TEMPLATES, refresh_method_atom_templates
 
+    refresh_method_atom_templates()
     library = MethodAtomLibrary()
     library.register_many(ALL_METHOD_ATOM_TEMPLATES)
     return library

@@ -7,14 +7,9 @@ import {
   parseParameterData,
   shouldUseBulkParameterIO,
 } from '../src/flow/parameterBulkIO.ts';
+import { makeParameters } from './fixtures.ts';
 
-const parameters = [
-  { name: 'enabled', type: 'boolean', value: false },
-  { name: 'alpha', type: 'number', value: 0.05 },
-  { name: 'channels', type: 'number-list', value: [1, 2] },
-  { name: 'metadata', type: 'text', value: { group: 'control' } },
-  { name: 'label', type: 'text', value: 'baseline' },
-];
+const parameters = makeParameters();
 
 test('shouldUseBulkParameterIO turns on when more than three parameters are text-like', () => {
   assert.equal(shouldUseBulkParameterIO(parameters), false);

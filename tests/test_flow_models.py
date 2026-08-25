@@ -25,6 +25,15 @@ from fnirs_flow.flow.schemas import flow_to_dict, load_flow_from_dict, validate_
 pytestmark = pytest.mark.core
 
 
+def test_minimal_flow_factory_returns_isolated_nested_data(minimal_flow_factory):
+    first = minimal_flow_factory()
+    second = minimal_flow_factory()
+
+    first["nodes"][0]["config"]["dataset_id"] = "mutated"
+
+    assert second["nodes"][0]["config"]["dataset_id"] == "test-dataset"
+
+
 class TestFlowNode:
     def test_create_node(self):
         node = FlowNode(

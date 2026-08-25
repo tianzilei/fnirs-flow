@@ -15,6 +15,7 @@ from fnirs_flow.compiler.execution_dag import DagNode, ExecutionDag
 from fnirs_flow.compiler.manifests import (
     write_adapter_manifest,
     write_artifact_manifest,
+    write_method_atom_manifest,
     write_reporting_checklist,
     write_reproducibility_manifest,
     write_risk_register,
@@ -56,6 +57,25 @@ class CompileResult:
         self.plan = plan
         self.execution_dag = execution_dag
         self.outdir = outdir
+
+
+def _plan_atom_record(node: DagNode) -> dict[str, Any]:
+    """Return the auditable Atom record used by plan.json chains."""
+    return {
+        "atom_id": node.atom_id,
+        "atom_type": node.atom_type,
+        "operation": node.operation,
+        "template_id": node.template_id,
+        "description": node.description,
+        "reference": node.reference,
+        "tags": node.tags,
+        "origin": node.origin,
+        "execution_trust_level": node.execution_trust_level,
+        "security_status": node.security_status,
+        "capability_manifest": node.capability_manifest,
+        "parameters": node.parameters,
+        "evidence_refs": node.evidence_refs,
+    }
 
 
 def _topological_layers(flow: FlowGraph) -> list[list[str]]:
@@ -287,6 +307,26 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
                     atom_type=atom_type,
                     template_id=node.template_id,
                     operation=operation,
+                    description=node.description,
+                    reference=node.reference,
+                    tags=list(node.tags),
+                    template_snapshot=dict(node.template_snapshot),
+                    origin=(node.origin.value if hasattr(node.origin, "value") else str(node.origin)),
+                    execution_trust_level=(
+                        node.execution_trust_level.value
+                        if hasattr(node.execution_trust_level, "value")
+                        else str(node.execution_trust_level)
+                    ),
+                    security_status=(
+                        node.security_status.value
+                        if hasattr(node.security_status, "value")
+                        else str(node.security_status)
+                    ),
+                    capability_manifest=(
+                        node.capability_manifest.model_dump(mode="json")
+                        if node.capability_manifest
+                        else None
+                    ),
                     category=(node.category.value if hasattr(node.category, "value") else str(node.category)),
                     execution_scope=execution_scope,
                     adapter_id=adapter_id,
@@ -322,42 +362,25 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
         "project": {},
         "dataset": {},
         "study_design": study_design,
+        "data_semantics": flow.data_semantics.model_dump(),
+        "solver": flow.solver.model_dump(),
+        "processed_hb": flow.processed_hb,
         "acquisition": {},
         "conditions": conditions,
         "contrasts": contrasts,
+        "method_atoms": [_plan_atom_record(n) for n in dag_nodes],
         "preprocessing_atoms": [
-            {
-                "atom_id": n.atom_id,
-                "atom_type": n.atom_type,
-                "operation": n.operation,
-                "template_id": n.template_id,
-                "parameters": n.parameters,
-                "evidence_refs": n.evidence_refs,
-            }
+            _plan_atom_record(n)
             for n in dag_nodes
             if n.category == "preprocessing"
         ],
         "analysis_atoms": [
-            {
-                "atom_id": n.atom_id,
-                "atom_type": n.atom_type,
-                "operation": n.operation,
-                "template_id": n.template_id,
-                "parameters": n.parameters,
-                "evidence_refs": n.evidence_refs,
-            }
+            _plan_atom_record(n)
             for n in dag_nodes
             if n.category == "analysis"
         ],
         "output_atoms": [
-            {
-                "atom_id": n.atom_id,
-                "atom_type": n.atom_type,
-                "operation": n.operation,
-                "template_id": n.template_id,
-                "parameters": n.parameters,
-                "evidence_refs": n.evidence_refs,
-            }
+            _plan_atom_record(n)
             for n in dag_nodes
             if n.category == "output"
         ],
@@ -409,6 +432,7 @@ def compile_flow(flow_dict: dict[str, Any], outdir: str | Path) -> CompileResult
 
     # Write manifests (reuse report from validation above)
     write_adapter_manifest(flow, compiled_dir)
+    write_method_atom_manifest(flow, compiled_dir)
     write_risk_register(report.risks, compiled_dir)
     write_reporting_checklist(compiled_dir)
     write_artifact_manifest([], compiled_dir)

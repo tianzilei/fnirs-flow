@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import ipaddress
 import json
+import shutil
 from collections.abc import Callable
 from importlib.resources import files
 from pathlib import Path
@@ -55,14 +57,14 @@ def cmd_backends(args: argparse.Namespace) -> int:
                 backend_class = registry.get(backend_id)
                 if backend_class:
                     # Try to get capabilities
-                    if hasattr(backend_class, 'capabilities'):
+                    if hasattr(backend_class, "capabilities"):
                         caps = backend_class.capabilities
                         if isinstance(caps, dict):
                             print(f"  Version: {caps.get('version', 'unknown')}")
-                            ops = caps.get('supported_operations', [])
+                            ops = caps.get("supported_operations", [])
                             if ops:
                                 print(f"  Operations: {', '.join(ops)}")
-                            limitations = caps.get('limitations', [])
+                            limitations = caps.get("limitations", [])
                             if limitations:
                                 print(f"  Limitations: {', '.join(limitations)}")
             except Exception as e:
@@ -131,6 +133,64 @@ def cmd_compile(args: argparse.Namespace) -> int:
 
 
 def cmd_discover(args: argparse.Namespace) -> int:
+    if args.dataset_id == "vendor-processed-hb":
+        from fnirs_flow.data.frozen_manifest import discover_frozen_processed_hb
+
+        manifest_root = getattr(args, "manifest_root", None)
+        if not manifest_root:
+            print("Error: vendor-processed-hb requires --manifest-root")
+            return 1
+        root = Path(manifest_root)
+        try:
+            manifest = discover_frozen_processed_hb(
+                root / "fnirs_signal_provenance.csv",
+                root / "analysis_population_manifest.csv",
+                runtime_root=getattr(args, "data_root", None),
+                events_uri=str(root / "fnirs_events.tsv"),
+                contrast_matrix_uri=str(root / "contrast_matrix.csv"),
+            )
+            compiled = Path(args.outdir) / "compiled"
+            compiled.mkdir(parents=True, exist_ok=True)
+            frozen_dir = compiled / "frozen_inputs"
+            frozen_dir.mkdir(exist_ok=True)
+            preset_resource = files("fnirs_flow.resources.presets").joinpath("vendor_processed_hb_v1.json")
+            (compiled / "processed_hb_preset.json").write_text(
+                preset_resource.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+            for name in ("analysis_population_manifest.csv", "fnirs_events.tsv", "contrast_matrix.csv"):
+                shutil.copy2(root / name, frozen_dir / name)
+            portable_signal = frozen_dir / "fnirs_signal_provenance.csv"
+            with (root / "fnirs_signal_provenance.csv").open(newline="", encoding="utf-8-sig") as source:
+                signal_rows = list(csv.DictReader(source))
+                fields = list(signal_rows[0]) if signal_rows else ["fnirs_record_id", "fnirs_signal_uri"]
+            for row in signal_rows:
+                signal_value = row.get("fnirs_signal_uri") or row.get("fnirs_signal_path", "")
+                portable_uri = f"external-data://vendor-processed-hb/{Path(signal_value).name}"
+                row["fnirs_signal_uri"] = portable_uri
+                if "fnirs_signal_path" in row:
+                    row["fnirs_signal_path"] = portable_uri
+            portable_by_id = {row.get("fnirs_record_id", ""): row["fnirs_signal_uri"] for row in signal_rows}
+            for run in manifest.runs:
+                if run.fnirs_record_id in portable_by_id:
+                    run.signal_uri = portable_by_id[run.fnirs_record_id]
+            if "fnirs_signal_uri" not in fields:
+                fields.append("fnirs_signal_uri")
+            with portable_signal.open("w", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
+                writer.writeheader()
+                writer.writerows(signal_rows)
+            manifest.signal_provenance_uri = "frozen_inputs/fnirs_signal_provenance.csv"
+            manifest.population_manifest_uri = "frozen_inputs/analysis_population_manifest.csv"
+            manifest.events_uri = "frozen_inputs/fnirs_events.tsv"
+            manifest.contrast_matrix_uri = "frozen_inputs/contrast_matrix.csv"
+            (compiled / "data_manifest.json").write_text(json.dumps(manifest.model_dump(), indent=2), encoding="utf-8")
+            print(f"Dataset '{args.dataset_id}' discovered")
+            print(f"  Runs:       {len(manifest.runs)}")
+            print(f"  Output:     {compiled}")
+            return 0
+        except (OSError, ValueError) as exc:
+            print(f"Error: {exc}")
+            return 1
     from fnirs_flow.application.data_use_cases import discover_dataset_to_workspace
 
     try:
@@ -156,6 +216,29 @@ def cmd_discover(args: argparse.Namespace) -> int:
 
 
 def cmd_dry_run(args: argparse.Namespace) -> int:
+    compiled = Path(args.plan_dir)
+    if not (compiled / "data_manifest.json").exists() and (compiled / "compiled" / "data_manifest.json").exists():
+        compiled = compiled / "compiled"
+    manifest_path = compiled / "data_manifest.json"
+    if manifest_path.exists():
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if payload.get("data_branch") == "vendor_processed_hb":
+            from fnirs_flow.execution.processed_hb_pipeline import dry_run_processed_hb
+
+            result = dry_run_processed_hb(
+                compiled,
+                data_root=getattr(args, "data_root", None),
+                fnirs_record_ids=getattr(args, "fnirs_record_id", None),
+                record_pair_ids=getattr(args, "record_pair_id", None),
+            )
+            report = Path(args.outdir) / "derivatives" / "processed_hb_first_level" / "dry_run.json"
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text(json.dumps(result, indent=2), encoding="utf-8")
+            print(
+                f"Processed-Hb dry-run complete: {result['counts']['eligible']} eligible of {result['counts']['total']}"
+            )
+            print(f"  Report: {report}")
+            return 0
     from fnirs_flow.application.execution_use_cases import dry_run_compiled_project
 
     try:
@@ -184,6 +267,27 @@ def cmd_dry_run(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     """Execute real analysis runs via ExecutionService."""
+    compiled = Path(args.plan_dir)
+    if not (compiled / "data_manifest.json").exists() and (compiled / "compiled" / "data_manifest.json").exists():
+        compiled = compiled / "compiled"
+    manifest_path = compiled / "data_manifest.json"
+    if manifest_path.exists():
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if payload.get("data_branch") == "vendor_processed_hb":
+            from fnirs_flow.execution.processed_hb_pipeline import run_processed_hb
+
+            result = run_processed_hb(
+                compiled,
+                args.outdir,
+                data_root=getattr(args, "data_root", None),
+                fnirs_record_ids=getattr(args, "fnirs_record_id", None),
+                record_pair_ids=getattr(args, "record_pair_id", None),
+            )
+            print("Processed-Hb execution complete")
+            print(f"  Successful record pairs: {result['successful_record_pairs']}")
+            print(f"  Exclusions:              {result['exclusions']}")
+            print(f"  Derivatives:             {result['derivatives']}")
+            return 0 if result["exclusions"] == 0 else 1
     from fnirs_flow.application.execution_use_cases import execute_compiled_project
     from fnirs_flow.execution.service import ExecutionRequest
 
@@ -283,7 +387,7 @@ def cmd_verify_package(args: argparse.Namespace) -> int:
     from fnirs_flow.exporters.package_verifier import verify_and_print
 
     package_path = Path(args.package_path)
-    expected_profile = args.profile if hasattr(args, 'profile') else None
+    expected_profile = args.profile if hasattr(args, "profile") else None
 
     return verify_and_print(package_path, expected_profile)
 
@@ -561,6 +665,7 @@ def cmd_deps_resolve(args: argparse.Namespace) -> int:
     else:
         # Compile the flow first
         from fnirs_flow.application.flow_use_cases import compile_flow_payload
+
         flow_dict = json.loads(source.read_text(encoding="utf-8"))
         outdir = source.parent / "compiled"
         result = compile_flow_payload(flow_dict, outdir)
@@ -725,7 +830,7 @@ def cmd_deps_env_list(args: argparse.Namespace) -> int:
         print(f"  {env['environment_id']}")
         print(f"    Status:  {env['status']}")
         print(f"    Path:    {env['path']}")
-        if env.get('created_at'):
+        if env.get("created_at"):
             print(f"    Created: {env['created_at']}")
         print()
 
@@ -842,6 +947,24 @@ def cmd_rerun(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_processed_hb_acceptance(args: argparse.Namespace) -> int:
+    from fnirs_flow.execution.processed_hb_acceptance import write_processed_hb_acceptance_report
+
+    target = write_processed_hb_acceptance_report(
+        args.project_dir,
+        args.output,
+        frozen_root=args.frozen_root,
+        package_path=args.package_path,
+    )
+    report = json.loads(target.read_text(encoding="utf-8"))
+    print(f"Processed-Hb acceptance report: {target}")
+    print(f"  Status:        {report['status']}")
+    print(f"  Release ready: {report['release_ready']}")
+    for blocker in report["blocked"]:
+        print(f"  Blocked:       {blocker['reason_code']}")
+    return 0 if report["release_ready"] else 2
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="fnirs-flow",
@@ -863,6 +986,7 @@ def main(argv: list[str] | None = None) -> int:
     p_discover.add_argument("dataset_id", help="Dataset identifier")
     p_discover.add_argument("--outdir", required=True, help="Output directory")
     p_discover.add_argument("--data-root", help="Local root directory for BIDS-NIRS data")
+    p_discover.add_argument("--manifest-root", help="Directory containing frozen processed-Hb CSV/TSV inputs")
     p_discover.set_defaults(func=cmd_discover)
 
     p_dryrun = subparsers.add_parser("dry-run", help="Dry-run a compiled plan")
@@ -872,6 +996,9 @@ def main(argv: list[str] | None = None) -> int:
     p_dryrun.add_argument("--session-label", nargs="*", help="Filter by session label")
     p_dryrun.add_argument("--task-label", nargs="*", help="Filter by task label")
     p_dryrun.add_argument("--run-label", nargs="*", help="Filter by run label")
+    p_dryrun.add_argument("--data-root", help="Local root for processed-Hb signal binding")
+    p_dryrun.add_argument("--fnirs-record-id", nargs="*", help="Filter exact frozen fNIRS record IDs")
+    p_dryrun.add_argument("--record-pair-id", nargs="*", help="Filter exact frozen record-pair IDs")
     p_dryrun.set_defaults(func=cmd_dry_run)
 
     p_run = subparsers.add_parser("run", help="Execute analysis runs via adapter")
@@ -882,6 +1009,8 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--session-label", nargs="*", help="Filter by session label")
     p_run.add_argument("--task-label", nargs="*", help="Filter by task label")
     p_run.add_argument("--run-label", nargs="*", help="Filter by run label")
+    p_run.add_argument("--fnirs-record-id", nargs="*", help="Filter exact frozen fNIRS record IDs")
+    p_run.add_argument("--record-pair-id", nargs="*", help="Filter exact frozen record-pair IDs")
     p_run.add_argument(
         "--continue-on-failure",
         action=argparse.BooleanOptionalAction,
@@ -936,6 +1065,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Continue on failure (default: True)",
     )
     p_rerun.set_defaults(func=cmd_rerun)
+
+    p_acceptance = subparsers.add_parser(
+        "processed-hb-acceptance", help="Write machine-readable processed-Hb release acceptance evidence"
+    )
+    p_acceptance.add_argument("project_dir", help="Project or imported package directory")
+    p_acceptance.add_argument("--output", required=True, help="Acceptance JSON output path")
+    p_acceptance.add_argument("--frozen-root", help="Directory containing the four external frozen inputs")
+    p_acceptance.add_argument("--package-path", help="Optional reproducibility package to audit")
+    p_acceptance.set_defaults(func=cmd_processed_hb_acceptance)
 
     # Backend adapter commands
     p_import_h3 = subparsers.add_parser(

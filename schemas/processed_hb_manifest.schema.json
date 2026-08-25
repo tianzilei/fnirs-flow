@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fnirs-flow.dev/schemas/processed_hb_manifest.schema.json",
+  "title": "Processed Hb DataManifest 0.2.0",
+  "type": "object",
+  "required": ["schema_version", "data_branch", "runs"],
+  "properties": {
+    "schema_version": {"const": "0.2.0"},
+    "data_branch": {"const": "vendor_processed_hb"},
+    "runs": {"type": "array", "items": {"$ref": "#/$defs/run"}}
+  },
+  "$defs": {"run": {
+    "type": "object",
+    "required": ["linked_record_id", "fnirs_record_id", "record_pair_id", "signal_uri", "analysis_included", "data_branch"],
+    "properties": {
+      "linked_record_id": {"type": "string", "minLength": 1},
+      "fnirs_record_id": {"type": "string", "minLength": 1},
+      "record_pair_id": {"type": "string", "minLength": 1},
+      "signal_uri": {"type": "string", "minLength": 1},
+      "input_sha256": {"type": "string"},
+      "analysis_included": {"type": "boolean"},
+      "absolute_unit_verified": {"const": false},
+      "data_branch": {"const": "vendor_processed_hb"}
+    },
+    "additionalProperties": true
+  }}
+}

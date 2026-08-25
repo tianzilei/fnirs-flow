@@ -30,6 +30,14 @@ class DagNode(BaseModel):
     atom_type: str
     template_id: str | None = None
     operation: str | None = None
+    description: str = ""
+    reference: str = ""
+    tags: list[str] = Field(default_factory=list)
+    template_snapshot: dict[str, Any] = Field(default_factory=dict)
+    origin: str = "builtin"
+    execution_trust_level: str = "builtin_managed"
+    security_status: str = "trusted"
+    capability_manifest: dict[str, Any] | None = None
     category: str = ""
     execution_scope: str = "run"
     adapter_id: str | None = None

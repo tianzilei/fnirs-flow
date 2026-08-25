@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fnirs-flow.dev/schemas/processed_hb_analysis.schema.json",
+  "title": "Processed Hb derivatives contract 1.0.0",
+  "type": "object",
+  "required": ["derivatives_contract", "flow_schema", "data_manifest_schema", "analysis_version"],
+  "properties": {
+    "derivatives_contract": {"const": "1.0.0"},
+    "flow_schema": {"const": "0.4.0"},
+    "data_manifest_schema": {"const": "0.2.0"},
+    "analysis_version": {"type": "string", "minLength": 1},
+    "absolute_unit_verified": {"const": false},
+    "solver_requested": {"enum": ["ols", "ar1", "ar1_irls"]},
+    "solver_effective": {"enum": ["ols", "ar1", "ar1_irls"]}
+  },
+  "additionalProperties": true
+}

@@ -24,6 +24,7 @@ export function createProjectActions(set: StoreSet, get: StoreGet) {
         dataDiscovered: !!discoverResult || !!readiness?.data_discovered,
         executed: !!executeInfo || !!readiness?.executed,
         hasFatalRisk,
+        quarantinedAtoms: readiness?.quarantined_atoms ?? [],
       };
     },
 

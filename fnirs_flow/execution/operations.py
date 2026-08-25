@@ -100,6 +100,23 @@ def delegated_handler_factory(spec: OperationSpec) -> OperationHandler:
     return DelegatedOperationHandler(spec)
 
 
+def local_callable_factory(module_name: str, callable_name: str) -> Callable[[OperationSpec], OperationHandler]:
+    """Lazily import an explicitly trusted local Atom implementation."""
+
+    def factory(spec: OperationSpec) -> OperationHandler:
+        def execute(context: OperationContext) -> Any:
+            import importlib
+
+            callback = getattr(importlib.import_module(module_name), callable_name, None)
+            if callback is None or not callable(callback):
+                raise ValueError(f"Local Atom implementation is unavailable: {module_name}:{callable_name}")
+            return callback(context)
+
+        return CallableOperationHandler(spec, execute)
+
+    return factory
+
+
 @dataclass
 class OperationSpec:
     """Specification for a registered operation."""
@@ -117,6 +134,7 @@ class OperationSpec:
     allow_reviewed_noop: bool = False
     handler_factory: Callable[..., OperationHandler] | None = None
     backend_handler_factories: dict[str, Callable[..., OperationHandler]] = field(default_factory=dict)
+    contract_variants: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def handler_factory_for(self, backend_id: str | None = None) -> Callable[..., OperationHandler] | None:
         if backend_id and backend_id in self.backend_handler_factories:
@@ -146,6 +164,25 @@ class OperationRegistry:
         """Get an operation spec by ID, or None if not found."""
         return self._operations.get(operation_id)
 
+    def register_contract_variant(
+        self,
+        operation_id: str,
+        variant_id: str,
+        *,
+        input_schemas: list[str],
+        output_schemas: list[str],
+    ) -> None:
+        """Attach a template-specific port contract to a shared operation."""
+        spec = self.get(operation_id)
+        if spec is None:
+            raise ValueError(f"Unknown operation: {operation_id}")
+        if variant_id in spec.contract_variants:
+            raise ValueError(f"Duplicate operation contract variant: {operation_id}:{variant_id}")
+        spec.contract_variants[variant_id] = {
+            "input_schemas": list(input_schemas),
+            "output_schemas": list(output_schemas),
+        }
+
     def has(self, operation_id: str) -> bool:
         """Check if an operation is registered."""
         return operation_id in self._operations
@@ -163,6 +200,7 @@ class OperationRegistry:
         backend_id: str | None = None,
         required_capabilities: set[str] | None = None,
         require_handler: bool = False,
+        contract_variant_id: str | None = None,
     ) -> list[str]:
         spec = self.get(operation_id)
         if spec is None:
@@ -180,6 +218,8 @@ class OperationRegistry:
             )
         if require_handler and spec.handler_factory_for(backend_id) is None:
             errors.append(f"Operation {operation_id} has no registered handler")
+        if contract_variant_id and spec.contract_variants and contract_variant_id not in spec.contract_variants:
+            errors.append(f"Operation {operation_id} has no contract variant {contract_variant_id}")
         return errors
 
     def execute(self, operation_id: str, context: OperationContext) -> Any:
@@ -210,6 +250,18 @@ class OperationRegistry:
 
 
 OPERATION_ALIASES: dict[str, str] = {
+    # Literature MethodAtoms use descriptive operation ids.  Keep those ids
+    # in serialized flows, but route them through the same native adapter
+    # implementations as the canonical built-in atoms.  Without this bridge
+    # the declarative library silently fell back to simplified NumPy/SciPy
+    # implementations (most notably MBLL), producing backend-dependent
+    # scientific results.
+    "data_import": "read_run",
+    "hardware_import": "read_run",
+    "bandpass_filter": "filtering",
+    "hpf_lpf_filter": "filtering",
+    "mbll_conversion": "beer_lambert_law",
+    "signal_quality_check": "compute_qc",
     "snirf_reader": "read_run",
     "optical_density_conversion": "optical_density",
     "qc_metrics": "compute_qc",
@@ -279,6 +331,13 @@ def create_default_registry() -> OperationRegistry:
         ("lowpass", "Alias for filtering with lowpass method"),
         ("beer_lambert_law", "Convert OD to haemoglobin concentration"),
         ("mbll", "Alias for beer_lambert_law used by node templates"),
+        ("data_import", "MethodAtom alias for native raw-data import"),
+        ("hardware_import", "MethodAtom alias for native hardware-data import"),
+        ("bandpass_filter", "MethodAtom alias for native bandpass filtering"),
+        ("hpf_lpf_filter", "MethodAtom alias for native high/low-pass filtering"),
+        ("mbll_conversion", "MethodAtom alias for native Beer-Lambert conversion"),
+        ("signal_quality_check", "MethodAtom alias for native QC computation"),
+        ("short_channel_regression", "MethodAtom native short-channel regression"),
     ]:
         backend_handlers = dict(mne_handlers)
         if op_id in {
@@ -288,6 +347,7 @@ def create_default_registry() -> OperationRegistry:
             "optical_density_conversion",
             "beer_lambert_law",
             "mbll",
+            "mbll_conversion",
         }:
             backend_handlers.update(cedalion_handlers)
         registry.register(
@@ -399,11 +459,23 @@ def create_default_registry() -> OperationRegistry:
     from fnirs_flow.adapters.cedalion_bindings import is_verified_cedalion_atom
     from fnirs_flow.execution.deep_learning_handlers import DEEP_LEARNING_OPERATIONS, deep_learning_handler_factory
     from fnirs_flow.execution.scientific_handlers import SCIENTIFIC_OPERATIONS, generic_handler_factory
-    from fnirs_flow.registry.atom_templates import ALL_METHOD_ATOM_TEMPLATES
+    from fnirs_flow.registry.atom_templates import ALL_METHOD_ATOM_TEMPLATES, refresh_method_atom_templates
+
+    refresh_method_atom_templates()
 
     for template in ALL_METHOD_ATOM_TEMPLATES:
         operation_id = str(template.operation or template.atom_type)
-        if not operation_id or registry.has(operation_id):
+        if not operation_id:
+            continue
+        input_schemas = [port.port_schema for port in template.ports if port.direction == "in" and port.required]
+        output_schemas = [port.port_schema for port in template.ports if port.direction == "out"]
+        if registry.has(operation_id):
+            registry.register_contract_variant(
+                operation_id,
+                template.template_id,
+                input_schemas=input_schemas,
+                output_schemas=output_schemas,
+            )
             continue
         scope = template.default_execution_scope or "run"
         if operation_id in {
@@ -426,21 +498,22 @@ def create_default_registry() -> OperationRegistry:
         operation_handler = scientific_handler or (
             deep_learning_handler_factory if operation_id in DEEP_LEARNING_OPERATIONS else None
         )
-        declared_backend_handlers = dict(verified_backend_handlers)
-        # Literature Cedalion atoms retain their explicit backend binding.  A
-        # binding becomes executable only when its wrapper is present; the
-        # template verification/readiness fields still control compile-time
-        # approval and make the unverified state visible to users.
-        if template.backend_binding and not declared_backend_handlers:
-            declared_backend_handlers[template.backend_binding.backend_id] = backend_method_factory(
-                template.backend_binding.operation
+        if template.implementation_module and template.implementation_callable:
+            operation_handler = local_callable_factory(
+                template.implementation_module,
+                template.implementation_callable,
             )
+        # Backend metadata is discoverable before it is executable.  Only
+        # contract-tested Cedalion bindings receive runtime handlers; an
+        # unverified wrapper must fail the compile gate instead of becoming
+        # executable merely because the catalog names a backend method.
+        declared_backend_handlers = dict(verified_backend_handlers)
         registry.register(
             OperationSpec(
                 operation_id=operation_id,
                 category=str(template.category.value),
-                input_schemas=[port.port_schema for port in template.ports if port.direction == "in" and port.required],
-                output_schemas=[port.port_schema for port in template.ports if port.direction == "out"],
+                input_schemas=input_schemas,
+                output_schemas=output_schemas,
                 capabilities=list(template.required_capabilities),
                 execution_scope=scope,
                 supported_backends=[template.backend_binding.backend_id] if template.backend_binding else [],
@@ -452,6 +525,12 @@ def create_default_registry() -> OperationRegistry:
                     or ({"core": reviewed_noop_factory} if operation_id == "study_design" else {})
                     or ({"mne_nirs": operation_handler} if operation_handler else {})
                 ),
+                contract_variants={
+                    template.template_id: {
+                        "input_schemas": input_schemas,
+                        "output_schemas": output_schemas,
+                    }
+                },
             )
         )
 

@@ -129,9 +129,7 @@ def _validate_import_atom_project_paths(flow: dict[str, Any]) -> None:
             try:
                 normalize_project_relative_path(path_value, label=f"Atom {atom_id} {field}")
             except ValueError as exc:
-                raise ProjectBundleError(
-                    f"Import atom paths must be project-relative; {exc}"
-                ) from exc
+                raise ProjectBundleError(f"Import atom paths must be project-relative; {exc}") from exc
 
 
 class StaleCompiledPlanError(ValueError):
@@ -208,7 +206,7 @@ def load_flow_from_compiled_package(compiled_dir: Path) -> dict[str, Any]:
         for index, edge in enumerate(dag.get("edges", []))
     ]
     return {
-        "schema_version": "0.3.0",
+        "schema_version": "0.4.0",
         "flow_id": plan.get("flow_id", "imported-flow"),
         "name": plan.get("name", "Imported Flow"),
         "description": plan.get("description", "Reconstructed from a legacy package"),
@@ -232,9 +230,7 @@ def _assert_compiled_plan_current(store: ProjectStore, project_id: str) -> None:
         # Imported plans are immutable at the service boundary.
         return
     try:
-        compiled_flow = json.loads(
-            (plan_path.parent / "flow.json").read_text(encoding="utf-8")
-        )
+        compiled_flow = json.loads((plan_path.parent / "flow.json").read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
         raise StaleCompiledPlanError("Compiled plan is unreadable; compile the Flow again") from exc
     if not flows_match(compiled_flow, flow):
@@ -686,9 +682,7 @@ class ProjectStore:
             # Reload in-memory metadata from the extracted version
             meta_path = tx.staging_dir / "project.json"
             if meta_path.exists():
-                self._projects[project_id] = json.loads(
-                    meta_path.read_text(encoding="utf-8")
-                )
+                self._projects[project_id] = json.loads(meta_path.read_text(encoding="utf-8"))
             tx.commit()
 
         return self.get(project_id)
@@ -763,9 +757,7 @@ class ProjectStore:
         self._persist(project_id, reason="design_commit")
         return commit_id
 
-    def create_design_branch(
-        self, project_id: str, name: str, from_commit_id: str | None = None
-    ) -> dict[str, Any]:
+    def create_design_branch(self, project_id: str, name: str, from_commit_id: str | None = None) -> dict[str, Any]:
         """Create a new design branch."""
         svc = self._history_service(project_id)
         branch = svc.create_branch(name, from_commit_id)
@@ -804,9 +796,7 @@ class ProjectStore:
         svc = self._history_service(project_id)
         return [c.model_dump() for c in svc.list_commits(branch, limit=limit, offset=offset)]
 
-    def get_design_diff(
-        self, project_id: str, from_commit: str, to_commit: str
-    ) -> dict[str, Any]:
+    def get_design_diff(self, project_id: str, from_commit: str, to_commit: str) -> dict[str, Any]:
         """Get structured diff between two design commits."""
         svc = self._history_service(project_id)
         return svc.diff(from_commit, to_commit).model_dump()
@@ -838,6 +828,7 @@ class ProjectStore:
         if not svc.store.is_initialized():
             svc.initialize(current_flow)
         from fnirs_flow.history.migration import migrate_snapshots_to_history
+
         report = migrate_snapshots_to_history(svc, snapshots, current_flow=current_flow)
         if report.success:
             self._persist(project_id, reason="history_migration")
@@ -868,9 +859,7 @@ def validate_project_flow(store: ProjectStore, project_id: str) -> ValidationRes
     store.update_state(
         project_id,
         validated_flow=flow if result.is_valid else {},
-        validated_revision=(
-            int(getattr(store.get(project_id), "revision", 0)) if result.is_valid else 0
-        ),
+        validated_revision=(int(getattr(store.get(project_id), "revision", 0)) if result.is_valid else 0),
     )
     return result
 
@@ -891,9 +880,7 @@ def compile_project_flow(
 
     from fnirs_flow.infrastructure.transaction import ProjectTransaction
 
-    with ProjectTransaction(
-        store, project_id, reason="compile", base_revision=base_revision
-    ) as tx:
+    with ProjectTransaction(store, project_id, reason="compile", base_revision=base_revision) as tx:
         outdir = tx.output_dir
         result = compile_flow_payload(flow, outdir)
         store.update_state(
@@ -948,10 +935,7 @@ def load_project_compile_result(store: ProjectStore, project_id: str) -> Compile
     execution_dag = ExecutionDag.model_validate(normalize_execution_dag_payload(dag))
     nodes = [atom.model_dump(mode="json", exclude_none=True) for atom in execution_dag.atoms]
     layers = execution_dag.execution_layers
-    node_by_id = {
-        str(node.get("atom_id") or node.get("id")): node
-        for node in nodes
-    }
+    node_by_id = {str(node.get("atom_id") or node.get("id")): node for node in nodes}
     dag_layers = [
         [
             {
@@ -964,13 +948,7 @@ def load_project_compile_result(store: ProjectStore, project_id: str) -> Compile
         ]
         for layer in layers
     ]
-    atom_types = sorted(
-        {
-            str(node.get("atom_type") or "")
-            for node in nodes
-            if node.get("atom_type")
-        }
-    )
+    atom_types = sorted({str(node.get("atom_type") or "") for node in nodes if node.get("atom_type")})
     return CompileResult(
         flow_id=str(plan.get("flow_id") or dag.get("flow_id") or ""),
         revision=int(store._projects[project_id].get("state", {}).get("compiled_revision", 0)),
@@ -993,12 +971,64 @@ def discover_project_data(
     base_revision: int | None = None,
 ) -> DiscoverResult:
     """Discover a dataset for a project."""
-    from fnirs_flow.data.discovery import discover_dataset
     from fnirs_flow.infrastructure.transaction import ProjectTransaction
 
-    with ProjectTransaction(
-        store, project_id, reason="discover_data", base_revision=base_revision
-    ) as tx:
+    if dataset_id == "vendor-processed-hb":
+        from fnirs_flow.data.frozen_manifest import discover_frozen_processed_hb
+        from fnirs_flow.execution.processed_hb_pipeline import dry_run_processed_hb
+
+        with ProjectTransaction(store, project_id, reason="discover_processed_hb", base_revision=base_revision) as tx:
+            root_value = data_root or store.get_project_data_root(project_id) or None
+            if data_path is not None:
+                root = resolve_project_data_path(
+                    store, project_id, data_path, label="Frozen manifest folder", must_be_dir=True, allow_empty=True
+                )[0]
+            elif root_value is not None:
+                root = Path(root_value)
+            else:
+                raise ValueError("Vendor processed-Hb discovery requires the project data folder or dataset folder")
+            required = (
+                "fnirs_signal_provenance.csv",
+                "analysis_population_manifest.csv",
+                "fnirs_events.tsv",
+                "contrast_matrix.csv",
+            )
+            missing = [name for name in required if not (root / name).is_file()]
+            if missing:
+                raise ValueError(f"Missing frozen processed-Hb inputs: {missing}")
+            manifest = discover_frozen_processed_hb(
+                root / required[0],
+                root / required[1],
+                runtime_root=root,
+                events_uri=str(root / required[2]),
+                contrast_matrix_uri=str(root / required[3]),
+            )
+            manifest_payload = manifest.model_dump(mode="json")
+            manifest_payload["dataset_id"] = dataset_id
+            compiled_dir = tx.output_dir / "compiled"
+            compiled_dir.mkdir(parents=True, exist_ok=True)
+            (compiled_dir / "data_manifest.json").write_text(json.dumps(manifest_payload, indent=2), encoding="utf-8")
+            from importlib.resources import files
+
+            preset = files("fnirs_flow.resources.presets").joinpath("vendor_processed_hb_v1.json")
+            (compiled_dir / "processed_hb_preset.json").write_text(preset.read_text(encoding="utf-8"), encoding="utf-8")
+            store.bind_dataset(dataset_id, root)
+            preview = dry_run_processed_hb(compiled_dir, data_root=root)
+            result = DiscoverResult(
+                dataset_id=dataset_id,
+                files=sum(record["discovery_status"] == "available" for record in preview["records"]),
+                runs=len(manifest.runs),
+                local_root=str(root),
+                metadata_tables=4,
+                processed_hb=preview,
+            )
+            store.update_state(project_id, dataset_id=dataset_id, discovered_runs=result.runs)
+            tx.commit()
+        return result
+
+    from fnirs_flow.data.discovery import discover_dataset
+
+    with ProjectTransaction(store, project_id, reason="discover_data", base_revision=base_revision) as tx:
         outdir = tx.output_dir
         effective_data_root: Path | None
         if data_path is not None:
@@ -1049,8 +1079,7 @@ def list_project_data_folders(store: ProjectStore, project_id: str, parent: str 
         relative = PurePosixPath(parent_rel, child.name).as_posix() if parent_rel else child.name
         try:
             has_children = any(
-                grandchild.is_dir() and not grandchild.name.startswith(".")
-                for grandchild in child.iterdir()
+                grandchild.is_dir() and not grandchild.name.startswith(".") for grandchild in child.iterdir()
             )
         except OSError:
             has_children = False
@@ -1068,6 +1097,18 @@ def load_project_discover_result(store: ProjectStore, project_id: str) -> Discov
         return None
     dataset_id = str(manifest.get("dataset_id", ""))
     binding = store.get_dataset_binding(dataset_id) if dataset_id else None
+    if manifest.get("data_branch") == "vendor_processed_hb":
+        from fnirs_flow.execution.processed_hb_pipeline import dry_run_processed_hb
+
+        preview = dry_run_processed_hb(compiled_dir, data_root=binding)
+        return DiscoverResult(
+            dataset_id=dataset_id or "vendor-processed-hb",
+            files=sum(record["discovery_status"] == "available" for record in preview["records"]),
+            runs=len(manifest.get("runs", []) or []),
+            local_root=str(binding or ""),
+            metadata_tables=4,
+            processed_hb=preview,
+        )
     return DiscoverResult(
         dataset_id=dataset_id,
         files=len(manifest.get("files", []) or []),
@@ -1164,6 +1205,27 @@ def dry_run_project(store: ProjectStore, project_id: str) -> DryRunResult | None
     """Execute a dry-run for a project."""
     outdir = store.get_output_dir(project_id)
     _assert_compiled_plan_current(store, project_id)
+    compiled_dir = outdir / "compiled"
+    manifest = _load_data_manifest(compiled_dir) or {}
+    if manifest.get("data_branch") == "vendor_processed_hb":
+        from fnirs_flow.execution.processed_hb_pipeline import dry_run_processed_hb
+
+        dataset_id = str(manifest.get("dataset_id") or "vendor-processed-hb")
+        binding = store.get_dataset_binding(dataset_id)
+        result = dry_run_processed_hb(compiled_dir, data_root=binding)
+        planned = [
+            {
+                "run_id": row["fnirs_record_id"],
+                "status": "planned" if row["eligible"] else "skipped",
+                "subject": "",
+                "session": "",
+                "run": row["record_pair_id"],
+                "started_at": "",
+                "completed_at": "",
+            }
+            for row in result["records"]
+        ]
+        return DryRunResult(total_runs=len(planned), planned_runs=planned, summary={"processed_hb": result})
     try:
         result = dry_run_compiled_project(outdir)
         return DryRunResult(
@@ -1196,6 +1258,9 @@ def validate_project_execution(store: ProjectStore, project_id: str) -> bool:
     dag_path = compiled_dir / "execution_dag.json"
     if not dag_path.exists():
         return False
+    from fnirs_flow.execution.dag_payload import assert_atom_security
+
+    assert_atom_security(json.loads(dag_path.read_text(encoding="utf-8")))
     _assert_compiled_plan_current(store, project_id)
     manifest = _load_data_manifest(compiled_dir) or {}
     dataset_id = str(manifest.get("dataset_id", ""))
@@ -1222,6 +1287,68 @@ def execute_project_runs(
         return None
 
     outdir = store.get_output_dir(project_id)
+    compiled_dir = outdir / "compiled"
+    manifest = _load_data_manifest(compiled_dir) or {}
+
+    if manifest.get("data_branch") == "vendor_processed_hb":
+        from fnirs_flow.execution.processed_hb_pipeline import run_processed_hb
+
+        snap = create_snapshot(store, project_id)
+        dataset_id = str(manifest.get("dataset_id") or "vendor-processed-hb")
+        binding = store.get_dataset_binding(dataset_id)
+        result = run_processed_hb(compiled_dir, outdir, data_root=binding)
+        run_rows = []
+        processed_root = outdir / "derivatives" / "processed_hb_first_level"
+        run_manifest_path = processed_root / "run_manifest.csv"
+        exclusion_path = processed_root / "exclusion_manifest.csv"
+        import csv
+
+        with run_manifest_path.open(newline="", encoding="utf-8-sig") as stream:
+            discovered_runs = list(csv.DictReader(stream))
+        with exclusion_path.open(newline="", encoding="utf-8-sig") as stream:
+            failed_ids = {row["fnirs_record_id"] for row in csv.DictReader(stream) if row.get("status") == "fail"}
+        artifacts = [
+            ArtifactSummary(
+                artifact_id=name,
+                type="processed_hb_derivative",
+                path=path,
+                relative_path=Path(path).relative_to(outdir).as_posix(),
+                exists=True,
+            )
+            for name, path in result["artifacts"].items()
+        ]
+        for row in discovered_runs:
+            record_id = row["fnirs_record_id"]
+            status = (
+                "failed"
+                if record_id in failed_ids
+                else ("completed" if row.get("analysis_included") == "true" else "skipped")
+            )
+            run_rows.append(
+                RunSummary(
+                    run_id=record_id,
+                    status=status,
+                    run=row.get("record_pair_id", ""),
+                    atom_results=[],
+                    artifacts=artifacts if status == "completed" else [],
+                )
+            )
+        attempt = attempt_id or f"processed-hb-{uuid.uuid4().hex[:12]}"
+        response = ExecuteResult(
+            attempt_id=attempt,
+            total_runs=len(run_rows),
+            successful=result["successful_record_pairs"],
+            failed=result["exclusions"],
+            runs=run_rows,
+            failure_ids=sorted(failed_ids),
+        )
+        store.update_state(
+            project_id,
+            last_attempt_id=attempt,
+            last_execution_status="failed" if result["exclusions"] else "completed",
+            snapshot_id=snap.snapshot_id if snap else "",
+        )
+        return response
 
     try:
         from fnirs_flow.execution.service import (
@@ -1357,6 +1484,20 @@ def _runnable_manifest_runs(compiled_dir: Path, data_root: Path | None = None) -
 
     local_root = data_root
     runnable = 0
+    if manifest.get("data_branch") == "vendor_processed_hb":
+        for run in manifest.get("runs", []):
+            value = str(run.get("signal_uri", ""))
+            if value.startswith("external-data://") and local_root is not None:
+                relative = value.split("external-data://", 1)[1]
+                relative = relative.split("/", 1)[1] if "/" in relative else relative
+                candidate = local_root / relative
+                if not candidate.is_file():
+                    candidate = local_root / Path(relative).name
+            else:
+                candidate = Path(value) if value else Path()
+            if value and candidate.is_file():
+                runnable += 1
+        return runnable
     for run in manifest.get("subject_session_runs", []):
         value = str(run.get("uri") or run.get("path", ""))
         if value.startswith("external-data://") and local_root is not None:
@@ -1397,6 +1538,21 @@ def get_project_status(store: ProjectStore, project_id: str) -> ProjectStatus | 
         except (json.JSONDecodeError, OSError):
             compiled_flow = {}
     metadata = get_import_metadata(store, project_id)
+    quarantined_atoms = list(metadata.get("quarantined_atoms", []))
+    dag_path = compiled_dir / "execution_dag.json"
+    if dag_path.exists():
+        try:
+            dag = json.loads(dag_path.read_text(encoding="utf-8"))
+            from fnirs_flow.execution.dag_payload import execution_atoms
+
+            quarantined_atoms.extend(
+                str(atom.get("atom_id") or atom.get("atom_type") or "<unknown>")
+                for atom in execution_atoms(dag)
+                if str(atom.get("security_status", "trusted")) in {"quarantined", "blocked"}
+            )
+        except (json.JSONDecodeError, OSError):
+            pass
+    quarantined_atoms = list(dict.fromkeys(quarantined_atoms))
     read_only = bool(metadata.get("read_only", False))
     compiled = bool(compiled_flow and (read_only or flows_match(compiled_flow, flow)))
     manifest = _load_data_manifest(compiled_dir) or {}
@@ -1405,11 +1561,7 @@ def get_project_status(store: ProjectStore, project_id: str) -> ProjectStatus | 
     runnable_runs = _runnable_manifest_runs(compiled_dir, binding) if compiled else 0
     validated_flow = state.get("validated_flow")
     validated = bool(
-        flow
-        and (
-            (isinstance(validated_flow, dict) and flows_match(validated_flow, flow))
-            or (read_only and compiled)
-        )
+        flow and ((isinstance(validated_flow, dict) and flows_match(validated_flow, flow)) or (read_only and compiled))
     )
     return ProjectStatus(
         flow_saved=bool(flow),
@@ -1423,7 +1575,7 @@ def get_project_status(store: ProjectStore, project_id: str) -> ProjectStatus | 
         last_attempt_id=state.get("last_attempt_id", ""),
         last_execution_status=state.get("last_execution_status", ""),
         read_only=read_only,
-        quarantined_atoms=list(metadata.get("quarantined_atoms", [])),
+        quarantined_atoms=quarantined_atoms,
     )
 
 

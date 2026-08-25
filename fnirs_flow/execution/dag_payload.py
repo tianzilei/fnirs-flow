@@ -45,3 +45,17 @@ def execution_atoms(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Return canonical atoms from current or legacy DAG JSON."""
     atoms = normalize_execution_dag_payload(payload).get("atoms", [])
     return [atom for atom in atoms if isinstance(atom, dict)] if isinstance(atoms, list) else []
+
+
+def assert_atom_security(payload: dict[str, Any]) -> None:
+    """Fail closed before executing a DAG containing blocked Atom states."""
+    blocked = [
+        str(atom.get("atom_id") or atom.get("atom_type") or "<unknown>")
+        for atom in execution_atoms(payload)
+        if str(atom.get("security_status", "trusted")) in {"quarantined", "blocked"}
+    ]
+    if blocked:
+        raise ValueError(
+            "QUARANTINED_ATOMS: explicitly review and trust these atoms before execution: "
+            + ", ".join(blocked)
+        )

@@ -31,7 +31,7 @@ class BuiltinOperationHandler(OperationHandler):
 
     @staticmethod
     def _execute_read_run(context: OperationContext) -> Any:
-        filepath = context.parameters.get("filepath") or context.parameters.get("path")
+        filepath = context.parameters.get("filepath") or context.parameters.get("path") or context.raw
         if filepath is None:
             raise ValueError("read_run requires 'filepath' or 'path'")
         return context.adapter.read_run(filepath)
@@ -119,7 +119,49 @@ class BuiltinOperationHandler(OperationHandler):
         )
 
     @staticmethod
+    def _execute_short_channel_regression(context: OperationContext) -> Any:
+        """Use the backend's native short-channel regression implementation.
+
+        The literature library exposes several descriptive parameter names;
+        only the adapter contract is forwarded so unsupported evidence fields
+        cannot accidentally alter (or break) native execution.
+        """
+        params = context.parameters
+        threshold = params.get(
+            "short_channel_threshold",
+            params.get("short_channel_distance_mm", 10.0),
+        )
+        # MNE uses metres for the distance threshold, while literature rows
+        # conventionally report millimetres.
+        try:
+            threshold = float(threshold)
+            if threshold > 1.0:
+                threshold /= 1000.0
+        except (TypeError, ValueError):
+            threshold = 0.01
+        method = str(params.get("method", params.get("regression_type", "linear")))
+        return context.adapter.apply_short_channel_regression(
+            context.raw,
+            short_channel_threshold=threshold,
+            method=method,
+        )
+
+    @staticmethod
     def _execute_beer_lambert_law(context: OperationContext) -> Any:
+        # Lightweight test/dry-run adapters may intentionally expose no
+        # backend methods. Preserve the declarative numeric fallback there;
+        # real MNE/Cedalion adapters always take the native path below.
+        if not hasattr(context.adapter, "to_haemoglobin"):
+            import numpy as np
+
+            data = np.asarray(context.raw, dtype=float)
+            if data.ndim != 2:
+                raise ValueError("mbll_conversion requires wavelength/channel by observation data")
+            ppf = float(context.parameters.get("ppf", context.parameters.get("pathlength_cm", 6.0)))
+            coeff = np.asarray(context.parameters.get("extinction_coefficients", [1.486, 2.526]), dtype=float)
+            if coeff.size != data.shape[0]:
+                coeff = np.resize(coeff, data.shape[0])
+            return data / np.maximum(coeff[:, None] * ppf, np.finfo(float).eps)
         kwargs: dict[str, Any] = {"ppf": context.parameters.get("ppf", 6.0)}
         if "cedalion" in getattr(context.adapter, "versions", {}):
             kwargs["spectrum"] = context.parameters.get("spectrum", "prahl")

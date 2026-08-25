@@ -412,30 +412,28 @@ export function templatePorts(template: AtomTemplate): AtomPortRecord[] {
 }
 
 export function createFlowAtomFromTemplate(template: AtomTemplate, id: string, position: { x: number; y: number }) {
-  const ports = templatePorts(template);
-  const inputPorts = ports.filter((port) => port.direction === 'in');
-  const outputPorts = ports.filter((port) => port.direction === 'out');
+  const blueprint = { ...(template.flow_atom_blueprint || {}) };
+  const ports = asRecords(blueprint.ports).length > 0
+    ? asRecords(blueprint.ports).map((port) => normalizePortRecord(port))
+    : templatePorts(template);
+  const blueprintMetadata = (blueprint.metadata as Record<string, unknown>) || {};
   return {
+    ...blueprint,
     id,
-    atom_id: id,
-    atom_type: template.atom_type,
-    type: template.atom_type,
-    template_id: template.id,
-    category: template.category,
-    origin: 'builtin',
-    operation: template.operation,
-    description: template.description,
+    atom_type: String(blueprint.atom_type || template.atom_type),
+    template_id: String(blueprint.template_id || template.id),
+    category: String(blueprint.category || template.category),
+    origin: String(blueprint.origin || template.origin || 'builtin'),
+    operation: String(blueprint.operation || template.operation || template.atom_type),
     ports,
-    input_ports: inputPorts,
-    output_ports: outputPorts,
-    evidence_refs: template.evidence_refs,
-    readiness_status: String(template.default_readiness_status || template.default_config?.readiness_status || 'not_configured'),
-    execution_status: 'not_run',
-    security_status: 'trusted',
-    parameters: {},
-    execution_scope: String(template.default_execution_scope || template.default_config?.execution_scope || 'run'),
-    config: editableConfig({ ...(template.default_config || {}) }),
+    evidence_refs: blueprint.evidence_refs || template.evidence_refs,
+    readiness_status: String(blueprint.readiness_status || template.default_readiness_status || 'not_configured'),
+    execution_status: String(blueprint.execution_status || 'not_run'),
+    security_status: String(blueprint.security_status || 'trusted'),
+    execution_scope: String(blueprint.execution_scope || template.default_execution_scope || 'run'),
+    config: editableConfig({ ...(template.default_config || {}), ...((blueprint.config as Record<string, unknown>) || {}) }),
     metadata: {
+      ...blueprintMetadata,
       template_id: template.id,
       parameter_options: template.parameter_options || {},
       parameter_specs: template.parameter_specs || {},

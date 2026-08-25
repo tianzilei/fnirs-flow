@@ -37,6 +37,34 @@ def test_english_gate_reports_chinese_text_line(tmp_path):
         module.validate_english_public_text([module.CopyItem(source, tmp_path / "target.md")])
 
 
+def test_generic_naming_gate_accepts_domain_neutral_text(tmp_path):
+    module = _load_sync_module()
+    source = tmp_path / "processed_hb.md"
+    source.write_text("Generic vendor-processed haemoglobin analysis.\n", encoding="utf-8")
+
+    module.validate_generic_public_naming([module.CopyItem(source, tmp_path / "target.md")])
+
+
+def test_generic_naming_gate_reports_specific_text_line(tmp_path):
+    module = _load_sync_module()
+    source = tmp_path / "README.md"
+    prohibited = "acu" + "puncture"
+    source.write_text(f"Generic line.\nSpecific {prohibited} workflow.\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match=r"README\.md:2"):
+        module.validate_generic_public_naming([module.CopyItem(source, tmp_path / "target.md")])
+
+
+def test_generic_naming_gate_reports_specific_filename(tmp_path):
+    module = _load_sync_module()
+    prohibited = "acu" + "puncture"
+    source = tmp_path / f"{prohibited}_flow.json"
+    source.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(SystemExit, match=r"path; policy term"):
+        module.validate_generic_public_naming([module.CopyItem(source, tmp_path / "target.json")])
+
+
 def test_public_ci_tools_are_in_copy_plan(tmp_path):
     module = _load_sync_module()
     root = Path(__file__).parents[1]

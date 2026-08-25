@@ -69,7 +69,6 @@ EVLINK_0067,EQ_PMC11428271_02,background_only,ATOM_motion_correction,background_
 EVLINK_0068,EQ_PMC10683738_01,background_only,,background_only,high,"Of 29 studies, 26 reported decreased NVC with increasing severity of cSVD, of which 18 were individually significant.",SRC_PMC10683738,From results_claims.CLM_PMC10683738_01
 EVLINK_0069,EQ_PMC10683738_02,background_only,,background_only,high,"%BOLD occipital change to a visual stimulus was consistently reduced with more severe WMH (seven studies, SMD -1.51, p < 0.01) and increasing microbleeds (seven studies, SMD -1.31, p < 0.01).",SRC_PMC10683738,From results_claims.CLM_PMC10683738_02
 EVLINK_0070,EQ_PMC10014824_01,background_only,,background_only,high,"The findings indicate that EEG is the preferred neuroimaging sensor for detecting brain activity patterns, compared to fMRI, fNIRS, and PET.",SRC_PMC10014824,From results_claims.CLM_PMC10014824_01
-EVLINK_0071,EQ_PMC9975578_01,background_only,,background_only,high,"Acupuncture-induced brain alterations observed in those patients with MCI tended to be observable in the cingulate cortex, prefrontal cortex, and hippocampus.",SRC_PMC9975578,From results_claims.CLM_PMC9975578_01
 EVLINK_0072,EQ_PMC9245014_01,background_only,,background_only,high,"The findings from the review revealed that most of the articles have followed the social psychology paradigm, while 36% of the selected studies have an application in cognitive neuroscience.",SRC_PMC9245014,From results_claims.CLM_PMC9245014_01
 EVLINK_0073,EQ_PMC9245014_02,background_only,,background_only,high,"While most of the experiments have control experiments as a part of their setup, a small number implemented algorithmic control, and only one study had interventional or a stimulus-induced control exp",SRC_PMC9245014,From risk_register.RSK_PMC9245014_01
 EVLINK_0074,EQ_PMC8918582_01,background_only,,background_only,high,The random-effects modeling results confirmed a robust positive correlation between INS and learning outcomes.,SRC_PMC8918582,From results_claims.CLM_PMC8918582_01
@@ -79,7 +78,6 @@ EVLINK_0077,EQ_PMC7827826_01,background_only,,background_only,high,"despite the 
 EVLINK_0078,EQ_PMC2761652_01,background_only,,background_only,high,NIRS offers a higher temporal resolution and additional spectroscopic information about both oxyhemoglobin and deoxyhemoglobin changes in comparison with fMRI.,SRC_PMC2761652,From results_claims.CLM_PMC2761652_01
 EVLINK_0079,EQ_PMC8888846_01,background_only,ATOM_first_level_glm,background_only,high,We found substantial evidence that surgical expertise can be delineated by differential activation and connectivity in the prefrontal cortex (PFC) across multiple task and neuroimaging modalities.,SRC_PMC8888846,From results_claims.CLM_PMC8888846_01
 EVLINK_0080,EQ_PMC8881080_01,background_only,,background_only,high,"The advantages of using DL for DOI versus conventional inverse solvers cited in the literature reviewed herein are numerous. These include, among others, a decrease in analysis time (often by many ord",SRC_PMC8881080,From results_claims.CLM_PMC8881080_01
-EVLINK_0081,EQ_PMC4480930_01,background_only,,background_only,high,Acupuncture was found to influence regional oxygen saturation in cerebral and muscular tissue.,SRC_PMC4480930,From results_claims.CLM_PMC4480930_01
 EVLINK_0082,EQ_PMC4309034_01,background_only,,background_only,high,"In relation to the prefrontal cortex, fNIRS showed a significant advantage due to no hair in detecting the cognitive tasks like mental arithmetic, music imagery, emotion induction, etc.",SRC_PMC4309034,From results_claims.CLM_PMC4309034_01
 EVLINK_0083,EQ_PMC13290608_01,background_only,,background_only,high,"The results showed that the TMS-fNIRS combined protocol was safe and feasible, with six of the nine interventional studies reporting statistically significant improvements in motor function.",SRC_PMC13290608,From results_claims.CLM_PMC13290608_01
 EVLINK_0084,EQ_PMC13290608_02,background_only,,background_only,high,"effective TMS interventions could enhance the activation of the ipsilesional primary motor cortex, facilitate the restoration of interhemispheric balance, and improve local and interhemispheric functi",SRC_PMC13290608,From results_claims.CLM_PMC13290608_02
@@ -147,7 +145,6 @@ EVLINK_0145,EQ_PMC9780687_01,background_only,ATOM_mbll_conversion,background_onl
 EVLINK_0146,EQ_PMC9335366_01,background_only,,background_only,high,"Much of the literature supported a positive linear relationship between changes in CW-NIRS based metrics, particularly regional cerebral oxygen saturation (rSO2), and changes in CBF.",SRC_PMC9335366,From results_claims.CLM_PMC9335366_01
 EVLINK_0147,EQ_PMC7315225_01,background_only,ATOM_first_level_glm,background_only,high,"At rest, an overall increase in cortical activation was observed in fNIRS responses at the site of stimulation. Conversely, during tasks, reduced cortical activation was observed during online stimula",SRC_PMC7315225,From results_claims.CLM_PMC7315225_01
 EVLINK_0148,EQ_PMC6953699_01,background_only,,background_only,high,"The hybrid algorithm corrected 94% of the artifacts produced by JM, and it did not lead to spurious responses in the data.",SRC_PMC6953699,From results_claims.CLM_PMC6953699_01
-EVLINK_0149,EQ_PMC11066257_01,background_only,,background_only,medium,Review of Infrared imaging in acupuncture.,SRC_PMC11066257,From results_claims.CLM_PMC11066257_01
 EVLINK_0150,EQ_PMC11048695_01,background_only,,background_only,medium,Review of Remote wearable neuroimaging devices.,SRC_PMC11048695,From results_claims.CLM_PMC11048695_01
 EVLINK_0151,EQ_PMC10863935_01,background_only,,background_only,medium,Review of Skin pigmentation impact on NIRS.,SRC_PMC10863935,From results_claims.CLM_PMC10863935_01
 EVLINK_0152,EQ_PMC9442204_01,background_only,,background_only,medium,Review of NIRS cerebral oxygenation in pediatric CHD.,SRC_PMC9442204,From results_claims.CLM_PMC9442204_01
@@ -223,7 +220,6 @@ EVLINK_0221,EQ_PMC11598675_01,background_only,,background_only,medium,Methods pa
 EVLINK_0222,EQ_PMC11383710_01,background_only,,background_only,medium,"Methods paper: Creating anatomically-derived, standardized, customizable, and three-dimensional printable head caps",SRC_PMC11383710,From results_claims.CLM_PMC11383710_01
 EVLINK_0223,EQ_PMC11191237_01,background_only,ATOM_first_level_glm,background_only,medium,Methods paper: Changes in temporal lobe activation during a sound stimulation task in patients with sensorineural t,SRC_PMC11191237,From results_claims.CLM_PMC11191237_01
 EVLINK_0224,EQ_PMC10665481_01,background_only,,background_only,medium,Methods paper: Prefrontal cortex functional connectivity changes during verbal fluency test in adults with short-te,SRC_PMC10665481,From results_claims.CLM_PMC10665481_01
-EVLINK_0225,EQ_PMC10188977_01,background_only,,background_only,high,"16 sources and 13 detectors were set on the bilateral prefrontal cortex (PFC) and bilateral somatosensory cortex, which referred to the standard international 10-10 system of electrode placement.",SRC_PMC10188977,From results_claims.CLM_PMC10188977_01
 EVLINK_0226,EQ_PMC9950900_01,background_only,,background_only,medium,Methods paper: Single-leg stance on a challenging surface can enhance cortical activation in the right hemisphere –,SRC_PMC9950900,From results_claims.CLM_PMC9950900_01
 EVLINK_0227,EQ_PMC9682186_01,background_only,ATOM_resting_connectivity,background_only,medium,Methods paper: Resting-state functional connectivity for determining outcomes in upper extremity function after str,SRC_PMC9682186,From results_claims.CLM_PMC9682186_01
 EVLINK_0228,EQ_PMC7821565_01,background_only,,background_only,medium,Methods paper: The Role of the Prefrontal Cortex and Functional Connectivity during Maritime Operations: An fNIRS s,SRC_PMC7821565,From results_claims.CLM_PMC7821565_01
@@ -265,7 +261,6 @@ EVLINK_0263,EQ_PMC13269331_01,background_only,,background_only,medium,ML paper: 
 EVLINK_0264,EQ_PMC13244843_01,background_only,ATOM_first_level_glm,background_only,medium,"ML paper: The gait performance, sensorimotor cortical activation and their correlation during walking task amo",SRC_PMC13244843,From results_claims.CLM_PMC13244843_01
 EVLINK_0265,EQ_PMC13136355_01,background_only,,background_only,medium,ML paper: An early detection framework for young Chinese learners at risk of reading difficulty using fNIRS an,SRC_PMC13136355,From results_claims.CLM_PMC13136355_01
 EVLINK_0266,EQ_PMC12944262_01,background_only,,background_only,medium,ML paper: Toward Mobile Neuroimaging: Design of a Multi-Modal EEG/fNIRS Instrument for Real-Time Use,SRC_PMC12944262,From results_claims.CLM_PMC12944262_01
-EVLINK_0267,EQ_PMC12517182_01,background_only,,background_only,medium,ML paper: Predicting Individual Response to Acupuncture in Sensorineural Tinnitus Using Integrated Functional ,SRC_PMC12517182,From results_claims.CLM_PMC12517182_01
 EVLINK_0268,EQ_PMC11564592_01,background_only,,background_only,medium,ML paper: Classification algorithm for motor imagery fusing CNN and attentional mechanisms based on functional,SRC_PMC11564592,From results_claims.CLM_PMC11564592_01
 EVLINK_0269,EQ_PMC11548208_01,background_only,,background_only,medium,ML paper: Computer Vision-Driven Movement Annotations to Advance fNIRS Pre-Processing Algorithms,SRC_PMC11548208,From results_claims.CLM_PMC11548208_01
 EVLINK_0270,EQ_PMC10790918_01,background_only,,background_only,medium,ML paper: Benchmarking framework for machine learning classification from fNIRS data,SRC_PMC10790918,From results_claims.CLM_PMC10790918_01
@@ -633,7 +628,6 @@ EVLINK_0631,EV_PMC11584861,background_only,,background_only,medium,not_reported,
 EVLINK_0632,EV_PMC11587096,background_only,,background_only,medium,not_reported,SRC_PMC11587096,From studies.article_type
 EVLINK_0633,EV_PMC11587899,background_only,,background_only,medium,not_reported,SRC_PMC11587899,From studies.article_type
 EVLINK_0634,EV_PMC11591234,background_only,,background_only,medium,not_reported,SRC_PMC11591234,From studies.article_type
-EVLINK_0635,EV_PMC11604711,background_only,,background_only,medium,not_reported,SRC_PMC11604711,From studies.article_type
 EVLINK_0636,EV_PMC11606037,background_only,,background_only,medium,not_reported,SRC_PMC11606037,From studies.article_type
 EVLINK_0637,EV_PMC11608255,background_only,,background_only,medium,not_reported,SRC_PMC11608255,From studies.article_type
 EVLINK_0638,EV_PMC11609993,background_only,,background_only,medium,not_reported,SRC_PMC11609993,From studies.article_type
@@ -717,7 +711,6 @@ EVLINK_0715,EV_PMC12135919,background_only,,background_only,medium,not_reported,
 EVLINK_0716,EV_PMC12144309,background_only,,background_only,medium,not_reported,SRC_PMC12144309,From studies.article_type
 EVLINK_0717,EV_PMC12151435,background_only,,background_only,medium,not_reported,SRC_PMC12151435,From studies.article_type
 EVLINK_0718,EV_PMC12155569,background_only,,background_only,medium,not_reported,SRC_PMC12155569,From studies.article_type
-EVLINK_0719,EV_PMC12171123,background_only,,background_only,medium,not_reported,SRC_PMC12171123,From studies.article_type
 EVLINK_0720,EV_PMC12176596,background_only,,background_only,medium,not_reported,SRC_PMC12176596,From studies.article_type
 EVLINK_0721,EV_PMC12176816,background_only,,background_only,medium,not_reported,SRC_PMC12176816,From studies.article_type
 EVLINK_0722,EV_PMC12206696,background_only,,background_only,medium,not_reported,SRC_PMC12206696,From studies.article_type
@@ -768,7 +761,6 @@ EVLINK_0766,EV_PMC12487057,background_only,,background_only,medium,not_reported,
 EVLINK_0767,EV_PMC12489784,background_only,,background_only,medium,not_reported,SRC_PMC12489784,From studies.article_type
 EVLINK_0768,EV_PMC12496052,background_only,,background_only,medium,not_reported,SRC_PMC12496052,From studies.article_type
 EVLINK_0769,EV_PMC12503683,background_only,,background_only,medium,not_reported,SRC_PMC12503683,From studies.article_type
-EVLINK_0770,EV_PMC12504231,background_only,,background_only,medium,not_reported,SRC_PMC12504231,From studies.article_type
 EVLINK_0771,EV_PMC12504255,background_only,,background_only,medium,not_reported,SRC_PMC12504255,From studies.article_type
 EVLINK_0772,EV_PMC12517010,background_only,,background_only,medium,not_reported,SRC_PMC12517010,From studies.article_type
 EVLINK_0773,EV_PMC12521986,background_only,,background_only,medium,not_reported,SRC_PMC12521986,From studies.article_type
@@ -1253,7 +1245,6 @@ EVLINK_1251,EV_PMC6306799,background_only,,background_only,low,Review — no own
 EVLINK_1252,EV_PMC6311664,background_only,,background_only,medium,not_reported,SRC_PMC6311664,From studies.article_type
 EVLINK_1253,EV_PMC6351455,background_only,,background_only,medium,not_reported,SRC_PMC6351455,From studies.article_type
 EVLINK_1254,EV_PMC6357488,background_only,,background_only,medium,not_reported,SRC_PMC6357488,From studies.article_type
-EVLINK_1255,EV_PMC6359459,background_only,,background_only,medium,not_reported,SRC_PMC6359459,From studies.article_type
 EVLINK_1256,EV_PMC6360878,background_only,,background_only,medium,not_reported,SRC_PMC6360878,From studies.article_type
 EVLINK_1257,EV_PMC6362521,background_only,,background_only,medium,not_reported,SRC_PMC6362521,From studies.article_type
 EVLINK_1258,EV_PMC6369365,background_only,,background_only,medium,not_reported,SRC_PMC6369365,From studies.article_type
@@ -1291,7 +1282,6 @@ EVLINK_1289,EV_PMC6692246,background_only,,background_only,medium,not_reported,S
 EVLINK_1290,EV_PMC6692742,background_only,,background_only,medium,not_reported,SRC_PMC6692742,From studies.article_type
 EVLINK_1291,EV_PMC6698343,background_only,,background_only,medium,not_reported,SRC_PMC6698343,From studies.article_type
 EVLINK_1292,EV_PMC6701524,background_only,,background_only,medium,not_reported,SRC_PMC6701524,From studies.article_type
-EVLINK_1293,EV_PMC6730485,background_only,,background_only,medium,not_reported,SRC_PMC6730485,From studies.article_type
 EVLINK_1294,EV_PMC6743351,background_only,,background_only,medium,not_reported,SRC_PMC6743351,From studies.article_type
 EVLINK_1295,EV_PMC6744459,background_only,,background_only,medium,not_reported,SRC_PMC6744459,From studies.article_type
 EVLINK_1296,EV_PMC6749052,background_only,,background_only,medium,not_reported,SRC_PMC6749052,From studies.article_type
@@ -1487,13 +1477,10 @@ EVLINK_1485,EV_PMC8681021,background_only,,background_only,medium,not_reported,S
 EVLINK_1486,EV_PMC8695976,background_only,,background_only,medium,not_reported,SRC_PMC8695976,From studies.article_type
 EVLINK_1487,EV_PMC8712652,background_only,,background_only,medium,not_reported,SRC_PMC8712652,From studies.article_type
 EVLINK_1488,EV_PMC8741949,background_only,,background_only,medium,not_reported,SRC_PMC8741949,From studies.article_type
-EVLINK_1489,EV_PMC8762121,background_only,,background_only,medium,not_reported,SRC_PMC8762121,From studies.article_type
 EVLINK_1490,EV_PMC8765292,background_only,,background_only,medium,not_reported,SRC_PMC8765292,From studies.article_type
 EVLINK_1491,EV_PMC8778041,background_only,,background_only,medium,not_reported,SRC_PMC8778041,From studies.article_type
 EVLINK_1492,EV_PMC8781620,background_only,,background_only,medium,not_reported,SRC_PMC8781620,From studies.article_type
 EVLINK_1493,EV_PMC8801602,background_only,,background_only,medium,not_reported,SRC_PMC8801602,From studies.article_type
-EVLINK_1494,EV_PMC8804104,background_only,,background_only,medium,not_reported,SRC_PMC8804104,From studies.article_type
-EVLINK_1495,EV_PMC8820726,background_only,,background_only,medium,not_reported,SRC_PMC8820726,From studies.article_type
 EVLINK_1496,EV_PMC8823693,background_only,,background_only,medium,not_reported,SRC_PMC8823693,From studies.article_type
 EVLINK_1497,EV_PMC8844436,background_only,,background_only,medium,not_reported,SRC_PMC8844436,From studies.article_type
 EVLINK_1498,EV_PMC8845219,background_only,,background_only,medium,not_reported,SRC_PMC8845219,From studies.article_type
@@ -1614,7 +1601,6 @@ EVLINK_1612,EV_PMC9934728,background_only,,background_only,medium,not_reported,S
 EVLINK_1613,EV_PMC9965810,background_only,,background_only,medium,not_reported,SRC_PMC9965810,From studies.article_type
 EVLINK_1614,EV_PMC9995819,background_only,,background_only,medium,not_reported,SRC_PMC9995819,From studies.article_type
 EVLINK_1615,EV_PMC9997722,background_only,,background_only,medium,not_reported,SRC_PMC9997722,From studies.article_type
-EVLINK_1616,EV_PMC9999014,background_only,,background_only,medium,not_reported,SRC_PMC9999014,From studies.article_type
 EVLINK_1617,EV_VBIT_0001,method_atom,ATOM_data_import,method_atom,high,system is not without criticism,SRC_PMC12877426,From acquisition.device_brand_model
 EVLINK_1618,EV_VBIT_0002,method_atom,ATOM_data_import,method_atom,high,85 channels,SRC_PMC12877426,From acquisition.channels_n
 EVLINK_1619,EV_VBIT_0003,method_atom,ATOM_data_import,method_atom,high,system is defined at a particular angle,SRC_PMC6297380,From acquisition.device_brand_model
@@ -1649,7 +1635,6 @@ EVLINK_1647,EV_VBIT_0031,method_atom,ATOM_data_import,method_atom,high,685 nm an
 EVLINK_1648,EV_VBIT_0032,method_atom,ATOM_data_import,method_atom,high,730 nm and 850 nm,SRC_PMC11191237,From acquisition.wavelengths_nm
 EVLINK_1649,EV_VBIT_0033,method_atom,ATOM_data_import,method_atom,high,20 channels,SRC_PMC11191237,From acquisition.channels_n
 EVLINK_1650,EV_VBIT_0034,method_atom,ATOM_data_import,method_atom,high,48 channels,SRC_PMC10665481,From acquisition.channels_n
-EVLINK_1651,EV_VBIT_0035,method_atom,ATOM_data_import,method_atom,high,36 channels were,SRC_PMC10188977,From acquisition.channels_n
 EVLINK_1652,EV_VBIT_0036,method_atom,ATOM_data_import,method_atom,high,sampling rate of 11 Hz,SRC_PMC9682186,From acquisition.sampling_rate_hz
 EVLINK_1653,EV_VBIT_0037,method_atom,ATOM_data_import,method_atom,high,35 channels,SRC_PMC9682186,From acquisition.channels_n
 EVLINK_1654,EV_VBIT_0038,method_atom,ATOM_data_import,method_atom,high,device was utilized to capture neurovascular measures of activation,SRC_PMC7821565,From acquisition.device_brand_model
@@ -1871,7 +1856,6 @@ EVLINK_1869,EV_VBIT_0253,method_atom,ATOM_data_import,method_atom,high,17 channe
 EVLINK_1870,EV_VBIT_0254,method_atom,ATOM_data_import,method_atom,high,48 channels,SRC_PMC11946344,From acquisition.channels_n
 EVLINK_1871,EV_VBIT_0255,method_atom,ATOM_data_import,method_atom,high,48 channels was,SRC_PMC12110038,From acquisition.channels_n
 EVLINK_1872,EV_VBIT_0256,background_only,,background_only,high,wavelet filter,SRC_PMC12110038,From preprocessing_methods.motion_correction
-EVLINK_1873,EV_VBIT_0257,method_atom,ATOM_data_import,method_atom,high,52 channels,SRC_PMC12517182,From acquisition.channels_n
 EVLINK_1874,EV_VBIT_0258,method_atom,ATOM_data_import,method_atom,high,32-channel,SRC_PMC12592382,From acquisition.channels_n
 EVLINK_1875,EV_VBIT_0259,background_only,,background_only,high,ICA method,SRC_PMC12592382,From preprocessing_methods.motion_correction
 EVLINK_1876,EV_VBIT_0260,method_atom,ATOM_data_import,method_atom,high,35 Channels,SRC_PMC12818463,From acquisition.channels_n
@@ -2188,7 +2172,6 @@ EVLINK_4041,EV_VBIT_0003,method_atom,ATOM_motion_correction,method_atom,medium,S
 EVLINK_4042,EQ_PMC4801878_01,method_atom,ATOM_motion_correction,method_atom,medium,Supporting evidence from 1343 papers,SRC_PMC4801878,Canonical atom ATOM_motion_correction
 EVLINK_4043,EV_VBIT_0016,method_atom,ATOM_motion_correction,method_atom,medium,Supporting evidence from 1343 papers,SRC_PMC4801878,Canonical atom ATOM_motion_correction
 EVLINK_4044,EV_VBIT_0017,method_atom,ATOM_motion_correction,method_atom,medium,Supporting evidence from 1343 papers,SRC_PMC4801878,Canonical atom ATOM_motion_correction
-EVLINK_4045,EQ_PMC10188977_01,method_atom,ATOM_motion_correction,method_atom,medium,Supporting evidence from 1343 papers,SRC_PMC10188977,Canonical atom ATOM_motion_correction
 EVLINK_4046,EQ_PMC6953699_01,method_atom,ATOM_bandpass_filter,method_atom,medium,Supporting evidence from 334 papers,SRC_PMC6953699,Canonical atom ATOM_bandpass_filter
 EVLINK_4047,EV_VBIT_0232,method_atom,ATOM_bandpass_filter,method_atom,medium,Supporting evidence from 334 papers,SRC_PMC6953699,Canonical atom ATOM_bandpass_filter
 EVLINK_4048,EQ_PMC12877426_01,method_atom,ATOM_bandpass_filter,method_atom,medium,Supporting evidence from 334 papers,SRC_PMC12877426,Canonical atom ATOM_bandpass_filter
@@ -2523,7 +2506,6 @@ EVLINK_6117,EV_VBIT_0003,risk_rule,RULE_missing_motion_correction,risk_rule,medi
 EVLINK_6118,EQ_PMC4801878_01,risk_rule,RULE_missing_motion_correction,risk_rule,medium,Risk-related evidence from literature,SRC_PMC4801878,Supports risk rule RULE_missing_motion_correction
 EVLINK_6119,EV_VBIT_0016,risk_rule,RULE_missing_motion_correction,risk_rule,medium,Risk-related evidence from literature,SRC_PMC4801878,Supports risk rule RULE_missing_motion_correction
 EVLINK_6120,EV_VBIT_0017,risk_rule,RULE_missing_motion_correction,risk_rule,medium,Risk-related evidence from literature,SRC_PMC4801878,Supports risk rule RULE_missing_motion_correction
-EVLINK_6121,EQ_PMC10188977_01,risk_rule,RULE_missing_motion_correction,risk_rule,medium,Risk-related evidence from literature,SRC_PMC10188977,Supports risk rule RULE_missing_motion_correction
 EVLINK_6122,EQ_PMC11506513_03,risk_rule,RULE_missing_filter_cutoffs,risk_rule,medium,Risk-related evidence from literature,SRC_PMC11506513,Supports risk rule RULE_missing_filter_cutoffs
 EVLINK_6123,EQ_PMID_40843107_03,risk_rule,RULE_missing_filter_cutoffs,risk_rule,medium,Risk-related evidence from literature,SRC_PMID40843107,Supports risk rule RULE_missing_filter_cutoffs
 EVLINK_6124,EQ_PMID_40843107_04,risk_rule,RULE_missing_filter_cutoffs,risk_rule,medium,Risk-related evidence from literature,SRC_PMID40843107,Supports risk rule RULE_missing_filter_cutoffs
@@ -2575,7 +2557,6 @@ EVLINK_7019,EQ_PMC12505193_04,method_atom,ATOM_roi_analysis,method_atom,medium,S
 EVLINK_7020,EQ_PMC12061381_02,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC12061381,Supports ATOM_roi_analysis
 EVLINK_7021,EQ_PMC12347915_03,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC12347915,Supports ATOM_roi_analysis
 EVLINK_7022,EQ_PMC10014824_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC10014824,Supports ATOM_roi_analysis
-EVLINK_7023,EQ_PMC9975578_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC9975578,Supports ATOM_roi_analysis
 EVLINK_7024,EQ_PMC8888846_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC8888846,Supports ATOM_roi_analysis
 EVLINK_7025,EQ_PMC4309034_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC4309034,Supports ATOM_roi_analysis
 EVLINK_7026,EQ_PMC13030400_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC13030400,Supports ATOM_roi_analysis
@@ -2589,7 +2570,6 @@ EVLINK_7033,EQ_PMC11048695_01,method_atom,ATOM_roi_analysis,method_atom,medium,S
 EVLINK_7034,EQ_PMC5603769_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC5603769,Supports ATOM_roi_analysis
 EVLINK_7035,EQ_PMC6336925_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC6336925,Supports ATOM_roi_analysis
 EVLINK_7036,EQ_PMC10665481_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC10665481,Supports ATOM_roi_analysis
-EVLINK_7037,EQ_PMC10188977_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC10188977,Supports ATOM_roi_analysis
 EVLINK_7038,EQ_PMC7821565_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC7821565,Supports ATOM_roi_analysis
 EVLINK_7039,EQ_PMC8901827_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC8901827,Supports ATOM_roi_analysis
 EVLINK_7040,EQ_PMC12944262_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC12944262,Supports ATOM_roi_analysis
@@ -2599,7 +2579,6 @@ EVLINK_7043,EQ_PMC10362671_01,method_atom,ATOM_roi_analysis,method_atom,medium,S
 EVLINK_7044,EQ_PMC10765727_01,method_atom,ATOM_roi_analysis,method_atom,medium,Statistical method evidence,SRC_PMC10765727,Supports ATOM_roi_analysis
 EVLINK_7045,EQ_PMC12061381_02,method_atom,ATOM_laterality_index,method_atom,medium,Statistical method evidence,SRC_PMC12061381,Supports ATOM_laterality_index
 EVLINK_7046,EQ_PMC13013050_01,method_atom,ATOM_laterality_index,method_atom,medium,Statistical method evidence,SRC_PMC13013050,Supports ATOM_laterality_index
-EVLINK_7047,EQ_PMC10188977_01,method_atom,ATOM_laterality_index,method_atom,medium,Statistical method evidence,SRC_PMC10188977,Supports ATOM_laterality_index
 EVLINK_7048,EQ_PMC9950900_01,method_atom,ATOM_laterality_index,method_atom,medium,Statistical method evidence,SRC_PMC9950900,Supports ATOM_laterality_index
 EVLINK_7049,EQ_PMC8901827_01,method_atom,ATOM_laterality_index,method_atom,medium,Statistical method evidence,SRC_PMC8901827,Supports ATOM_laterality_index
 EVLINK_7050,EQ_PMC13269331_01,method_atom,ATOM_laterality_index,method_atom,medium,Statistical method evidence,SRC_PMC13269331,Supports ATOM_laterality_index
@@ -2729,7 +2708,6 @@ EVLINK_8099,EV_VBIT_0003,method_atom,ATOM_spline_motion_correction,method_atom,m
 EVLINK_8100,EQ_PMC4801878_01,method_atom,ATOM_spline_motion_correction,method_atom,medium,Evidence from traditional analysis packages,SRC_PMC4801878,Supports ATOM_spline_motion_correction
 EVLINK_8101,EV_VBIT_0016,method_atom,ATOM_spline_motion_correction,method_atom,medium,Evidence from traditional analysis packages,SRC_PMC4801878,Supports ATOM_spline_motion_correction
 EVLINK_8102,EV_VBIT_0017,method_atom,ATOM_spline_motion_correction,method_atom,medium,Evidence from traditional analysis packages,SRC_PMC4801878,Supports ATOM_spline_motion_correction
-EVLINK_8103,EQ_PMC10188977_01,method_atom,ATOM_spline_motion_correction,method_atom,medium,Evidence from traditional analysis packages,SRC_PMC10188977,Supports ATOM_spline_motion_correction
 EVLINK_8205,EQ_PMC11833346_02,method_atom,ATOM_artifact_detection,method_atom,medium,Evidence from traditional analysis packages,SRC_PMC11833346,Supports ATOM_artifact_detection
 EVLINK_8206,EQ_PMC12505193_02,method_atom,ATOM_artifact_detection,method_atom,medium,Evidence from traditional analysis packages,SRC_PMC12505193,Supports ATOM_artifact_detection
 EVLINK_8207,EQ_PMC12053328_03,method_atom,ATOM_artifact_detection,method_atom,medium,Evidence from traditional analysis packages,SRC_PMC12053328,Supports ATOM_artifact_detection

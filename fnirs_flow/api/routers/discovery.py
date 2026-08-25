@@ -40,19 +40,57 @@ def _service() -> Any:
 
 @router.get("/api/datasets", response_model=list[DatasetRead])
 async def list_datasets_endpoint() -> list[DatasetRead]:
-    return [DatasetRead(dataset_id=e.dataset_id, name=e.name, source_kind=e.source_kind, url=e.url, doi=e.doi,
-                         citation=e.citation, license=e.license, description=e.description, folder_name=e.folder_name)
-            for e in DatasetRegistry().all_entries()]
+    entries = [
+        DatasetRead(
+            dataset_id=e.dataset_id,
+            name=e.name,
+            source_kind=e.source_kind,
+            url=e.url,
+            doi=e.doi,
+            citation=e.citation,
+            license=e.license,
+            description=e.description,
+            folder_name=e.folder_name,
+        )
+        for e in DatasetRegistry().all_entries()
+    ]
+    entries.append(
+        DatasetRead(
+            dataset_id="vendor-processed-hb",
+            name="Vendor Processed-Hb Frozen Manifest",
+            source_kind="local",
+            description="Four frozen inputs plus externally bound _RE.TXT signals (experimental)",
+        )
+    )
+    return entries
 
 
 _EXAMPLE_FLOWS: dict[str, dict[str, Any]] = {
-    "blank_template": {"label": "Blank Template", "flow": {"schema_version": "0.3.0", "flow_id": "blank-template",
-        "name": "Blank Template", "description": "Start with an empty flow canvas.", "nodes": [], "flow_atoms": [],
-        "edges": [], "adapter_registry": [], "metadata": {"tags": [], "order_policy": {"allow_order_violations": False,
-        "allow_empty_edges": False}, "checklist": {}}}},
+    "blank_template": {
+        "label": "Blank Template",
+        "flow": {
+            "schema_version": "0.4.0",
+            "flow_id": "blank-template",
+            "name": "Blank Template",
+            "description": "Start with an empty flow canvas.",
+            "nodes": [],
+            "flow_atoms": [],
+            "edges": [],
+            "adapter_registry": [],
+            "metadata": {
+                "tags": [],
+                "order_policy": {"allow_order_violations": False, "allow_empty_edges": False},
+                "checklist": {},
+            },
+        },
+    },
     "demo_task_glm_real": {"label": "Demo Task GLM Real Data", "path": Path("configs/demo_task_glm_real.json")},
     "demo_task_flow": {"label": "Demo Task GLM", "path": Path("configs/demo_task_flow.json")},
     "demo_resting_state_flow": {"label": "Demo Resting State", "path": Path("configs/demo_resting_state_flow.json")},
+    "vendor_processed_hb": {
+        "label": "Vendor Processed-Hb (Experimental)",
+        "path": Path("configs/vendor_processed_hb_flow.json"),
+    },
 }
 
 
@@ -78,33 +116,73 @@ async def get_example_flow_endpoint(example_id: str) -> dict[str, Any]:
 
 
 @router.post("/api/projects/{project_id}/discover-data", response_model=DiscoverResult)
-async def discover_data_endpoint(project_id: str, dataset_id: str,
-                                  data_root: str | None = Query(None), data_path: str | None = Query(None),
-                                  base_revision: int | None = Query(None)) -> Any:
+async def discover_data_endpoint(
+    project_id: str,
+    dataset_id: str,
+    data_root: str | None = Query(None),
+    data_path: str | None = Query(None),
+    base_revision: int | None = Query(None),
+) -> Any:
     if _store().get(project_id) is None:
-        raise api_error(404, "PROJECT_NOT_FOUND", "Project not found", "discovery", recoverable=False,
-                        suggested_action="Select an existing project")
+        raise api_error(
+            404,
+            "PROJECT_NOT_FOUND",
+            "Project not found",
+            "discovery",
+            recoverable=False,
+            suggested_action="Select an existing project",
+        )
     try:
-        return await run_in_threadpool(_service().discover, project_id, dataset_id, data_root=data_root,
-                                       data_path=data_path, base_revision=base_revision)
+        return await run_in_threadpool(
+            _service().discover,
+            project_id,
+            dataset_id,
+            data_root=data_root,
+            data_path=data_path,
+            base_revision=base_revision,
+        )
     except ValueError as exc:
-        raise api_error(404, "DATASET_NOT_FOUND", str(exc), "discovery", recoverable=True,
-                        suggested_action="Choose a registered dataset ID") from exc
+        raise api_error(
+            404,
+            "DATASET_NOT_FOUND",
+            str(exc),
+            "discovery",
+            recoverable=True,
+            suggested_action="Choose a registered dataset ID",
+        ) from exc
     except (OSError, KeyError, RuntimeError) as exc:
-        raise api_error(500, "DATA_DISCOVERY_FAILED", str(exc), "discovery", recoverable=True,
-                        suggested_action="Check data access and server logs") from exc
+        raise api_error(
+            500,
+            "DATA_DISCOVERY_FAILED",
+            str(exc),
+            "discovery",
+            recoverable=True,
+            suggested_action="Check data access and server logs",
+        ) from exc
 
 
 @router.get("/api/projects/{project_id}/data-folders", response_model=ProjectDataFolderList)
 async def list_project_data_folders_endpoint(project_id: str, parent: str = Query("")) -> Any:
     if _store().get(project_id) is None:
-        raise api_error(404, "PROJECT_NOT_FOUND", "Project not found", "data", recoverable=False,
-                        suggested_action="Select an existing project")
+        raise api_error(
+            404,
+            "PROJECT_NOT_FOUND",
+            "Project not found",
+            "data",
+            recoverable=False,
+            suggested_action="Select an existing project",
+        )
     try:
         return await run_in_threadpool(list_project_data_folders, _store(), project_id, parent)
     except (OSError, ValueError) as exc:
-        raise api_error(422, "PROJECT_DATA_FOLDER_INVALID", str(exc), "data", recoverable=True,
-                        suggested_action="Choose a folder under the project's data directory") from exc
+        raise api_error(
+            422,
+            "PROJECT_DATA_FOLDER_INVALID",
+            str(exc),
+            "data",
+            recoverable=True,
+            suggested_action="Choose a folder under the project's data directory",
+        ) from exc
 
 
 @router.get("/api/projects/{project_id}/discover-data", response_model=DiscoverResult)
@@ -112,17 +190,28 @@ async def get_discover_data_endpoint(project_id: str) -> Any:
     result = load_project_discover_result(_store(), project_id)
     if result is None:
         status = 404 if _store().get(project_id) is None else 409
-        raise api_error(status, "PROJECT_NOT_FOUND" if status == 404 else "DATA_NOT_DISCOVERED",
-                        "Dataset discovery result not found", "discovery", recoverable=status == 409,
-                        suggested_action="Discover a dataset first")
+        raise api_error(
+            status,
+            "PROJECT_NOT_FOUND" if status == 404 else "DATA_NOT_DISCOVERED",
+            "Dataset discovery result not found",
+            "discovery",
+            recoverable=status == 409,
+            suggested_action="Discover a dataset first",
+        )
     return result
 
 
 @router.post("/api/projects/{project_id}/participant-table", response_model=ParticipantTableImportResult)
 async def import_participant_table_endpoint(project_id: str, data: ParticipantTableImportRequest) -> Any:
     if _store().get(project_id) is None:
-        raise api_error(404, "PROJECT_NOT_FOUND", "Project not found", "participant_metadata", recoverable=False,
-                        suggested_action="Select an existing project")
+        raise api_error(
+            404,
+            "PROJECT_NOT_FOUND",
+            "Project not found",
+            "participant_metadata",
+            recoverable=False,
+            suggested_action="Select an existing project",
+        )
     try:
         table_path, _ = resolve_project_data_path(
             _store(), project_id, data.path, label="Participant table path", must_be_file=True
@@ -157,6 +246,12 @@ async def import_participant_table_endpoint(project_id: str, data: ParticipantTa
             suggested_action="Check the table path, delimiter, encoding, and participant id column",
         ) from exc
     if result is None:
-        raise api_error(404, "PROJECT_NOT_FOUND", "Project not found", "participant_metadata", recoverable=False,
-                        suggested_action="Select an existing project")
+        raise api_error(
+            404,
+            "PROJECT_NOT_FOUND",
+            "Project not found",
+            "participant_metadata",
+            recoverable=False,
+            suggested_action="Select an existing project",
+        )
     return result

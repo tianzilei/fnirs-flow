@@ -8,6 +8,8 @@ preserving backward compatibility.
 from __future__ import annotations
 
 import copy
+import json
+from pathlib import Path
 from typing import Any
 
 
@@ -93,3 +95,33 @@ def ensure_dag_atom_fields(dag_node_dict: dict[str, Any]) -> dict[str, Any]:
     if "atom_type" not in result and "node_type" in result:
         result["atom_type"] = result["node_type"]
     return result
+
+
+def migrate_flow_schema_v0_3_to_v0_4(
+    flow_dict: dict[str, Any], *, confirm_ar1_semantic_change: bool = False
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Migrate a 0.3 flow while auditing the AR(1) semantic change."""
+    if flow_dict.get("schema_version") != "0.3.0":
+        raise ValueError("expected a Flow schema 0.3.0 payload")
+    result = copy.deepcopy(flow_dict)
+    atoms = result.get("flow_atoms", result.get("nodes", []))
+    noise_models = {str(atom.get("config", {}).get("noise_model", "")) for atom in atoms if isinstance(atom, dict)}
+    audit: dict[str, Any] = {"from_version": "0.3.0", "to_version": "0.4.0", "actions": []}
+    result["schema_version"] = "0.4.0"
+    result.setdefault(
+        "data_semantics",
+        {"branch": "raw_intensity_or_snirf", "signal_level": "raw_intensity_or_snirf", "absolute_unit_verified": False},
+    )
+    if "ar1" in noise_models and not confirm_ar1_semantic_change:
+        raise ValueError("AR1_SEMANTIC_CHANGE_CONFIRMATION_REQUIRED")
+    requested = "ar1" if "ar1" in noise_models else "ols"
+    result["solver"] = {"requested": requested, "fallback_policy": "forbid", "confirmatory": False}
+    audit["actions"].extend(["data_semantics_added", f"solver_requested_{requested}"])
+    return result, audit
+
+
+def write_migration_audit(path: str | Path, audit: dict[str, Any]) -> Path:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(audit, indent=2), encoding="utf-8")
+    return target

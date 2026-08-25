@@ -24,7 +24,14 @@ interface SidebarProps {
   highlightedTemplateIds?: string[];
   checklistRecommendations?: ChecklistTemplateRecommendation[];
   activeChecklistLabel?: string;
+  dataBranch?: string;
 }
+
+const PROCESSED_HB_ALLOWED = new Set([
+  'frozen_manifest_discovery', 'read_vendor_processed_hb', 'ingest_frozen_events',
+  'regularize_processed_hb_time', 'compile_processed_hb_designs', 'fit_processed_hb_first_level',
+  'estimate_full_contrasts', 'write_processed_hb_derivatives',
+]);
 
 const tierLabels: Record<ChecklistRecommendationTier, string> = {
   best: 'Best fit',
@@ -44,6 +51,7 @@ export function Sidebar({
   highlightedTemplateIds = [],
   checklistRecommendations = [],
   activeChecklistLabel = '',
+  dataBranch = '',
 }: SidebarProps) {
   const [templates, setTemplates] = useState<AtomTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +83,7 @@ export function Sidebar({
     const normalizedQuery = query.trim().toLowerCase();
     const highlighted = new Set(highlightedTemplateIds);
     return templates.filter((template) => {
+      if (dataBranch === 'vendor_processed_hb' && !PROCESSED_HB_ALLOWED.has(template.operation || template.id)) return false;
       const highlightedTemplate = highlighted.has(template.id) || highlighted.has(template.operation);
       const inCategory = activeCategory === 'all' || template.category === activeCategory ||
         (activeCategory === 'checklist' && highlightedTemplate);
@@ -87,7 +96,7 @@ export function Sidebar({
       ].join(' ').toLowerCase();
       return inCategory && (!normalizedQuery || text.includes(normalizedQuery));
     });
-  }, [activeCategory, highlightedTemplateIds, query, templates]);
+  }, [activeCategory, dataBranch, highlightedTemplateIds, query, templates]);
 
   const grouped = filteredTemplates.reduce<Record<string, AtomTemplate[]>>((acc, template) => {
     (acc[template.category] = acc[template.category] || []).push(template);

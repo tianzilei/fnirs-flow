@@ -20,7 +20,9 @@ ALLOWED_INTERNAL_DEPENDENCIES: dict[str, set[str]] = {
     # Compilation validates OperationSpec scope/backend contracts before a DAG
     # can reach runtime; it depends on execution contracts, not the executor.
     "compiler": {"dependencies", "execution", "flow", "infrastructure", "validation"},
-    "execution": {"adapters", "data", "infrastructure", "registry", "settings"},
+    # Processed-Hb orchestration consumes the dedicated scientific-analysis
+    # kernel; execution remains the owner of I/O and task fan-out.
+    "execution": {"adapters", "analysis", "data", "infrastructure", "registry", "settings"},
     "exporters": {"execution", "infrastructure", "validation"},
 }
 

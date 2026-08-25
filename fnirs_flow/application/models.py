@@ -122,6 +122,7 @@ class DiscoverResult(BaseModel):
     local_root: str
     source_url: str = ""
     metadata_tables: int = 0
+    processed_hb: dict[str, Any] = Field(default_factory=dict)
 
 
 class ParticipantTableImportRequest(BaseModel):
@@ -352,6 +353,14 @@ class AtomTemplate(BaseModel):
     input_ports: list[PortDescription] = Field(default_factory=list)
     output_ports: list[PortDescription] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
+    origin: str = "builtin"
+    reference: str = ""
+    tags: list[str] = Field(default_factory=list)
+    flow_atom_blueprint: dict[str, Any] = Field(default_factory=dict)
+    implementation_module: str | None = None
+    implementation_callable: str | None = None
+    implementation_status: str = "managed"
+    capability_manifest: dict[str, Any] | None = None
     operation_contract: OperationContract | None = None
 
 

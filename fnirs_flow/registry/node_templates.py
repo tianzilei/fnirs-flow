@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fnirs_flow.flow.atoms import AtomPort, BackendBinding, MethodAtomCategory
-from fnirs_flow.registry.node_library import MethodAtomTemplate
+from fnirs_flow.registry.node_library import MethodAtomTemplate, discover_method_atom_templates
 
 COMMON_PARAMETER_OPTIONS = {
     "aggregation": ["mean"],
@@ -113,6 +113,7 @@ def attach_common_parameter_options(templates: list[MethodAtomTemplate]) -> None
         template.parameter_options = options
         template.parameter_specs = specs
 
+
 # ============================================================================
 # DATA NODES
 # ============================================================================
@@ -178,6 +179,153 @@ RUN_READER = MethodAtomTemplate(
     tags=["data", "bids", "snirf", "run"],
 )
 
+VENDOR_PROCESSED_HB_READER = MethodAtomTemplate(
+    template_id="read_vendor_processed_hb",
+    name="Read Vendor Processed Hb",
+    category=MethodAtomCategory.DATA,
+    atom_type="processed_hb_reader",
+    operation="read_vendor_processed_hb",
+    description="Read a vendor processed-haemoglobin _RE.TXT recording with strict provenance/QC",
+    default_config={"encoding": "auto", "data_branch": "vendor_processed_hb"},
+    ports=[
+        AtomPort(name="processed_hb_run", direction="in", schema="ProcessedHbRun"),
+        AtomPort(name="processed_hb_recording", direction="out", schema="ProcessedHbRecording"),
+        AtomPort(name="parser_qc", direction="out", schema="ParserQC"),
+    ],
+    tags=["data", "vendor_processed_hb", "provenance"],
+    implementation_module="fnirs_flow.execution.processed_hb_handlers",
+    implementation_callable="read_vendor_processed_hb_handler",
+)
+
+FROZEN_MANIFEST_DISCOVERY = MethodAtomTemplate(
+    template_id="frozen_manifest_discovery",
+    name="Frozen Processed-Hb Manifest Discovery",
+    category=MethodAtomCategory.DATA,
+    atom_type="processed_hb_discovery",
+    operation="frozen_manifest_discovery",
+    description="Join the four frozen project inputs by explicit fnirs_record_id",
+    default_config={"data_branch": "vendor_processed_hb"},
+    default_execution_scope="project",
+    ports=[
+        AtomPort(name="processed_hb_run", direction="out", schema="ProcessedHbRun"),
+        AtomPort(name="processed_hb_manifest", direction="out", schema="ProcessedHbManifest"),
+    ],
+    tags=["data", "vendor_processed_hb", "frozen_manifest"],
+    implementation_module="fnirs_flow.execution.processed_hb_handlers",
+    implementation_callable="frozen_manifest_discovery_handler",
+)
+
+FROZEN_EVENT_INGESTION = MethodAtomTemplate(
+    template_id="ingest_frozen_events",
+    name="Ingest Frozen Events",
+    category=MethodAtomCategory.DESIGN,
+    atom_type="processed_hb_events",
+    operation="ingest_frozen_events",
+    description="Load authoritative frozen events without deriving events from vendor Task/Mark columns",
+    default_config={"event_source": "fnirs_events.tsv"},
+    ports=[
+        AtomPort(name="processed_hb_run", direction="in", schema="ProcessedHbRun"),
+        AtomPort(name="frozen_event_set", direction="out", schema="FrozenEventSet"),
+    ],
+    tags=["design", "vendor_processed_hb", "frozen_events"],
+    implementation_module="fnirs_flow.execution.processed_hb_handlers",
+    implementation_callable="ingest_frozen_events_handler",
+)
+
+PROCESSED_HB_TIME_REGULARIZATION = MethodAtomTemplate(
+    template_id="regularize_processed_hb_time",
+    name="Regularize Processed-Hb Time",
+    category=MethodAtomCategory.DESIGN,
+    atom_type="processed_hb_time_regularization",
+    operation="regularize_processed_hb_time",
+    description="Audit native timestamps and explicitly create a regular sampling grid",
+    default_config={"target_sfreq_policy": "median_native", "interpolation_method": "linear"},
+    ports=[
+        AtomPort(name="processed_hb_recording", direction="in", schema="ProcessedHbRecording"),
+        AtomPort(name="regularized_hb_recording", direction="out", schema="RegularizedHbRecording"),
+    ],
+    tags=["design", "vendor_processed_hb", "timestamps"],
+    implementation_module="fnirs_flow.execution.processed_hb_handlers",
+    implementation_callable="regularize_processed_hb_time_handler",
+)
+
+PROCESSED_HB_DESIGN_COMPILER = MethodAtomTemplate(
+    template_id="compile_processed_hb_designs",
+    name="Compile Processed-Hb Designs",
+    category=MethodAtomCategory.DESIGN,
+    atom_type="processed_hb_design",
+    operation="compile_processed_hb_designs",
+    description="Compile condition, post-event FIR, and event-order GLMs from frozen events",
+    default_config={
+        "models": [
+            "glm_conditions_canonical_td_v1",
+            "fir_post_event_0_30_10s_v1",
+            "glm_event_order_linear_canonical_td_v1",
+        ]
+    },
+    ports=[
+        AtomPort(name="regularized_hb_recording", direction="in", schema="RegularizedHbRecording"),
+        AtomPort(name="frozen_event_set", direction="in", schema="FrozenEventSet"),
+        AtomPort(name="design_bundle_set", direction="out", schema="DesignBundleSet"),
+    ],
+    tags=["design", "vendor_processed_hb", "glm", "fir"],
+    implementation_module="fnirs_flow.execution.processed_hb_handlers",
+    implementation_callable="compile_processed_hb_designs_handler",
+)
+
+PROCESSED_HB_FIRST_LEVEL = MethodAtomTemplate(
+    template_id="fit_processed_hb_first_level",
+    name="Fit Processed-Hb First Level",
+    category=MethodAtomCategory.ANALYSIS,
+    atom_type="processed_hb_first_level",
+    operation="fit_processed_hb_first_level",
+    description="Fit requested OLS, AR(1), or AR(1)+Huber solver per channel and chromophore",
+    default_config={"solver_requested": "ar1_irls", "fallback_policy": "forbid"},
+    ports=[
+        AtomPort(name="regularized_hb_recording", direction="in", schema="RegularizedHbRecording"),
+        AtomPort(name="design_bundle_set", direction="in", schema="DesignBundleSet"),
+        AtomPort(name="first_level_fit_set", direction="out", schema="FirstLevelFitSet"),
+    ],
+    tags=["analysis", "vendor_processed_hb", "first_level", "covariance"],
+    implementation_module="fnirs_flow.execution.processed_hb_handlers",
+    implementation_callable="fit_processed_hb_first_level_handler",
+)
+
+PROCESSED_HB_CONTRASTS = MethodAtomTemplate(
+    template_id="estimate_full_contrasts",
+    name="Estimate Full Processed-Hb Contrasts",
+    category=MethodAtomCategory.ANALYSIS,
+    atom_type="processed_hb_contrasts",
+    operation="estimate_full_contrasts",
+    description="Estimate scalar t and multidimensional Wald/F contrasts from full beta covariance",
+    default_config={},
+    ports=[
+        AtomPort(name="first_level_fit_set", direction="in", schema="FirstLevelFitSet"),
+        AtomPort(name="contrast_set", direction="out", schema="ContrastSet"),
+    ],
+    tags=["analysis", "vendor_processed_hb", "contrast"],
+    implementation_module="fnirs_flow.execution.processed_hb_handlers",
+    implementation_callable="estimate_full_contrasts_handler",
+)
+
+PROCESSED_HB_DERIVATIVE_WRITER = MethodAtomTemplate(
+    template_id="write_processed_hb_derivatives",
+    name="Write Processed-Hb Derivatives",
+    category=MethodAtomCategory.OUTPUT,
+    atom_type="processed_hb_derivatives",
+    operation="write_processed_hb_derivatives",
+    description="Atomically write processed-Hb derivatives contract 1.0.0 and audit decisions",
+    default_config={"derivatives_contract": "1.0.0"},
+    default_execution_scope="project",
+    ports=[
+        AtomPort(name="contrast_set", direction="in", schema="ContrastSet"),
+        AtomPort(name="processed_hb_derivatives", direction="out", schema="ProcessedHbDerivatives"),
+    ],
+    tags=["output", "vendor_processed_hb", "derivatives", "audit"],
+    implementation_module="fnirs_flow.execution.processed_hb_handlers",
+    implementation_callable="write_processed_hb_derivatives_handler",
+)
+
 LOCALIZATION_PROJECTION_IMPORT = MethodAtomTemplate(
     template_id="localization_projection_import",
     name="Localization Projection Import",
@@ -216,8 +364,7 @@ NIRS_SPM_SURFACE_PROJECTION = MethodAtomTemplate(
     ),
     default_config={
         "path": (
-            "Sample/privatedata/positioning/usable_projection_csv/"
-            "G1_shouzhen_ch01_ch42_projection_coordinates.csv"
+            "Sample/privatedata/positioning/usable_projection_csv/G1_shouzhen_ch01_ch42_projection_coordinates.csv"
         ),
         "reference_dir": "References/NIRS_SPM_v4_r1",
         "coordinate_set_id": "G1_shouzhen_ch01_ch42",
@@ -363,9 +510,7 @@ PROBE_LAYOUT_SPLIT = MethodAtomTemplate(
         "source_commit": "3d904b444c7965c3aad5dfde82dbbe91dfa4f647",
         "source_license": "Apache-2.0",
         "reuse_mode": "adapt",
-        "divergence_reason": (
-            "Made output paths explicit and parameterized column names and prefixes."
-        ),
+        "divergence_reason": ("Made output paths explicit and parameterized column names and prefixes."),
     },
     ports=[
         AtomPort(name="probe_layout", direction="in", schema="ProbeLayoutCSV"),
@@ -1490,6 +1635,7 @@ GROUP_SUMMARY = MethodAtomTemplate(
     category=MethodAtomCategory.OUTPUT,
     atom_type="data_export",
     operation="group_summary",
+    default_execution_scope="group",
     description="Compute group-level statistics across subjects",
     default_config={"exclude_subjects": []},
     ports=[
@@ -1545,6 +1691,7 @@ PACKAGE_EXPORT = MethodAtomTemplate(
     category=MethodAtomCategory.EXPORT,
     atom_type="data_export",
     operation="package_export",
+    default_execution_scope="project",
     description="Export reproducibility package (.fnirsflow.zip)",
     default_config={"exclude_raw_data": True},
     ports=[
@@ -1620,6 +1767,7 @@ COMBAT_HARMONIZATION = MethodAtomTemplate(
     category=MethodAtomCategory.PREPROCESSING,
     atom_type="short_channel_regression",
     operation="combat_harmonization",
+    default_execution_scope="group",
     description="ComBat harmonization to remove site effects while preserving biological signals",
     default_config={
         "method": "combat",
@@ -1643,6 +1791,7 @@ LINEAR_MIXED_EFFECTS_GLM = MethodAtomTemplate(
     category=MethodAtomCategory.ANALYSIS,
     atom_type="first_level_glm",
     operation="linear_mixed_effects_glm",
+    default_execution_scope="group",
     description="GLM with site as random effect for multi-site studies",
     default_config={
         "random_effects": ["site"],
@@ -1667,6 +1816,7 @@ SITE_COVARIATE_GLM = MethodAtomTemplate(
     category=MethodAtomCategory.ANALYSIS,
     atom_type="first_level_glm",
     operation="site_covariate_glm",
+    default_execution_scope="group",
     description="GLM with site as fixed-effect covariate",
     default_config={
         "site_as_covariate": True,
@@ -1713,6 +1863,8 @@ ALL_NODE_TEMPLATES: list[MethodAtomTemplate] = [
     BIDS_IMPORT,
     SNIRF_READER,
     RUN_READER,
+    FROZEN_MANIFEST_DISCOVERY,
+    VENDOR_PROCESSED_HB_READER,
     NIRX_READER,
     HITACHI_READER,
     ISS_READER,
@@ -1727,6 +1879,9 @@ ALL_NODE_TEMPLATES: list[MethodAtomTemplate] = [
     STUDY_DESIGN,
     EVENT_EXTRACTION,
     DESIGN_MATRIX,
+    FROZEN_EVENT_INGESTION,
+    PROCESSED_HB_DESIGN_COMPILER,
+    PROCESSED_HB_TIME_REGULARIZATION,
     # Preprocessing - Motion Correction
     OPTICAL_DENSITY,
     TDDR_MOTION,
@@ -1756,6 +1911,8 @@ ALL_NODE_TEMPLATES: list[MethodAtomTemplate] = [
     SNR_CHECK,
     # Analysis - GLM
     FIRST_LEVEL_GLM,
+    PROCESSED_HB_FIRST_LEVEL,
+    PROCESSED_HB_CONTRASTS,
     CONTRAST,
     MULTIPLE_COMPARISON_CORRECTION,
     NUISANCE_GLM,
@@ -1784,6 +1941,7 @@ ALL_NODE_TEMPLATES: list[MethodAtomTemplate] = [
     CHANNEL_OUTPUT,
     ROI_OUTPUT,
     GROUP_SUMMARY,
+    PROCESSED_HB_DERIVATIVE_WRITER,
     # Validation
     REPORTING_CHECKLIST,
     RISK_REGISTER,
@@ -1867,11 +2025,13 @@ CEDALION_BEER_LAMBERT = MethodAtomTemplate(
 )
 
 # Add Cedalion templates to ALL_NODE_TEMPLATES
-ALL_NODE_TEMPLATES.extend([
-    CEDALION_SNIRF_READER,
-    CEDALION_OPTICAL_DENSITY,
-    CEDALION_BEER_LAMBERT,
-])
+ALL_NODE_TEMPLATES.extend(
+    [
+        CEDALION_SNIRF_READER,
+        CEDALION_OPTICAL_DENSITY,
+        CEDALION_BEER_LAMBERT,
+    ]
+)
 
 
 # ============================================================================
@@ -1990,13 +2150,18 @@ OBSERVATION_PAIRING_PROJECTION = MethodAtomTemplate(
     tags=["metadata", "paired", "repeated_measures", "hyperscanning"],
 )
 
-ALL_NODE_TEMPLATES.extend([
-    PARTICIPANT_TABLE_INPUT,
-    PARTICIPANT_METADATA_VALIDATE,
-    GROUP_DESIGN_MATRIX,
-    PARTICIPANT_LABEL_PROJECTION,
-    PARTICIPANT_SITE_PROJECTION,
-    OBSERVATION_PAIRING_PROJECTION,
-])
+ALL_NODE_TEMPLATES.extend(
+    [
+        PARTICIPANT_TABLE_INPUT,
+        PARTICIPANT_METADATA_VALIDATE,
+        GROUP_DESIGN_MATRIX,
+        PARTICIPANT_LABEL_PROJECTION,
+        PARTICIPANT_SITE_PROJECTION,
+        OBSERVATION_PAIRING_PROJECTION,
+    ]
+)
 
+# Rebuild the legacy exported list from declarations so newly declared templates
+# are registered without also editing a second, error-prone manual list.
+ALL_NODE_TEMPLATES[:] = discover_method_atom_templates(globals())
 attach_common_parameter_options(ALL_NODE_TEMPLATES)

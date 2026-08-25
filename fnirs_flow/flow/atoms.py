@@ -16,6 +16,7 @@ NodeStateContract) are re-exported as backward-compatible aliases.
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -249,6 +250,10 @@ class FlowAtom(BaseModel):
     atom_type: str
     template_id: str | None = None
     operation: str | None = None
+    description: str = ""
+    reference: str = ""
+    tags: list[str] = Field(default_factory=list)
+    template_snapshot: dict[str, Any] = Field(default_factory=dict)
     evidence_refs: list[str] = Field(default_factory=list)
     category: MethodAtomCategory
     origin: MethodAtomOrigin = MethodAtomOrigin.BUILTIN
@@ -278,6 +283,22 @@ class FlowAtom(BaseModel):
         if not isinstance(data, dict):
             return data
         result = dict(data)
+        metadata = dict(result.get("metadata") or {})
+        if metadata.get("local_atom_file"):
+            metadata["local_atom_file"] = Path(str(metadata["local_atom_file"])).name
+        snapshot = result.get("template_snapshot")
+        if isinstance(snapshot, dict):
+            snapshot = dict(snapshot)
+            snapshot_metadata = dict(snapshot.get("metadata") or {})
+            if snapshot_metadata.get("local_atom_file"):
+                snapshot_metadata["local_atom_file"] = Path(
+                    str(snapshot_metadata["local_atom_file"])
+                ).name
+            if snapshot_metadata:
+                snapshot["metadata"] = snapshot_metadata
+            result["template_snapshot"] = snapshot
+        if metadata:
+            result["metadata"] = metadata
         config = result.get("config")
         if isinstance(config, dict):
             clean_config = dict(config)

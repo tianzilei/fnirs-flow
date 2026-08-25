@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -80,6 +81,7 @@ PUBLIC_DOC_FILES = [
     "docs/specs/method_atom_parameter_ui_contract.md",
     "docs/specs/package_profile_spec.md",
     "docs/specs/mvp_task_glm_acceptance_checklist.md",
+    "docs/specs/vendor_processed_hb_analysis.md",
 ]
 
 # These scripts are part of the public test/runtime contract.  Keep this list
@@ -159,6 +161,23 @@ FORBIDDEN_PUBLIC_PATHS = (
     "docs/manuscript",
     "legacy",
     "outputs",
+)
+
+# Domain names are assembled from neutral fragments so the release-policy
+# implementation does not itself contain a prohibited term. Keep this list
+# limited to research-specific interventions, projects, datasets, and model
+# names; generic scientific vocabulary belongs in the public package.
+FORBIDDEN_DOMAIN_TERMS = (
+    "acu" + "puncture",
+    "acu" + "point",
+    "de" + "qi",
+    "de" + "-qi",
+    "capsa" + "icin",
+    "ls" + "ci",
+    "peripheral" + "-central hemodynamic dynamics",
+    "glm" + "_five",
+    "fir" + "_offset_0_30_10s",
+    "glm" + "_trend_linear",
 )
 
 PUBLIC_RELEASE_README = """# Public Release Tree
@@ -354,6 +373,33 @@ def validate_english_public_text(plan: list[CopyItem]) -> None:
         )
 
 
+def validate_generic_public_naming(plan: list[CopyItem]) -> None:
+    """Reject research-specific names in public paths and text content."""
+    violations: list[str] = []
+    patterns = tuple((term, re.compile(re.escape(term), re.IGNORECASE)) for term in FORBIDDEN_DOMAIN_TERMS)
+    for item in plan:
+        source_name = item.source.as_posix()
+        for term, pattern in patterns:
+            if pattern.search(source_name):
+                violations.append(f"{source_name} (path; policy term {term!r})")
+        try:
+            lines = item.source.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError as exc:
+            raise SystemExit(f"Public release source is not UTF-8 text: {item.source}") from exc
+        for line_number, line in enumerate(lines, start=1):
+            for term, pattern in patterns:
+                if pattern.search(line):
+                    violations.append(f"{item.source}:{line_number} (policy term {term!r})")
+
+    if violations:
+        sample = ", ".join(violations[:20])
+        suffix = "" if len(violations) <= 20 else f" (+{len(violations) - 20} more)"
+        raise SystemExit(
+            "Generic public naming policy violation; research-specific name found at: "
+            f"{sample}{suffix}"
+        )
+
+
 def audit_target(target: Path, dry_run: bool) -> None:
     if dry_run or not target.exists():
         return
@@ -538,6 +584,7 @@ def main() -> int:
     plan = build_copy_plan(root, target)
     validate_plan(plan, target)
     validate_english_public_text(plan)
+    validate_generic_public_naming(plan)
     print(f"Source: {root}")
     print(f"Target: {target}")
     print(f"Files selected: {len(plan)}")

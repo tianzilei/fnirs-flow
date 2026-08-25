@@ -70,6 +70,7 @@ webui/dist/
 !fnirs_flow/resources/
 !fnirs_flow/resources/**
 webui/.vite/
+webui/.e2e-state/
 webui/test-results/
 webui/playwright-report/
 

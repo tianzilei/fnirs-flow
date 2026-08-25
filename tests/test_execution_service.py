@@ -655,7 +655,27 @@ class TestOperationRegistry:
         registry = create_default_registry()
         assert registry.get("channel_distance_computation").handler_factory_for("cedalion") is not None
         assert registry.get("extinction_coefficients").handler_factory_for("cedalion") is not None
-        assert registry.get("head_model_construction").handler_factory_for("cedalion") is not None
+        assert registry.get("head_model_construction").handler_factory_for("cedalion") is None
+
+    def test_shared_operations_register_explicit_template_contract_variants(self):
+        from fnirs_flow.execution.operations import create_default_registry
+
+        registry = create_default_registry()
+        expected = {
+            "optical_density_conversion": {"optical_density", "atom_optical_density"},
+            "short_channel_regression": {"short_channel_regression", "atom_short_channel_regression"},
+            "first_level_glm": {"first_level_glm", "atom_first_level_glm"},
+            "multiple_comparison_correction": {
+                "multiple_comparison_correction",
+                "atom_multiple_comparison_correction",
+            },
+            "feature_extraction": {"feature_extraction", "atom_ml_feature_extraction"},
+            "combat_harmonization": {"combat_harmonization", "atom_combat_harmonization"},
+        }
+        for operation, variants in expected.items():
+            spec = registry.get(operation)
+            assert spec is not None
+            assert variants <= set(spec.contract_variants)
 
     @pytest.mark.parametrize(
         "operation",

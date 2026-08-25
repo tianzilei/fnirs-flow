@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   formatApiError,
   getVersionHistory,
@@ -6,6 +6,7 @@ import {
   restoreProjectRevision,
   VersionHistoryEntry,
 } from '../api/client';
+import { useModalDialog } from '../utils/useModalDialog';
 
 interface BundleRecoveryPanelProps {
   projectId: string;
@@ -19,6 +20,12 @@ export function BundleRecoveryPanel({ projectId, onRestored }: BundleRecoveryPan
   const [pendingRevision, setPendingRevision] = useState<number | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const restoreTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeConfirmation = useCallback(() => {
+    setPendingRevision(null);
+    requestAnimationFrame(() => restoreTriggerRef.current?.focus());
+  }, []);
+  const confirmationRef = useModalDialog(pendingRevision !== null, closeConfirmation);
 
   useEffect(() => {
     loadHistory();
@@ -105,6 +112,7 @@ export function BundleRecoveryPanel({ projectId, onRestored }: BundleRecoveryPan
               </div>
               {!entry.current && pendingRevision !== entry.revision && (
                 <button
+                  ref={restoreTriggerRef}
                   className="restore-button"
                   onClick={() => {
                     setPendingRevision(entry.revision);
@@ -116,13 +124,20 @@ export function BundleRecoveryPanel({ projectId, onRestored }: BundleRecoveryPan
                 </button>
               )}
               {pendingRevision === entry.revision && (
-                <div className="restore-confirmation" role="alertdialog" aria-label={`Restore revision ${entry.revision}`}>
+                <div
+                  ref={confirmationRef}
+                  className="restore-confirmation"
+                  role="alertdialog"
+                  aria-modal="true"
+                  aria-label={`Restore revision ${entry.revision}`}
+                  tabIndex={-1}
+                >
                   <p>This restores revision {entry.revision} as a new project revision. Continue?</p>
                   <div className="restore-confirmation-actions">
                     <button className="restore-button" onClick={handleRestore} disabled={restoring}>
                       {restoring ? 'Restoring...' : 'Confirm restore'}
                     </button>
-                    <button className="ghost-button small" onClick={() => setPendingRevision(null)} disabled={restoring}>
+                    <button className="ghost-button small" onClick={closeConfirmation} disabled={restoring}>
                       Cancel
                     </button>
                   </div>

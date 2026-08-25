@@ -12,7 +12,7 @@ from typing import Any
 
 from fnirs_flow.flow.models import FlowGraph
 
-CURRENT_SCHEMA_VERSION = "0.3.0"
+CURRENT_SCHEMA_VERSION = "0.4.0"
 LEGACY_FIELD_REMOVAL_VERSION = "1.3.0"
 logger = logging.getLogger(__name__)
 

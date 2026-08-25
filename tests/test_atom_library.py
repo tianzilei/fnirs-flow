@@ -10,6 +10,7 @@ from fnirs_flow.registry.atom_templates import (
     LITERATURE_METHOD_ATOM_TEMPLATES,
     refresh_method_atom_templates,
 )
+from fnirs_flow.registry.local_atoms import discover_local_method_atom_templates
 from fnirs_flow.registry.methodatom_library import (
     load_literature_method_atom_templates,
     method_atom_library_state,
@@ -213,3 +214,142 @@ class TestLiteratureDerivedMethodAtoms:
         assert atom.backend_binding is not None
         assert atom.backend_binding.operation == "get_extinction_coefficients"
         assert atom.readiness_status == ReadinessStatus.READY
+
+    def test_bundled_method_atoms_have_complete_parameter_status_and_stable_ports(self):
+        import csv
+        import json
+
+        from fnirs_flow.registry.methodatom_library import METHOD_ATOMS_CSV
+
+        allowed_domains = {
+            "data_import",
+            "metadata",
+            "acquisition",
+            "qc",
+            "preprocessing",
+            "analysis",
+            "machine_learning",
+            "reporting",
+            "export",
+            "security",
+        }
+        with METHOD_ATOMS_CSV.open(encoding="utf-8", newline="") as stream:
+            rows = list(csv.DictReader(stream))
+        assert rows
+        for row in rows:
+            parameters = json.loads(row["parameters"])
+            statuses = json.loads(row["parameter_status"])
+            assert set(parameters) == set(statuses), row["atom_id"]
+            assert row["domain"] in allowed_domains, row["atom_id"]
+            assert row["input_port"] == "input_data", row["atom_id"]
+            assert row["output_port"] == "output_data", row["atom_id"]
+            if any(value in {"inferred", "missing"} for value in statuses.values()):
+                assert row["readiness_status"] == "needs_attention", row["atom_id"]
+
+    def test_bundled_templates_have_resolvable_nonempty_sequences(self):
+        import csv
+        import json
+
+        from fnirs_flow.registry.methodatom_library import PACKAGE_LIBRARY_DIR
+
+        def rows(name: str):
+            with (PACKAGE_LIBRARY_DIR / name).open(encoding="utf-8", newline="") as stream:
+                return list(csv.DictReader(stream))
+
+        atom_ids = {row["atom_id"] for row in rows("method_atoms.csv")}
+        slot_ids = {row["slot_id"] for row in rows("flow_slot_contracts.csv")}
+        rule_ids = {row["rule_id"] for row in rows("risk_rule_candidates.csv")}
+        requirement_ids = {row["requirement_id"] for row in rows("reporting_requirements.csv")}
+        for template in rows("templates.csv"):
+            atoms = json.loads(template["atom_sequence"])
+            slots = json.loads(template["slot_sequence"])
+            risks = json.loads(template["required_risk_rules"])
+            requirements = json.loads(template["required_reporting_requirements"])
+            assert atoms and set(atoms) <= atom_ids, template["template_id"]
+            assert slots and set(slots) <= slot_ids, template["template_id"]
+            assert len(atoms) == len(slots), template["template_id"]
+            assert risks and set(risks) <= rule_ids, template["template_id"]
+            assert requirements and set(requirements) <= requirement_ids, template["template_id"]
+
+    def test_bundled_sources_have_local_bibliographic_titles(self):
+        import csv
+
+        from fnirs_flow.registry.methodatom_library import PACKAGE_LIBRARY_DIR
+
+        with (PACKAGE_LIBRARY_DIR / "sources.csv").open(encoding="utf-8", newline="") as stream:
+            rows = list(csv.DictReader(stream))
+        assert rows
+        assert all(row["title"] and row["title"] != "Bundled extracted evidence source" for row in rows)
+
+    def test_local_python_declaration_is_static_and_quarantined(self, tmp_path):
+        path = tmp_path / "workshop_atom.py"
+        path.write_text(
+            "METHOD_ATOM = "
+            "{'template_id': 'workshop_local', 'name': 'Workshop local', "
+            "'category': 'analysis', 'atom_type': 'workshop_local', "
+            "'operation': 'workshop_local', 'ports': ["
+            "{'name': 'input', 'direction': 'in', 'schema': 'Input'}, "
+            "{'name': 'output', 'direction': 'out', 'schema': 'Output'}], "
+            "'implementation': 'workshop_impl:execute'}\n",
+            encoding="utf-8",
+        )
+        discovered = discover_local_method_atom_templates(tmp_path)
+        assert discovered.errors == []
+        assert len(discovered.templates) == 1
+        template = discovered.templates[0]
+        assert template.origin == NodeOrigin.IMPORTED
+        assert template.metadata["local_atom_file"] == str(path)
+        assert template.implementation_module == "workshop_impl"
+        assert template.implementation_callable == "execute"
+
+        library = MethodAtomLibrary()
+        library.register(template)
+        atom = library.create_atom("workshop_local", atom_id="local-1")
+        assert atom is not None
+        assert atom.metadata["local_atom_file"] == "workshop_atom.py"
+        assert atom.template_snapshot["metadata"]["local_atom_file"] == "workshop_atom.py"
+
+    def test_local_python_code_is_not_executed(self, tmp_path):
+        path = tmp_path / "unsafe_atom.py"
+        path.write_text(
+            "open('should-not-exist.txt', 'w').write('bad')\n"
+            "METHOD_ATOM = {'template_id': 'unsafe', 'name': 'Unsafe', "
+            "'category': 'analysis', 'atom_type': 'unsafe'}\n",
+            encoding="utf-8",
+        )
+        discovered = discover_local_method_atom_templates(tmp_path)
+        assert discovered.errors == []
+        assert not (tmp_path / "should-not-exist.txt").exists()
+
+    def test_local_duplicate_is_reported_by_registry(self, tmp_path):
+        (tmp_path / "one.json").write_text(
+            '{"template_id":"local_duplicate","name":"One","category":"analysis","atom_type":"one"}',
+            encoding="utf-8",
+        )
+        (tmp_path / "two.json").write_text(
+            '{"template_id":"local_duplicate","name":"Two","category":"analysis","atom_type":"two"}',
+            encoding="utf-8",
+        )
+        discovered = discover_local_method_atom_templates(tmp_path)
+        library = MethodAtomLibrary()
+        with pytest.raises(ValueError, match="Duplicate MethodAtom template id"):
+            library.register_many(discovered.templates)
+
+    def test_local_templates_are_composed_by_refresh(self, tmp_path):
+        path = tmp_path / "local.json"
+        path.write_text(
+            '{"template_id":"workshop_refresh","name":"Workshop refresh",'
+            '"category":"analysis","atom_type":"workshop_refresh",'
+            '"ports":[{"name":"in","direction":"in","schema":"Input"},'
+            '{"name":"out","direction":"out","schema":"Output"}]}',
+            encoding="utf-8",
+        )
+        state = refresh_method_atom_templates(force=True, write_state=False, local_atom_dir=str(tmp_path))
+        assert state["local_templates"] == 1
+        from fnirs_flow.registry.atom_templates import ALL_METHOD_ATOM_TEMPLATES
+
+        template = next(item for item in ALL_METHOD_ATOM_TEMPLATES if item.template_id == "workshop_refresh")
+        assert template is not None
+        assert template.origin == NodeOrigin.IMPORTED
+        # Restore the default discovery state for subsequent tests.
+        refresh_method_atom_templates(force=True, write_state=False)

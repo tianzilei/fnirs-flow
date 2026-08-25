@@ -164,10 +164,18 @@ async def trust_atom_endpoint(project_id: str, atom_id: str) -> Any:
     from fnirs_flow.api.transaction import ProjectTransaction
     from fnirs_flow.exporters.package_importer import trust_atom
 
-    with ProjectTransaction(_store(), project_id, reason="atom_trust_updated") as tx:
+    store = _store()
+    with ProjectTransaction(store, project_id, reason="atom_trust_updated") as tx:
         result = trust_atom(str(tx.output_dir), atom_id)
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
+        flow = store.get_flow(project_id)
+        if flow:
+            for atom in flow.get("flow_atoms", flow.get("nodes", [])):
+                if atom.get("id") == atom_id or atom.get("atom_id") == atom_id:
+                    atom["security_status"] = "trusted"
+                    atom.setdefault("metadata", {})["trusted_at"] = result["trusted_at"]
+            store.update_flow(project_id, flow)
         tx.commit()
     return result
 

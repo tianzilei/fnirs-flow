@@ -31,6 +31,7 @@ DOMAIN_CATEGORY_MAP: dict[str, MethodAtomCategory] = {
 }
 
 _LOADED = False
+_LOADED_LIBRARY_STATE: dict[str, Any] | None = None
 LITERATURE_METHOD_ATOM_TEMPLATES: list[MethodAtomTemplate] = []
 
 
@@ -271,13 +272,15 @@ def ensure_literature_method_atom_templates_current(
     write_state: bool = True,
 ) -> dict[str, Any]:
     """Reload bundled literature templates when their CSV inputs changed."""
-    global _LOADED, LITERATURE_METHOD_ATOM_TEMPLATES
+    global _LOADED, _LOADED_LIBRARY_STATE
 
     library_state = method_atom_library_state()
-    changed = force or not _LOADED
+    changed = force or not _LOADED or library_state != _LOADED_LIBRARY_STATE
     if changed:
-        LITERATURE_METHOD_ATOM_TEMPLATES = load_literature_method_atom_templates()
+        loaded = load_literature_method_atom_templates()
+        LITERATURE_METHOD_ATOM_TEMPLATES[:] = loaded
         _LOADED = True
+        _LOADED_LIBRARY_STATE = library_state
 
     state = {
         **library_state,

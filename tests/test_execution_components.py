@@ -1,7 +1,7 @@
 import pytest
 
 from fnirs_flow.compiler.execution_dag import ExecutionDag
-from fnirs_flow.execution.dag_payload import normalize_execution_dag_payload
+from fnirs_flow.execution.dag_payload import assert_atom_security, normalize_execution_dag_payload
 from fnirs_flow.execution.dag_scheduler import DAGScheduler, resolve_edge_dependency
 from fnirs_flow.execution.engine import RunContext
 from fnirs_flow.execution.group_executor import GroupExecutor
@@ -14,6 +14,17 @@ from fnirs_flow.execution.operations import (
     create_default_registry,
 )
 from fnirs_flow.execution.run_executor import RunExecutor
+
+
+def test_execution_dag_security_gate_blocks_quarantined_atom():
+    with pytest.raises(ValueError, match="QUARANTINED_ATOMS.*local-1"):
+        assert_atom_security(
+            {"atoms": [{"atom_id": "local-1", "security_status": "quarantined"}]}
+        )
+
+
+def test_execution_dag_security_gate_allows_trusted_atom():
+    assert_atom_security({"atoms": [{"atom_id": "local-1", "security_status": "trusted"}]})
 
 
 def test_run_executor_projects_atom_failure_into_run_summary(tmp_path):

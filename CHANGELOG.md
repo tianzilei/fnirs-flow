@@ -1,5 +1,37 @@
 # Changelog
 
+## [Unreleased] - 2026-08-25
+
+### Added
+
+- Added a generic vendor-processed Hb branch composed from eight MethodAtoms,
+  including strict manifest discovery, event ingestion, time regularization,
+  reusable design compilation, first-level solving, full contrasts, derivative
+  output, and release-acceptance evidence.
+- Added `docs/specs/vendor_processed_hb_analysis.md` and public CLI guidance for
+  the experimental processed-Hb workflow.
+- Added a case-insensitive public naming gate for filenames and UTF-8 content,
+  with regression tests and policy requirements in `PUBLIC_SYNC_SPEC.md`.
+
+### Changed
+
+- Generalized processed-Hb dataset, preset, operation, identity, and model IDs
+  so they no longer encode a particular project, intervention, condition
+  sequence, clinical indication, or analysis freeze.
+- Removed research-specific literature records and their evidence links from
+  the bundled MethodAtom library, and normalized non-portable evidence paths.
+- Rebuilt packaged WebUI assets after the identifier changes.
+
+### Validation
+
+- Development Python suite: 1,351 passed, 2 skipped.
+- Clean public Python suite: 1,340 passed, 13 skipped.
+- Ruff passed for `fnirs_flow tests scripts tools`.
+- Clean public WebUI unit tests: 25 passed; production build and locked npm
+  dependency audit passed with 0 vulnerabilities.
+- Public synchronization dry-run, English-only gate, generic naming gate, and
+  full-repository prohibited-term scan passed.
+
 ## [1.2.5] - 2026-08-23
 
 ### Changed

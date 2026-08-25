@@ -141,18 +141,17 @@ export function AppShell() {
   return (
     <div className="app shell">
       {!desktopViewport && (
-        <div className="mobile-unsupported" role="alert">
+        <div className="mobile-unsupported" role="status">
           <div>
-            <span className="mobile-unsupported-kicker">Desktop required</span>
-            <h1>Open fnirs-flow on a larger screen</h1>
+            <span className="mobile-unsupported-kicker">Compact view</span>
+            <strong>A larger screen is recommended for editing workflows.</strong>
             <p>
-              The workflow canvas, checklist, validation, and results tables require a desktop-width workspace.
+              Projects, runs, and results remain available here; some advanced canvas panels are collapsed.
             </p>
           </div>
         </div>
       )}
-      {desktopViewport && (
-        <>
+      <>
           <aside className="app-rail">
             <button className="brand-mark" onClick={() => navigate('/projects')} title="Projects">
               <FlaskConical size={20} />
@@ -269,8 +268,7 @@ export function AppShell() {
               <Outlet />
             </main>
           </section>
-        </>
-      )}
+      </>
     </div>
   );
 }

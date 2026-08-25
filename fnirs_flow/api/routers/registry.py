@@ -49,16 +49,33 @@ def _template_parameter_options(template: Any, templates: list[Any]) -> dict[str
 async def list_atom_templates() -> list[dict[str, Any]]:
     """List all available MethodAtom templates from the backend registry."""
     from fnirs_flow.execution.operations import create_default_registry
-    from fnirs_flow.registry.atom_templates import ALL_ATOM_TEMPLATES
+    from fnirs_flow.registry.atom_templates import create_method_atom_library
     from fnirs_flow.registry.node_templates import attach_common_parameter_options
 
-    attach_common_parameter_options(ALL_ATOM_TEMPLATES)
+    library = create_method_atom_library()
+    all_templates = library.all()
+    attach_common_parameter_options(all_templates)
     operation_registry = create_default_registry()
     templates: list[dict[str, Any]] = []
-    for template in ALL_ATOM_TEMPLATES:
+    for template in all_templates:
         readiness_status = getattr(template, "default_readiness_status", None)
         operation = template.operation or template.atom_type
         operation_spec = operation_registry.get(operation)
+        blueprint = library.create_atom(template.template_id, atom_id="__METHOD_ATOM_INSTANCE_ID__")
+        if blueprint is None:  # pragma: no cover - guarded by iteration over this library
+            continue
+        blueprint_data = blueprint.model_dump(mode="json", by_alias=True, exclude_none=True)
+        blueprint_data.pop("id", None)
+        blueprint_data.pop("position", None)
+        blueprint_metadata = dict(blueprint_data.get("metadata") or {})
+        blueprint_metadata.update(
+            {
+                "template_reference": template.reference,
+                "template_tags": list(template.tags),
+                "implementation_status": template.implementation_status,
+            }
+        )
+        blueprint_data["metadata"] = blueprint_metadata
         templates.append(
             {
                 "id": template.node_id,
@@ -68,7 +85,7 @@ async def list_atom_templates() -> list[dict[str, Any]]:
                 "operation": operation,
                 "description": getattr(template, "description", ""),
                 "default_config": dict(getattr(template, "default_config", {}) or {}),
-                "parameter_options": _template_parameter_options(template, ALL_ATOM_TEMPLATES),
+                "parameter_options": _template_parameter_options(template, all_templates),
                 "parameter_specs": dict(getattr(template, "parameter_specs", {}) or {}),
                 "default_readiness_status": (
                     readiness_status.value if readiness_status is not None else "not_configured"
@@ -83,6 +100,18 @@ async def list_atom_templates() -> list[dict[str, Any]]:
                     for port in getattr(template, "output_ports", [])
                 ],
                 "evidence_refs": list(getattr(template, "evidence_refs", [])),
+                "origin": template.origin.value,
+                "reference": template.reference,
+                "tags": list(template.tags),
+                "flow_atom_blueprint": blueprint_data,
+                "implementation_module": template.implementation_module,
+                "implementation_callable": template.implementation_callable,
+                "implementation_status": template.implementation_status,
+                "capability_manifest": (
+                    template.capability_manifest.model_dump(mode="json")
+                    if template.capability_manifest
+                    else None
+                ),
                 "operation_contract": (
                     {
                         "canonical_operation": operation_spec.operation_id,
@@ -99,6 +128,14 @@ async def list_atom_templates() -> list[dict[str, Any]]:
             }
         )
     return templates
+
+
+@router.get("/api/atom-registry-status")
+async def atom_registry_status() -> dict[str, Any]:
+    """Return the current built-in, literature, and local Atom composition state."""
+    from fnirs_flow.registry.atom_templates import refresh_method_atom_templates
+
+    return refresh_method_atom_templates()
 
 
 @router.get("/api/empty-marker-specs", response_model=list[EmptyMarkerSpec])

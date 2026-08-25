@@ -30,6 +30,18 @@ MAX_COMPRESSION_RATIO = 1_000
 MAX_MANIFEST_BYTES = 1024**2
 
 
+def _plan_atom_records(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return every Atom record, including compatibility category chains."""
+    records: list[dict[str, Any]] = []
+    seen_objects: set[int] = set()
+    for key in ("method_atoms", "preprocessing_atoms", "analysis_atoms", "output_atoms"):
+        for atom in plan.get(key, []):
+            if isinstance(atom, dict) and id(atom) not in seen_objects:
+                records.append(atom)
+                seen_objects.add(id(atom))
+    return records
+
+
 def _relative_data_path(value: str, old_root: Path | None = None) -> str:
     if not value:
         return ""
@@ -58,6 +70,35 @@ def _relink_manifest(manifest: dict[str, Any], data_root: Path) -> dict[str, Any
     old_root = Path(old_root_text) if old_root_text else None
     dataset_id = str(manifest.get("dataset_id") or "dataset")
     missing_paths = []
+    hash_mismatches = []
+    if manifest.get("data_branch") == "vendor_processed_hb":
+        for run in manifest.get("runs", []):
+            signal_uri = str(run.get("signal_uri", ""))
+            relative_text = _relative_data_path(signal_uri, old_root)
+            if not relative_text:
+                relative_text = Path(signal_uri).name
+            signal_path = root / relative_text
+            if not signal_path.exists() and relative_text:
+                basename_candidate = root / Path(relative_text).name
+                if basename_candidate.exists():
+                    signal_path = basename_candidate
+                    relative_text = Path(relative_text).name
+            dataset_id = str(manifest.get("dataset_id") or "vendor-processed-hb")
+            run["signal_uri"] = str(create_external_data_uri(dataset_id, relative_text))
+            run.pop("runtime_signal_path", None)
+            if not signal_path.exists():
+                missing_paths.append(str(signal_path))
+                continue
+            expected = str(run.get("input_sha256", ""))
+            actual = hashlib.sha256(signal_path.read_bytes()).hexdigest()
+            if expected and actual != expected:
+                hash_mismatches.append({
+                    "fnirs_record_id": str(run.get("fnirs_record_id", "")),
+                    "path": str(signal_path), "expected_sha256": expected, "actual_sha256": actual,
+                })
+        if hash_mismatches:
+            ids = [item["fnirs_record_id"] for item in hash_mismatches]
+            raise ValueError(f"Processed-Hb input SHA-256 mismatch for records: {ids}")
     for run in manifest.get("subject_session_runs", []):
         relative_text = str(run.get("relative_path", ""))
         if not relative_text:
@@ -98,7 +139,7 @@ def _relink_manifest(manifest: dict[str, Any], data_root: Path) -> dict[str, Any
     manifest["local_root"] = ""
     manifest["external_data_uri_prefix"] = f"external-data://{dataset_id}/"
     manifest["requires_data_binding"] = False
-    return {"data_root": str(root), "missing_paths": missing_paths}
+    return {"data_root": str(root), "missing_paths": missing_paths, "hash_mismatches": hash_mismatches}
 
 
 def _write_uri_binding(package_dir: Path, dataset_id: str, data_root: Path) -> None:
@@ -300,18 +341,50 @@ def import_package(
     plan_path = extract_dir / "plan.json"
     if plan_path.exists():
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        for atom_chain in ["preprocessing_atoms", "analysis_atoms", "output_atoms"]:
-            for atom in plan.get(atom_chain, []):
-                # Atoms with non-builtin operations are custom
-                operation = atom.get("operation", "")
-                if operation:
-                    from fnirs_flow.execution.operations import create_default_registry
+        registry = None
+        for atom in _plan_atom_records(plan):
+            # Custom/imported atoms remain quarantined even if this machine
+            # happens to register an operation with the same name.
+            operation = atom.get("operation", "")
+            trust_level = str(atom.get("execution_trust_level", ""))
+            origin = str(atom.get("origin", ""))
+            is_custom = trust_level in {"project_custom", "imported_custom"} or origin in {
+                "imported",
+                "user_created",
+            }
+            if operation and not is_custom:
+                from fnirs_flow.execution.operations import create_default_registry
 
-                    registry = create_default_registry()
-                    if not registry.has(operation):
-                        atom["security_status"] = "quarantined"
-                        import_metadata["quarantined_atoms"].append(atom.get("atom_id", operation))
+                registry = registry or create_default_registry()
+                is_custom = not registry.has(operation)
+            if is_custom:
+                atom["security_status"] = "quarantined"
+                atom_id = atom.get("atom_id", operation)
+                if atom_id not in import_metadata["quarantined_atoms"]:
+                    import_metadata["quarantined_atoms"].append(atom_id)
         plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
+        quarantined_ids = set(import_metadata["quarantined_atoms"])
+        flow_path = extract_dir / "flow.json"
+        if flow_path.exists():
+            flow = json.loads(flow_path.read_text(encoding="utf-8"))
+            for atom in flow.get("flow_atoms", flow.get("nodes", [])):
+                if str(atom.get("id") or atom.get("atom_id")) in quarantined_ids:
+                    atom["security_status"] = "quarantined"
+            flow_path.write_text(json.dumps(flow, indent=2), encoding="utf-8")
+        dag_path = extract_dir / "execution_dag.json"
+        if dag_path.exists():
+            dag = json.loads(dag_path.read_text(encoding="utf-8"))
+            for atom in dag.get("atoms", dag.get("nodes", [])):
+                if str(atom.get("atom_id") or atom.get("step_id")) in quarantined_ids:
+                    atom["security_status"] = "quarantined"
+            dag_path.write_text(json.dumps(dag, indent=2), encoding="utf-8")
+        atom_manifest_path = extract_dir / "method_atom_manifest.json"
+        if atom_manifest_path.exists():
+            atom_manifest = json.loads(atom_manifest_path.read_text(encoding="utf-8"))
+            for atom in atom_manifest.get("atoms", []):
+                if str(atom.get("atom_id")) in quarantined_ids:
+                    atom["security_status"] = "quarantined"
+            atom_manifest_path.write_text(json.dumps(atom_manifest, indent=2), encoding="utf-8")
 
     # Write import metadata
     metadata_path = outdir / "import_metadata.json"
@@ -369,10 +442,9 @@ def fork_package(
                 plan_path = fork_dir / "plan.json"
             if plan_path.exists():
                 plan = json.loads(plan_path.read_text(encoding="utf-8"))
-                for atom_chain in ["preprocessing_atoms", "analysis_atoms", "output_atoms"]:
-                    for atom in plan.get(atom_chain, []):
-                        if atom.get("atom_id") not in metadata.get("quarantined_atoms", []):
-                            atom.pop("security_status", None)
+                for atom in _plan_atom_records(plan):
+                    if atom.get("atom_id") not in metadata.get("quarantined_atoms", []):
+                        atom.pop("security_status", None)
                 plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
         else:
             metadata["forked_at"] = datetime.now(timezone.utc).isoformat()
@@ -401,26 +473,50 @@ def trust_atom(
         Dict with trust result
     """
     project_dir = Path(project_dir)
-    plan_path = project_dir / "compiled" / "plan.json"
-    if not plan_path.exists():
-        plan_path = project_dir / "plan.json"
+    compiled_dir = project_dir / "compiled"
+    if not compiled_dir.exists():
+        compiled_dir = project_dir
+    plan_path = compiled_dir / "plan.json"
 
     if not plan_path.exists():
         return {"error": "plan.json not found"}
 
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     found = False
+    trusted_at = datetime.now(timezone.utc).isoformat()
 
-    for atom_chain in ["preprocessing_atoms", "analysis_atoms", "output_atoms"]:
-        for atom in plan.get(atom_chain, []):
-            if atom.get("atom_id") == atom_id:
-                atom["security_status"] = "trusted"
-                atom["trusted_at"] = datetime.now(timezone.utc).isoformat()
-                found = True
-                break
+    for atom in _plan_atom_records(plan):
+        if atom.get("atom_id") == atom_id:
+            atom["security_status"] = "trusted"
+            atom["trusted_at"] = trusted_at
+            found = True
 
     if found:
         plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
+        flow_path = compiled_dir / "flow.json"
+        if flow_path.exists():
+            flow = json.loads(flow_path.read_text(encoding="utf-8"))
+            for atom in flow.get("flow_atoms", flow.get("nodes", [])):
+                if atom.get("id") == atom_id or atom.get("atom_id") == atom_id:
+                    atom["security_status"] = "trusted"
+                    atom.setdefault("metadata", {})["trusted_at"] = trusted_at
+            flow_path.write_text(json.dumps(flow, indent=2), encoding="utf-8")
+        dag_path = compiled_dir / "execution_dag.json"
+        if dag_path.exists():
+            dag = json.loads(dag_path.read_text(encoding="utf-8"))
+            for atom in dag.get("atoms", dag.get("nodes", [])):
+                if atom.get("atom_id") == atom_id or atom.get("step_id") == atom_id:
+                    atom["security_status"] = "trusted"
+                    atom["trusted_at"] = trusted_at
+            dag_path.write_text(json.dumps(dag, indent=2), encoding="utf-8")
+        manifest_path = compiled_dir / "method_atom_manifest.json"
+        if manifest_path.exists():
+            atom_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for atom in atom_manifest.get("atoms", []):
+                if atom.get("atom_id") == atom_id:
+                    atom["security_status"] = "trusted"
+                    atom["trusted_at"] = trusted_at
+            manifest_path.write_text(json.dumps(atom_manifest, indent=2), encoding="utf-8")
         metadata_path = project_dir / "import_metadata.json"
         if not metadata_path.exists() and project_dir.name == "compiled":
             metadata_path = project_dir.parent / "import_metadata.json"
@@ -431,11 +527,11 @@ def trust_atom(
                 {
                     "atom_id": atom_id,
                     "decision": "trusted",
-                    "trusted_at": datetime.now(timezone.utc).isoformat(),
+                    "trusted_at": trusted_at,
                 }
             )
             metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-        return {"atom_id": atom_id, "status": "trusted"}
+        return {"atom_id": atom_id, "status": "trusted", "trusted_at": trusted_at}
     else:
         return {"error": f"Atom not found: {atom_id}"}
 
@@ -501,7 +597,6 @@ def rerun_package(
     package_dir = Path(package_dir)
     outdir_path = Path(outdir) if outdir else package_dir
 
-    # Validate package structure
     plan_path = package_dir / "plan.json"
     if not plan_path.exists():
         raise FileNotFoundError(f"plan.json not found in {package_dir}")
@@ -537,6 +632,21 @@ def rerun_package(
                 f"Package has quarantined atoms: {quarantined}. "
                 "Trust them via trust_atom() or fork_package(unfork=True) before rerunning."
             )
+
+    if manifest.get("data_branch") == "vendor_processed_hb":
+        from fnirs_flow.execution.processed_hb_pipeline import run_processed_hb
+
+        processed = run_processed_hb(package_dir, outdir_path, data_root=data_root)
+        return {
+            "attempt_id": "processed-hb-rerun",
+            "total_runs": len(manifest.get("runs", [])),
+            "successful_runs": processed["successful_record_pairs"],
+            "failed_runs": processed["exclusions"],
+            "skipped_runs": 0,
+            "reports": processed["artifacts"],
+            "failure_ids": [],
+            "outdir": str(outdir_path),
+        }
 
     # Execute via ExecutionService
     service = ExecutionService()

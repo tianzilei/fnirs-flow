@@ -1,6 +1,6 @@
 # Documentation Index
 
-> Last updated: 2026-08-23
+> Last updated: 2026-08-25
 
 This page indexes the public documentation shipped with the release tree.
 Private research notes, literature worktables, generated outputs, caches, and
@@ -20,6 +20,7 @@ platform metadata are excluded from the public release.
 | `docs/specs/method_atom_parameter_ui_contract.md` | Parameter UI metadata contract |
 | `docs/specs/package_profile_spec.md` | Package profile definitions |
 | `docs/specs/mvp_task_glm_acceptance_checklist.md` | Task-GLM acceptance checklist |
+| `docs/specs/vendor_processed_hb_analysis.md` | Generic vendor-processed Hb branch and MethodAtom contract |
 
 ## Public Surface
 
@@ -27,6 +28,7 @@ platform metadata are excluded from the public release.
 - MNE-NIRS execution path with optional Cedalion-backed adapters
 - Homer3 and AnalyzIR import/export adapters
 - Package export/import/rerun with portable URI relinking
+- Generic vendor-processed Hb discovery, design, first-level, contrast, derivative, and acceptance workflow
 
 Compatibility aliases such as `FlowNode`, `NodeTemplate`, and `NodeLibrary`
 remain available only for older flows and migration code.
@@ -40,10 +42,11 @@ kept outside this code-oriented release tree.
 The repository does not include hosted CI/CD workflows. Maintainers run these
 checks locally before creating a release.
 
-The 2026-08-23 v1.2.5 public release passed 1,288 Python tests with 13 skips,
-an independently installed wheel package-content check, all 24 WebUI unit
-tests, Ruff, the development-mode WebUI build, and an npm audit with no known
-vulnerabilities.
+The 2026-08-25 development sync passed 1,351 Python tests with 2 skips, all 25
+WebUI unit tests, Ruff, the production WebUI build, the public English-only
+gate, and the generic naming gate. The clean public-tree validation result is
+1,340 Python tests passed with 13 skips; all 25 WebUI unit tests, Ruff, the
+production build, and the locked npm dependency audit also passed.
 
 The primary local reproduction commands are:
 
@@ -79,4 +82,6 @@ python cli.py export outputs/demo --outdir outputs/demo --profile reproducibilit
 python cli.py verify-package outputs/demo/package.fnirsflow.zip
 python cli.py webui
 python cli.py backends
+python cli.py validate configs/vendor_processed_hb_flow.json
+python cli.py processed-hb-acceptance outputs/processed --output outputs/processed/acceptance.json
 ```

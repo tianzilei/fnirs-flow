@@ -20,6 +20,16 @@ test('sanitizeSvg removes active content and event handlers', () => {
   assert.doesNotMatch(sanitized, /script|foreignObject|onload|onclick/i);
 });
 
+test('sanitizeSvg removes mixed-case event handlers', () => {
+  const sanitized = sanitizeSvg(
+    '<svg xmlns="http://www.w3.org/2000/svg" OnLoad="alert(1)">' +
+      '<image ONERROR=alert(2) /><text oNcLiCk="alert(3)">safe</text></svg>',
+  );
+
+  assert.match(sanitized, /<text>safe<\/text>/);
+  assert.doesNotMatch(sanitized, /onload|onerror|onclick/i);
+});
+
 test('sanitizeSvg removes unsafe url attributes', () => {
   const sanitized = sanitizeSvg(
     '<svg xmlns="http://www.w3.org/2000/svg">' +

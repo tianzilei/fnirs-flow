@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Loader2, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import {
   AIDraftFlow,
@@ -12,6 +12,7 @@ import {
   getProjectAIDraft,
   validateProjectAIDraft,
 } from '../api/client';
+import { useModalDialog } from '../utils/useModalDialog';
 
 interface AIDraftReviewPanelProps {
   projectId: string;
@@ -99,6 +100,14 @@ export function AIDraftReviewPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<'apply' | 'discard' | null>(null);
+  const applyTriggerRef = useRef<HTMLButtonElement>(null);
+  const discardTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeConfirmation = useCallback(() => {
+    const trigger = confirmAction === 'apply' ? applyTriggerRef.current : discardTriggerRef.current;
+    setConfirmAction(null);
+    requestAnimationFrame(() => trigger?.focus());
+  }, [confirmAction]);
+  const confirmationRef = useModalDialog(confirmAction !== null, closeConfirmation);
 
   useEffect(() => {
     let active = true;
@@ -433,10 +442,10 @@ export function AIDraftReviewPanel({
               )}
 
               <div className="ai-draft-actions">
-                <button className="ghost-button danger" onClick={() => setConfirmAction('discard')} disabled={working}>
+                <button ref={discardTriggerRef} className="ghost-button danger" onClick={() => setConfirmAction('discard')} disabled={working}>
                   <Trash2 size={15} />Discard
                 </button>
-                <button className="primary-button" onClick={() => setConfirmAction('apply')} disabled={!canApply}>
+                <button ref={applyTriggerRef} className="primary-button" onClick={() => setConfirmAction('apply')} disabled={!canApply}>
                   <ShieldCheck size={15} />Apply reviewed draft
                 </button>
               </div>
@@ -446,16 +455,24 @@ export function AIDraftReviewPanel({
       )}
 
       {confirmAction ? (
-        <div className="ai-review-confirmation" role="alertdialog" aria-label={confirmAction === 'apply' ? 'Apply AI draft' : 'Discard AI draft'}>
+        <div
+          ref={confirmationRef}
+          className="ai-review-confirmation"
+          role="alertdialog"
+          aria-modal="true"
+          aria-label={confirmAction === 'apply' ? 'Apply AI draft' : 'Discard AI draft'}
+          aria-describedby="ai-draft-confirmation-description"
+          tabIndex={-1}
+        >
           <strong>{confirmAction === 'apply' ? 'Replace the current flow?' : 'Discard the pending draft?'}</strong>
-          <p>{confirmAction === 'apply'
+          <p id="ai-draft-confirmation-description">{confirmAction === 'apply'
             ? 'The reviewed candidate will become the editable current flow. It will not execute automatically.'
             : 'The candidate will be removed; the current flow stays unchanged.'}</p>
           <div>
             <button className={confirmAction === 'apply' ? 'primary-button' : 'ghost-button danger'} onClick={confirmAction === 'apply' ? handleApply : handleDiscard} disabled={working}>
               {working ? 'Working…' : confirmAction === 'apply' ? 'Confirm apply' : 'Confirm discard'}
             </button>
-            <button className="ghost-button" onClick={() => setConfirmAction(null)} disabled={working}>Cancel</button>
+            <button className="ghost-button" onClick={closeConfirmation} disabled={working}>Cancel</button>
           </div>
         </div>
       ) : null}

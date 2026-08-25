@@ -53,7 +53,11 @@ export function createPackageActions(set: StoreSet, get: StoreGet) {
       set({ loading: true, error: null });
       try {
         await api.trustAtom(project.id, atomId);
-        set({ importStatus: await api.getImportStatus(project.id), loading: false });
+        const [importStatus, readiness] = await Promise.all([
+          api.getImportStatus(project.id),
+          api.getProjectStatus(project.id),
+        ]);
+        set({ importStatus, readiness, loading: false });
       } catch (error: unknown) {
         set({ error: { message: 'Trust failed', detail: api.formatApiError(error) }, loading: false });
       }

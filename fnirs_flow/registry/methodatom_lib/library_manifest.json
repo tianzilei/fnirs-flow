@@ -14,5 +14,5 @@
     "templates.csv"
   ],
   "default_promotion_policy": "Only parameter_status=project_default is executable.",
-  "bibliographic_metadata_status": "needs_attention"
+  "bibliographic_metadata_status": "locally_enriched_external_validation_pending"
 }

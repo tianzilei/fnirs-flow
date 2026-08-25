@@ -20,7 +20,7 @@ const BLOCKED_SELF_CLOSING_PATTERN = new RegExp(
   `<\\s*(${BLOCKED_ELEMENT_NAMES.join('|')})\\b[^>]*\\/\\s*>`,
   'gi',
 );
-const EVENT_HANDLER_ATTRIBUTE_PATTERN = /\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)/g;
+const EVENT_HANDLER_ATTRIBUTE_PATTERN = /\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)/gi;
 const STYLE_ATTRIBUTE_PATTERN = /\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+)/gi;
 const URL_ATTRIBUTE_PATTERN = /\s+(href|xlink:href|src)\s*=\s*("[^"]*"|'[^']*'|[^\s"'=<>`]+)/gi;
 const UNSAFE_ATTRIBUTE_VALUE_PATTERN =
@@ -58,11 +58,23 @@ export function sanitizeSvg(svg: string): string {
     return '';
   }
 
-  return trimmed
+  const fallbackSanitized = trimmed
     .replace(BLOCKED_ELEMENT_PATTERN, '')
     .replace(BLOCKED_SELF_CLOSING_PATTERN, '')
     .replace(EVENT_HANDLER_ATTRIBUTE_PATTERN, '')
     .replace(STYLE_ATTRIBUTE_PATTERN, '')
     .replace(UNSAFE_ATTRIBUTE_VALUE_PATTERN, '')
     .replace(URL_ATTRIBUTE_PATTERN, (match) => sanitizeUrlAttributes(match));
+
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+    return fallbackSanitized;
+  }
+
+  return DOMPurify.sanitize(fallbackSanitized, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    FORBID_TAGS: BLOCKED_ELEMENT_NAMES,
+    FORBID_ATTR: ['style'],
+    ALLOW_UNKNOWN_PROTOCOLS: false,
+  });
 }
+import DOMPurify from 'dompurify';

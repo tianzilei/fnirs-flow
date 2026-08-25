@@ -43,22 +43,21 @@ class TestValidationAPI:
             fatal_risks = [r for r in report.risks if r.severity == "fatal"]
             assert len(fatal_risks) == 0, f"Fatal risks: {[r.message for r in fatal_risks]}"
 
-    def test_high_risk_flow_needs_attention(self, minimal_flow_dict):
-        flow = dict(minimal_flow_dict)
-        flow["nodes"] = [dict(node, status="blocked") for node in minimal_flow_dict["nodes"]]
+    def test_high_risk_flow_needs_attention(self, minimal_flow_factory):
+        flow = minimal_flow_factory()
+        flow["nodes"] = [dict(node, status="blocked") for node in flow["nodes"]]
         report = validate_flow(flow)
         assert report.readiness is not None
         assert report.readiness.status == "Needs Attention"
 
-    def test_ai_draft_pending_confirmation_is_blocked(self, minimal_flow_dict):
-        flow = dict(minimal_flow_dict)
-        flow["metadata"] = {
+    def test_ai_draft_pending_confirmation_is_blocked(self, minimal_flow_factory):
+        flow = minimal_flow_factory(metadata={
             "ai_generation": {
                 "requires_user_confirmation": ["filter band", "contrast"],
                 "confirmed_parameters": ["filter band"],
                 "not_used_for_execution": True,
             }
-        }
+        })
 
         report = validate_flow(flow)
 
@@ -67,9 +66,8 @@ class TestValidationAPI:
         assert report.readiness is not None
         assert report.readiness.status == "Blocked"
 
-    def test_ai_draft_complete_confirmation_is_ready(self, minimal_flow_dict):
-        flow = dict(minimal_flow_dict)
-        flow["metadata"] = {
+    def test_ai_draft_complete_confirmation_is_ready(self, minimal_flow_factory):
+        flow = minimal_flow_factory(metadata={
             "ai_generation": {
                 "requires_user_confirmation": ["filter band"],
                 "confirmed_parameters": ["filter band"],
@@ -77,15 +75,14 @@ class TestValidationAPI:
                 "confirmed_at": "2026-07-13T12:00:00+08:00",
                 "not_used_for_execution": True,
             }
-        }
+        })
 
         report = validate_flow(flow)
 
         assert not report.has_fatal_risks
 
-    def test_ai_confirmation_record_incomplete_when_empty(self, minimal_flow_dict):
-        flow = dict(minimal_flow_dict)
-        flow["metadata"] = {
+    def test_ai_confirmation_record_incomplete_when_empty(self, minimal_flow_factory):
+        flow = minimal_flow_factory(metadata={
             "ai_generation": {
                 "requires_user_confirmation": ["filter band"],
                 "confirmed_parameters": ["filter band"],
@@ -93,7 +90,7 @@ class TestValidationAPI:
                 "confirmed_at": "",
                 "not_used_for_execution": True,
             }
-        }
+        })
 
         report = validate_flow(flow)
 
@@ -102,15 +99,14 @@ class TestValidationAPI:
         assert report.readiness is not None
         assert report.readiness.status == "Blocked"
 
-    def test_ai_not_used_for_execution_flag_recorded(self, minimal_flow_dict):
-        flow = dict(minimal_flow_dict)
-        flow["metadata"] = {
+    def test_ai_not_used_for_execution_flag_recorded(self, minimal_flow_factory):
+        flow = minimal_flow_factory(metadata={
             "ai_generation": {
                 "requires_user_confirmation": [],
                 "confirmed_parameters": [],
                 "not_used_for_execution": False,
             }
-        }
+        })
 
         report = validate_flow(flow)
         # not_used_for_execution=False does not block by itself,

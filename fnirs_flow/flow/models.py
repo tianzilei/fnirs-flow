@@ -110,6 +110,18 @@ class FlowMetadata(BaseModel):
     checklist: dict[str, Any] = Field(default_factory=dict)
 
 
+class DataSemantics(BaseModel):
+    branch: str = "raw_intensity_or_snirf"
+    signal_level: str = "raw_intensity_or_snirf"
+    absolute_unit_verified: bool = False
+
+
+class SolverContract(BaseModel):
+    requested: str = "ols"
+    fallback_policy: str = "forbid"
+    confirmatory: bool = False
+
+
 class FlowGraph(BaseModel):
     schema_version: str = "0.1.0"
     flow_id: str = ""
@@ -119,6 +131,9 @@ class FlowGraph(BaseModel):
     edges: list[FlowEdge] = Field(default_factory=list)
     adapter_registry: list[AdapterDefinition] = Field(default_factory=list)
     metadata: FlowMetadata = Field(default_factory=FlowMetadata)
+    data_semantics: DataSemantics = Field(default_factory=DataSemantics)
+    solver: SolverContract = Field(default_factory=SolverContract)
+    processed_hb: dict[str, Any] = Field(default_factory=dict)
     @property
     def nodes(self) -> list[FlowAtom]:
         """Deprecated read-only alias for source compatibility."""

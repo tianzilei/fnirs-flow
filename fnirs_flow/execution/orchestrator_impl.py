@@ -123,6 +123,9 @@ class ExecutionService:
         # Load plan and DAG
         plan = self._load_plan(compiled_dir)
         dag = self._load_dag(compiled_dir)
+        from fnirs_flow.execution.dag_payload import assert_atom_security
+
+        assert_atom_security(dag)
         plan_data = plan.get("plan", plan) if "plan" in plan else plan
 
         # Resolve data runs

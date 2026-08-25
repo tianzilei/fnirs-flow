@@ -45,6 +45,34 @@ const DATA_STEPS = [
 
 type DataStep = typeof DATA_STEPS[number]['id'];
 
+interface ProcessedHbRecordPreview {
+  fnirs_record_id?: string;
+  record_pair_id?: string;
+  discovery_status?: string;
+  reason_code?: string;
+  eligible?: boolean;
+  declared_channel_count?: number | null;
+  expected_series_fits?: number | null;
+}
+
+interface ProcessedHbPreview {
+  counts?: { total?: number; eligible?: number; missing?: number };
+  records?: ProcessedHbRecordPreview[];
+  estimands?: Record<string, { eligible_record_pairs?: number }>;
+}
+
+interface ProcessedHbDecisionRow {
+  fnirs_record_id?: string;
+  stage?: string;
+  scope_type?: string;
+  scope_id?: string;
+  status?: string;
+  reason_code?: string;
+  observed_value?: string;
+  threshold?: string;
+  policy_id?: string;
+}
+
 function normalizeRelativePathInput(value: string): string | null {
   const raw = value.trim();
   if (!raw) return '';
@@ -101,6 +129,9 @@ export function DataWorkspace() {
   const [loading, setLoading] = useState(false);
   const [metadataLoading, setMetadataLoading] = useState(false);
   const [error, setError] = useState('');
+  const [processedRecordFilter, setProcessedRecordFilter] = useState<'all' | 'eligible' | 'missing' | 'excluded'>('all');
+  const [processedDecisions, setProcessedDecisions] = useState<ProcessedHbDecisionRow[]>([]);
+  const [processedDecisionFilter, setProcessedDecisionFilter] = useState<'all' | 'pass' | 'warn' | 'fail'>('all');
   const previewColumns = participantTableResult
     ? participantTableResult.columns.slice(0, PREVIEW_COLUMN_LIMIT).map((column) => column.name)
     : [];
@@ -110,6 +141,33 @@ export function DataWorkspace() {
     return value !== null && value !== undefined && value !== '';
   });
   const joinPreview = participantTableResult?.validation_report.join_preview;
+  const flow = useStore((state) => state.flow);
+  const processedHb = (((flow.data_semantics as Record<string, unknown>) || {}).branch === 'vendor_processed_hb');
+  const processedPreview = (discoverResult as unknown as { processed_hb?: ProcessedHbPreview } | null)?.processed_hb;
+  const processedRecords = (processedPreview?.records || []).filter((record) => {
+    if (processedRecordFilter === 'eligible') return record.eligible === true;
+    if (processedRecordFilter === 'missing') return record.discovery_status === 'missing';
+    if (processedRecordFilter === 'excluded') return record.eligible !== true && record.discovery_status !== 'missing';
+    return true;
+  });
+  const displayedDecisions = processedDecisions.filter((row) => (
+    processedDecisionFilter === 'all' || row.status === processedDecisionFilter
+  ));
+
+  useEffect(() => {
+    if (!processedHb || !project?.id) return;
+    let active = true;
+    import('../api/client').then(({ getProjectResults }) => getProjectResults(project.id, 'qc')).then((result) => {
+      if (!active) return;
+      const decisions = result.files
+        .filter((file) => file.path.endsWith('exclusion_manifest.csv'))
+        .flatMap((file) => Array.isArray(file.data) ? file.data as ProcessedHbDecisionRow[] : []);
+      setProcessedDecisions(decisions);
+    }).catch(() => {
+      if (active) setProcessedDecisions([]);
+    });
+    return () => { active = false; };
+  }, [processedHb, project?.id, discoverResult]);
 
   useEffect(() => {
     if (participantTableResult) setActiveStep('join');
@@ -267,6 +325,79 @@ export function DataWorkspace() {
       </div>
 
       {error && <div className="error-message">{error}</div>}
+
+      {processedHb && (
+        <section className="notice-panel warning processed-hb-preview">
+          <div>
+            <strong>Vendor-processed Hb manifest join</strong>
+            <span>Identity comes only from frozen fnirs_record_id joins. Decisions remain row-specific; there is no allow-all action.</span>
+            {processedPreview && (
+              <div className="processed-hb-details">
+                <div className="metrics-grid compact-metrics">
+                  <ProcessedMetric label="Frozen total" value={processedPreview.counts?.total} />
+                  <ProcessedMetric label="Eligible" value={processedPreview.counts?.eligible} />
+                  <ProcessedMetric label="Missing" value={processedPreview.counts?.missing} />
+                  <ProcessedMetric
+                    label="Frozen excluded"
+                    value={(processedPreview.counts?.total || 0) - (processedPreview.counts?.eligible || 0) - (processedPreview.counts?.missing || 0)}
+                  />
+                </div>
+                <div className="metadata-table-scroll">
+                  <table className="artifacts-table">
+                    <thead><tr><th>Estimand</th><th>Eligible record pairs</th></tr></thead>
+                    <tbody>{Object.entries(processedPreview.estimands || {}).map(([model, count]) => (
+                      <tr key={model}><td>{model}</td><td>{count.eligible_record_pairs ?? 0}</td></tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+                <div className="processed-hb-filter-row">
+                  <label htmlFor="processed-record-filter">Record status</label>
+                  <select id="processed-record-filter" value={processedRecordFilter} onChange={(event) => setProcessedRecordFilter(event.target.value as typeof processedRecordFilter)}>
+                    <option value="all">All</option><option value="eligible">Eligible</option>
+                    <option value="missing">Missing</option><option value="excluded">Frozen excluded</option>
+                  </select>
+                </div>
+                <div className="metadata-table-scroll">
+                  <table className="artifacts-table">
+                    <thead><tr><th>Record</th><th>Pair</th><th>Discovery</th><th>Eligible</th><th>Reason</th><th>Channels</th><th>Expected fits</th></tr></thead>
+                    <tbody>{processedRecords.map((record) => (
+                      <tr key={record.fnirs_record_id}>
+                        <td>{record.fnirs_record_id || '-'}</td><td>{record.record_pair_id || '-'}</td>
+                        <td>{record.discovery_status || '-'}</td><td>{record.eligible ? 'yes' : 'no'}</td>
+                        <td>{record.reason_code || '-'}</td><td>{record.declared_channel_count ?? '-'}</td>
+                        <td>{record.expected_series_fits ?? '-'}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+                {processedDecisions.length > 0 && (
+                  <>
+                    <div className="processed-hb-filter-row">
+                      <label htmlFor="processed-decision-filter">Header / QC decisions</label>
+                      <select id="processed-decision-filter" value={processedDecisionFilter} onChange={(event) => setProcessedDecisionFilter(event.target.value as typeof processedDecisionFilter)}>
+                        <option value="all">All</option><option value="pass">Pass</option>
+                        <option value="warn">Warn</option><option value="fail">Fail</option>
+                      </select>
+                    </div>
+                    <div className="metadata-table-scroll">
+                      <table className="artifacts-table">
+                        <thead><tr><th>Record</th><th>Stage / scope</th><th>Status</th><th>Reason</th><th>Observed / threshold</th><th>Policy</th></tr></thead>
+                        <tbody>{displayedDecisions.map((row, index) => (
+                          <tr key={`${row.fnirs_record_id}-${row.stage}-${row.scope_id}-${row.reason_code}-${index}`}>
+                            <td>{row.fnirs_record_id || '-'}</td><td>{[row.stage, row.scope_type, row.scope_id].filter(Boolean).join(' / ')}</td>
+                            <td>{row.status || '-'}</td><td>{row.reason_code || '-'}</td>
+                            <td>{row.observed_value || '-'} / {row.threshold || '-'}</td><td>{row.policy_id || '-'}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {activeStep === 'dataset' && (
         <section className="workflow-panel">
@@ -612,6 +743,15 @@ export function DataWorkspace() {
           </button>
         </section>
       )}
+    </div>
+  );
+}
+
+function ProcessedMetric({ label, value }: { label: string; value?: number }) {
+  return (
+    <div className="metric">
+      <span className="metric-value">{value ?? 0}</span>
+      <span className="metric-label">{label}</span>
     </div>
   );
 }

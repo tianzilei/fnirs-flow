@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import {
   Boxes, CheckCircle2, FileJson, FlaskConical,
   BarChart3, Copy, XCircle
@@ -14,12 +14,25 @@ interface LocatedArtifact extends ArtifactSummary {
   run_id?: string;
 }
 
+const RESULT_TABS = [
+  { id: 'artifacts', label: 'Artifacts', icon: FileJson },
+  { id: 'qc', label: 'QC Results', icon: BarChart3 },
+  { id: 'channel', label: 'Channel', icon: BarChart3 },
+  { id: 'roi', label: 'ROI', icon: BarChart3 },
+  { id: 'group', label: 'Group', icon: BarChart3 },
+] as const;
+
+type ResultTab = typeof RESULT_TABS[number]['id'];
+
 export function ResultsWorkspace() {
   const runs = useStore(selectRuns);
   const executeInfo = useStore(selectExecuteInfo);
   const project = useStore(selectProject);
   const importStatus = useStore(selectImportStatus);
-  const [selectedTab, setSelectedTab] = useState<'artifacts' | 'qc' | 'channel' | 'roi' | 'group'>('artifacts');
+  const flow = useStore((state) => state.flow);
+  const processedHb = (((flow.data_semantics as Record<string, unknown>) || {}).branch === 'vendor_processed_hb');
+  const [selectedTab, setSelectedTab] = useState<ResultTab>('artifacts');
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [backendResults, setBackendResults] = useState<ProjectResults | null>(null);
   const [resultsLoading, setResultsLoading] = useState(false);
@@ -73,6 +86,19 @@ export function ResultsWorkspace() {
     setTimeout(() => setCopiedPath(null), 2000);
   };
 
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % RESULT_TABS.length;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + RESULT_TABS.length) % RESULT_TABS.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = RESULT_TABS.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = RESULT_TABS[nextIndex].id;
+    setSelectedTab(nextTab);
+    tabRefs.current[nextIndex]?.focus();
+  };
+
   return (
     <div className="page results-workspace work-page">
       <section className="page-header">
@@ -120,40 +146,36 @@ export function ResultsWorkspace() {
 
       {project && (
           <section className="results-tabs">
-            <div className="tab-bar">
-              <button
-                className={`tab ${selectedTab === 'artifacts' ? 'active' : ''}`}
-                onClick={() => setSelectedTab('artifacts')}
-              >
-                <FileJson size={14} /> Artifacts
-              </button>
-              <button
-                className={`tab ${selectedTab === 'qc' ? 'active' : ''}`}
-                onClick={() => setSelectedTab('qc')}
-              >
-                <BarChart3 size={14} /> QC Results
-              </button>
-              <button
-                className={`tab ${selectedTab === 'channel' ? 'active' : ''}`}
-                onClick={() => setSelectedTab('channel')}
-              >
-                <BarChart3 size={14} /> Channel
-              </button>
-              <button
-                className={`tab ${selectedTab === 'roi' ? 'active' : ''}`}
-                onClick={() => setSelectedTab('roi')}
-              >
-                <BarChart3 size={14} /> ROI
-              </button>
-              <button
-                className={`tab ${selectedTab === 'group' ? 'active' : ''}`}
-                onClick={() => setSelectedTab('group')}
-              >
-                <BarChart3 size={14} /> Group
-              </button>
+            <div className="tab-bar" role="tablist" aria-label="Result views">
+              {RESULT_TABS.map((tab, index) => {
+                const Icon = tab.icon;
+                const selected = selectedTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    ref={(element) => { tabRefs.current[index] = element; }}
+                    id={`results-tab-${tab.id}`}
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={`results-panel-${tab.id}`}
+                    tabIndex={selected ? 0 : -1}
+                    className={`tab ${selected ? 'active' : ''}`}
+                    onClick={() => setSelectedTab(tab.id)}
+                    onKeyDown={(event) => handleTabKeyDown(event, index)}
+                  >
+                    <Icon size={14} aria-hidden="true" /> {tab.label}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="tab-content">
+            <div
+              className="tab-content"
+              id={`results-panel-${selectedTab}`}
+              role="tabpanel"
+              aria-labelledby={`results-tab-${selectedTab}`}
+              tabIndex={0}
+            >
               {selectedTab === 'artifacts' && (
                 <div className="artifacts-panel">
                   <div className="results-section-heading">
@@ -284,7 +306,9 @@ export function ResultsWorkspace() {
               )}
 
               {selectedTab === 'roi' && (
-                <ResultDataPanel title="ROI Results" result={backendResults} loading={resultsLoading} error={resultsError} />
+                processedHb
+                  ? <div className="empty-state compact"><p>ROI unavailable: no versioned, hashed channel-to-ROI mapping is bound. No MNI atlas was selected automatically.</p></div>
+                  : <ResultDataPanel title="ROI Results" result={backendResults} loading={resultsLoading} error={resultsError} />
               )}
 
               {selectedTab === 'group' && (

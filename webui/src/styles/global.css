@@ -9,7 +9,7 @@
   --surface: #ffffff;
   --surface-subtle: #f8fafc;
   --text: #111827;
-  --text-secondary: #64748b;
+  --text-secondary: #526174;
   --muted: #94a3b8;
   --border: #dbe3ee;
   --border-strong: #cbd5e1;
@@ -43,6 +43,11 @@ textarea {
 
 button {
   border-radius: 6px;
+}
+
+:where(button, a, input, select, textarea, [role="button"], [role="tab"], [tabindex]):focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .app.shell {
@@ -2387,6 +2392,31 @@ pre {
   font-size: 0.82rem;
 }
 
+.processed-hb-details {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  min-width: 0;
+}
+
+.processed-hb-details .compact-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.processed-hb-filter-row {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.processed-hb-filter-row select {
+  min-width: 10rem;
+}
+
+.processed-qc-table {
+  min-width: 980px;
+}
+
 .quarantine-actions {
   flex: 0 0 auto !important;
   flex-direction: row !important;
@@ -4241,27 +4271,24 @@ pre {
   }
 
   .app.shell {
-    display: block;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
     background: var(--bg);
   }
 
   .mobile-unsupported {
-    display: grid;
-    place-items: center;
-    width: 100vw;
-    height: 100dvh;
-    min-height: 100vh;
-    padding: 24px;
-    background:
-      linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(238, 242, 247, 0.98)),
-      var(--bg);
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 20;
+    display: block;
+    width: min(360px, calc(100vw - 68px));
   }
 
   .mobile-unsupported > div {
     display: grid;
-    gap: 10px;
-    max-width: 420px;
-    padding: 20px;
+    gap: 5px;
+    padding: 12px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--surface);
@@ -4276,9 +4303,9 @@ pre {
     text-transform: uppercase;
   }
 
-  .mobile-unsupported h1 {
+  .mobile-unsupported strong {
     color: var(--text);
-    font-size: 1.22rem;
+    font-size: 0.86rem;
     line-height: 1.2;
   }
 
@@ -4288,9 +4315,40 @@ pre {
     line-height: 1.45;
   }
 
-  .app-rail,
-  .app-workbench {
+  .app-rail {
+    padding-inline: 3px;
+  }
+
+  .brand-mark,
+  .rail-nav button {
+    width: 36px;
+  }
+
+  .flow-toolbar {
+    padding-inline: 12px;
+  }
+
+  .app-main {
+    padding: 12px;
+  }
+
+  .canvas-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .canvas-sidebar {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

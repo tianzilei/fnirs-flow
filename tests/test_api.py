@@ -597,6 +597,25 @@ def test_project_status_survives_store_reload_and_requires_real_data(tmp_path):
     assert ready["runnable_runs"] == 1
 
 
+def test_project_status_reads_quarantine_from_compiled_dag():
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    pid = client.post("/api/projects", json={"name": "Local Atom status"}).json()["id"]
+    flow = json.loads((Path(__file__).parent.parent / "configs" / "demo_task_flow.json").read_text())
+    client.put(f"/api/projects/{pid}/flow", json={"flow": flow})
+    assert client.post(f"/api/projects/{pid}/compile").status_code == 200
+
+    compiled = app.state.store_provider().get_output_dir(pid) / "compiled"
+    dag_path = compiled / "execution_dag.json"
+    dag = json.loads(dag_path.read_text(encoding="utf-8"))
+    dag["atoms"][0]["security_status"] = "quarantined"
+    dag_path.write_text(json.dumps(dag), encoding="utf-8")
+
+    status = client.get(f"/api/projects/{pid}/status").json()
+    assert status["quarantined_atoms"] == [dag["atoms"][0]["atom_id"]]
+
+
 def test_flow_edit_invalidates_compiled_actions():
     from fastapi.testclient import TestClient
 
@@ -821,6 +840,17 @@ def test_atom_templates():
     assert bandpass["operation_contract"]["execution_scope"] == "run"
     bids_import = next(template for template in templates if template["id"] == "bids_import")
     assert bids_import["parameter_specs"]["bids_dir"]["control"] == "path"
+
+
+def test_atom_registry_status_exposes_local_composition_state():
+    from fastapi.testclient import TestClient
+
+    response = TestClient(app).get("/api/atom-registry-status")
+    assert response.status_code == 200
+    state = response.json()
+    assert state["total_templates"] >= state["handwritten_templates"]
+    assert "local_atoms_dir" in state
+    assert "local_errors" in state
 
 
 def test_empty_marker_specs():
