@@ -142,6 +142,18 @@ EXCLUDED_SUFFIXES = (
     ".swo",
 )
 
+# Study-bound analysis code can coexist in the development repository, but it
+# must not leak into the generic public package. Keep these paths explicit so
+# the public sync remains fail-closed instead of weakening the naming gate.
+PRIVATE_PUBLIC_REL_PATHS = (
+    "docs/processed_hb_analysis.md",
+    "fnirs_flow/processed_hb",
+    "tests/test_processed_hb.py",
+    # The development repository tests its hosted CI workflow. The public
+    # repository owns and preserves its own .github policy instead.
+    "tests/test_release_governance.py",
+)
+
 # The public repository owns these paths. A clean sync must preserve them
 # instead of replacing release-specific Git attributes or CI configuration.
 PRESERVED_TARGET_NAMES = {
@@ -232,6 +244,11 @@ def is_forbidden_public_rel(rel: Path) -> bool:
     return any(normalized == blocked or normalized.startswith(f"{blocked}/") for blocked in FORBIDDEN_PUBLIC_PATHS)
 
 
+def is_private_public_rel(rel: Path) -> bool:
+    normalized = rel.as_posix()
+    return any(normalized == blocked or normalized.startswith(f"{blocked}/") for blocked in PRIVATE_PUBLIC_REL_PATHS)
+
+
 def rel_to_target(path: Path, target: Path) -> Path:
     try:
         return path.relative_to(target)
@@ -262,6 +279,8 @@ def iter_files(root: Path, rel_dir: str) -> list[Path]:
             continue
         repo_rel = path.relative_to(root)
         if is_forbidden_public_rel(repo_rel):
+            continue
+        if is_private_public_rel(repo_rel):
             continue
         if any(is_excluded(part) for part in path.relative_to(base).parents):
             continue

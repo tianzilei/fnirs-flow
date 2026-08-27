@@ -1,9 +1,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 from scipy import stats
+
+from fnirs_flow.analysis.numerics import finite_pinv
+
+
+def _matrix_vector(matrix: np.ndarray, vector: np.ndarray) -> np.ndarray:
+    """Multiply finite operands without unsupported-BLAS warning noise.
+
+    NumPy 1.26 on Python 3.13 can emit spurious ``matmul`` floating-point
+    warnings for finite operands. ``einsum`` performs the same contraction
+    while explicit finite checks preserve fail-closed numerical behavior.
+    """
+    if not np.isfinite(matrix).all() or not np.isfinite(vector).all():
+        raise ValueError("matrix-vector operands must be finite")
+    result = np.einsum("ij,j->i", matrix, vector, optimize=True)
+    if not np.isfinite(result).all():
+        raise ValueError("matrix-vector result must be finite")
+    return cast(np.ndarray, result)
 
 
 @dataclass(frozen=True)
@@ -28,7 +46,7 @@ def _weighted_fit(y: np.ndarray, x: np.ndarray, weights: np.ndarray, rcond: floa
     sw = np.sqrt(weights)
     xw, yw = x * sw[:, None], y * sw
     beta = np.linalg.lstsq(xw, yw, rcond=rcond)[0]
-    return beta, y - x @ beta
+    return beta, y - _matrix_vector(x, beta)
 
 
 def _prais_winsten(x: np.ndarray, y: np.ndarray, rho: float, keep_first: bool):
@@ -40,10 +58,11 @@ def _prais_winsten(x: np.ndarray, y: np.ndarray, rho: float, keep_first: bool):
 
 
 def _estimate_rho(residuals: np.ndarray, bound: float) -> float:
-    denominator = float(residuals[:-1] @ residuals[:-1])
+    denominator = float(np.einsum("i,i->", residuals[:-1], residuals[:-1], optimize=True))
     if denominator <= 0 or not np.isfinite(denominator):
         return 0.0
-    rho = float(residuals[1:] @ residuals[:-1] / denominator)
+    numerator = float(np.einsum("i,i->", residuals[1:], residuals[:-1], optimize=True))
+    rho = numerator / denominator
     if not np.isfinite(rho):
         raise ValueError("AR_RHO_NONFINITE")
     return float(np.clip(rho, -bound, bound))
@@ -54,7 +73,7 @@ def _huber_weights(residuals: np.ndarray, c: float) -> tuple[np.ndarray, float]:
     if not np.isfinite(scale) or scale <= np.finfo(float).eps:
         scale = float(np.sqrt(np.mean(residuals**2)))
     if not np.isfinite(scale) or scale <= np.finfo(float).eps:
-        return np.ones(len(residuals)), max(scale, np.finfo(float).eps)
+        return np.ones(len(residuals)), max(scale, float(np.finfo(float).eps))
     standardized = np.abs(residuals) / scale
     weights = np.ones(len(residuals))
     mask = standardized > c
@@ -65,11 +84,14 @@ def _huber_weights(residuals: np.ndarray, c: float) -> tuple[np.ndarray, float]:
 def _covariance(x, residuals, weights, df, method, rcond):
     sw = np.sqrt(weights)
     xw, ew = x * sw[:, None], residuals * sw
-    bread = np.linalg.pinv(xw.T @ xw, rcond=rcond or 1e-15)
+    gram = np.einsum("ni,nj->ij", xw, xw, optimize=True)
+    bread = finite_pinv(gram, rcond=rcond or 1e-15)
     if method.casefold() in {"hc0_sandwich", "sandwich_hc0"}:
         score = xw * ew[:, None]
-        return bread @ (score.T @ score) @ bread
-    return float(ew @ ew) / df * bread
+        score_gram = np.einsum("ni,nj->ij", score, score, optimize=True)
+        return np.einsum("ij,jk,kl->il", bread, score_gram, bread, optimize=True)
+    residual_sum_squares = float(np.einsum("i,i->", ew, ew, optimize=True))
+    return residual_sum_squares / df * bread
 
 
 def _check_covariance(covariance: np.ndarray, config: SolverConfig) -> None:
@@ -98,7 +120,7 @@ def fit_first_level(
 ) -> dict[str, object]:
     y, x = np.asarray(y, float), np.asarray(x, float)
     config = solver_config or SolverConfig()
-    overrides = {}
+    overrides: dict[str, int | float] = {}
     if max_iter is not None:
         overrides["irls_max_iterations"] = max_iter
     if huber_c is not None:
@@ -125,7 +147,7 @@ def fit_first_level(
     if requested.startswith("ar1"):
         ar_converged, previous_beta = False, beta
         for ar_iterations in range(1, config.ar_max_iterations + 1):
-            new_rho = _estimate_rho(y - x @ previous_beta, config.rho_bound)
+            new_rho = _estimate_rho(y - _matrix_vector(x, previous_beta), config.rho_bound)
             fit_x, fit_y = _prais_winsten(x, y, new_rho, config.prais_winsten_first_row)
             beta, _ = _weighted_fit(fit_y, fit_x, np.ones(len(fit_y)), config.rank_rcond)
             if (
@@ -143,7 +165,9 @@ def fit_first_level(
     if requested == "ar1_irls":
         irls_converged = False
         for irls_iterations in range(1, config.irls_max_iterations + 1):
-            new_weights, robust_scale = _huber_weights(fit_y - fit_x @ beta, config.huber_c)
+            new_weights, robust_scale = _huber_weights(
+                fit_y - _matrix_vector(fit_x, beta), config.huber_c
+            )
             if float(np.sum(new_weights >= config.minimum_effective_weight)) <= rank:
                 raise ValueError("INSUFFICIENT_EFFECTIVE_WEIGHT")
             beta_new, _ = _weighted_fit(fit_y, fit_x, new_weights, config.rank_rcond)
@@ -156,7 +180,8 @@ def fit_first_level(
         if not irls_converged:
             raise ValueError("IRLS_NOT_CONVERGED")
 
-    residuals, fit_residuals = y - x @ beta, fit_y - fit_x @ beta
+    residuals = y - _matrix_vector(x, beta)
+    fit_residuals = fit_y - _matrix_vector(fit_x, beta)
     fit_rank = int(np.linalg.matrix_rank(fit_x * np.sqrt(weights)[:, None], tol=config.rank_rcond))
     df = int(np.sum(weights >= config.minimum_effective_weight)) - fit_rank
     if df <= 0:

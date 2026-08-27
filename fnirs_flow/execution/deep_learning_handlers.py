@@ -88,7 +88,7 @@ def _execute(operation: str, context: OperationContext) -> dict[str, Any]:
         )
         width = hidden * (2 if "bidirectional" in operation else 1)
 
-        class Model(nn.Module):
+        class RecurrentClassifier(nn.Module):
             def __init__(self):
                 super().__init__()
                 self.rnn = recurrent
@@ -98,21 +98,21 @@ def _execute(operation: str, context: OperationContext) -> dict[str, Any]:
                 out, _ = self.rnn(x.transpose(1, 2))
                 return self.fc(out[:, -1])
 
-        model = Model()
+        model: Any = RecurrentClassifier()
     elif "transformer" in operation:
         heads = int(p.get("n_heads", 1))
-        encoder = nn.TransformerEncoderLayer(channels, heads, hidden, batch_first=True)
+        transformer_encoder = nn.TransformerEncoderLayer(channels, heads, hidden, batch_first=True)
 
-        class Model(nn.Module):
+        class TransformerClassifier(nn.Module):
             def __init__(self):
                 super().__init__()
-                self.enc = encoder
+                self.enc = transformer_encoder
                 self.fc = nn.Linear(channels, classes)
 
             def forward(self, x):
                 return self.fc(self.enc(x.transpose(1, 2)).mean(1))
 
-        model = Model()
+        model = TransformerClassifier()
     else:
         model = nn.Sequential(
             nn.Conv1d(channels, hidden, kernel_size=3, padding=1),

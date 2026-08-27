@@ -108,6 +108,12 @@ class TestConfigManager:
         config = manager.get_acquisition_config(device="nirx_nirscout")
         assert isinstance(config, AcquisitionConfig)
 
+    def test_shimadzu_unknown_geometry_is_not_defaulted(self) -> None:
+        manager = ConfigManager()
+        config = manager.get_acquisition_config(device="shimadzu_omm")
+        assert config.source_detector_distance_mm is None
+        assert config.short_channel_distance_mm is None
+
     def test_get_preprocessing_config_task(self) -> None:
         """Test getting preprocessing configuration for task scenario."""
         manager = ConfigManager()

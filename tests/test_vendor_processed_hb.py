@@ -6,7 +6,16 @@ import pytest
 from fnirs_flow.adapters.vendor_processed_hb import ProcessedHbParseError, parse_vendor_processed_hb
 
 
-def _write(path, timestamps=(0, 1, 2, 3), *, channels=1, points=4, end_time=None, include_hbt=True):
+def _write(
+    path,
+    timestamps=(0, 1, 2, 3),
+    *,
+    channels=1,
+    points=4,
+    end_time=None,
+    include_hbt=True,
+    condition_block="",
+):
     fields = ["Time(sec)", "Task", "Mark", "Count"]
     for channel in range(1, channels + 1):
         fields.extend([f"CH{channel} oxyHb", f"CH{channel} deoxyHb"])
@@ -25,7 +34,7 @@ def _write(path, timestamps=(0, 1, 2, 3), *, channels=1, points=4, end_time=None
     if end_time is not None:
         header += f"End Time(sec)={end_time}\n"
     path.write_text(
-        header + "\t".join(fields) + "\n"
+        header + condition_block + "\t".join(fields) + "\n"
         + "\n".join(rows)
         + "\n",
         encoding="utf-8",
@@ -129,4 +138,58 @@ def test_multiple_time_headers_fail_as_ambiguous(tmp_path):
     text = path.read_text(encoding="utf-8")
     path.write_text("Time(sec)\tOther\n" + text, encoding="utf-8")
     with pytest.raises(ProcessedHbParseError, match="unique Time"):
+        parse_vendor_processed_hb(path)
+
+
+def test_gain_only_condition_is_not_mislabeled_as_voltage(tmp_path):
+    path = tmp_path / "gain_RE.TXT"
+    _write(
+        path,
+        condition_block=(
+            "[Condition-1]\n"
+            "Gain(X1,X4,X16,X64)\n"
+            "R1,R2,R3\n"
+            "1,4,16\n"
+        ),
+    )
+    recording, _qc = parse_vendor_processed_hb(path)
+    metadata = recording.header.sections["Parsed Condition Metadata"]
+    assert metadata == {"Amp. Gain": "1,4,16"}
+
+
+def test_voltage_and_gain_conditions_remain_separate(tmp_path):
+    path = tmp_path / "conditions_RE.TXT"
+    _write(
+        path,
+        condition_block=(
+            "[Condition-1]\n"
+            "R1,R2,R3\n"
+            "606,596,1000\n"
+            "Gain(X1,X4,X16,X64)\n"
+            "R1,R2,R3\n"
+            "1,4,16\n"
+        ),
+    )
+    recording, _qc = parse_vendor_processed_hb(path)
+    metadata = recording.header.sections["Parsed Condition Metadata"]
+    assert metadata == {"Applied Voltage": "606.0,596.0,1000.0", "Amp. Gain": "1,4,16"}
+
+
+def test_condition_count_mismatch_fails_closed(tmp_path):
+    path = tmp_path / "bad_condition_RE.TXT"
+    _write(path, condition_block="[Condition-1]\nR1,R2,R3\n606,596,1000,638\n")
+    with pytest.raises(ProcessedHbParseError, match="count does not match"):
+        parse_vendor_processed_hb(path)
+
+
+def test_conflicting_repeated_condition_rows_fail_closed(tmp_path):
+    path = tmp_path / "ambiguous_condition_RE.TXT"
+    _write(
+        path,
+        condition_block=(
+            "[Condition-1]\nR1,R2,R3\n606,596,1000\n"
+            "[Condition-2]\nR1,R2,R3\n600,590,990\n"
+        ),
+    )
+    with pytest.raises(ProcessedHbParseError, match="ambiguous repeated Shimadzu voltage"):
         parse_vendor_processed_hb(path)

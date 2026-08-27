@@ -11,7 +11,7 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -27,6 +27,7 @@ from fnirs_flow.analysis.design_models import (
     compile_post_event_fir,
 )
 from fnirs_flow.analysis.first_level_solvers import SolverConfig, fit_first_level
+from fnirs_flow.analysis.numerics import finite_pinv
 from fnirs_flow.data.frozen_events import ingest_frozen_events
 from fnirs_flow.data.processed_hb_models import DataManifest
 from fnirs_flow.execution.processed_hb_outputs import (
@@ -88,9 +89,9 @@ def _load_preset(compiled_dir: Path) -> dict[str, Any]:
     ]
     for path in candidates:
         if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
+            return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
     resource = files("fnirs_flow.resources.presets").joinpath("vendor_processed_hb_v1.json")
-    return json.loads(resource.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(resource.read_text(encoding="utf-8")))
 
 
 def _unfrozen_preset_values(preset: dict[str, Any]) -> list[str]:
@@ -154,7 +155,13 @@ def _contrast_definitions(path: Path, bundles: list[Any]) -> dict[str, list[dict
                 c = np.asarray(component_weights, dtype=float)
                 if np.linalg.matrix_rank(c) != len(component_names):
                     raise ValueError(f"contrast {contrast_id} has linearly dependent components")
-                projection = c @ np.linalg.pinv(bundle.matrix) @ bundle.matrix
+                projection = np.einsum(
+                    "ij,jk,kl->il",
+                    c,
+                    finite_pinv(bundle.matrix),
+                    bundle.matrix,
+                    optimize=True,
+                )
                 if not np.allclose(c, projection, rtol=1e-8, atol=1e-10):
                     raise ValueError(f"contrast {contrast_id} is not estimable")
                 by_model[model_id].append(
@@ -400,11 +407,7 @@ def run_processed_hb(
             if recording.hbt_validation is not None:
                 hbt_error = np.abs(recording.hbt_validation - (recording.hbo + recording.hbr))
                 hbt_exceedance_fraction = float(np.mean(hbt_error > qc_gates["hbt_absolute_tolerance"]))
-                hbt_status = (
-                    "pass"
-                    if hbt_exceedance_fraction <= qc_gates["hbt_exceedance_fraction_max"]
-                    else "fail"
-                )
+                hbt_status = "pass" if hbt_exceedance_fraction <= qc_gates["hbt_exceedance_fraction_max"] else "fail"
             event_set = ingest_frozen_events(
                 events_path,
                 run.fnirs_record_id,
@@ -549,8 +552,10 @@ def run_processed_hb(
                         "reason_code": warning,
                         "message": "Header warning retained after downstream record-level gates",
                         "observed_value": (
-                            abs((recording.provenance.declared_points or recording.provenance.actual_points)
-                                - recording.provenance.actual_points)
+                            abs(
+                                (recording.provenance.declared_points or recording.provenance.actual_points)
+                                - recording.provenance.actual_points
+                            )
                             if warning == "HEADER_POINT_COUNT_MISMATCH"
                             else "present"
                         ),
@@ -626,14 +631,12 @@ def run_processed_hb(
                     for chromophore, data in (("hbo", regularized.hbo), ("hbr", regularized.hbr)):
                         y = data[channel_index]
                         try:
-                            fit = fit_first_level(
+                            fit_result = fit_first_level(
                                 y,
                                 bundle.matrix,
                                 solver_requested=solver["requested"],
                                 fallback_policy=solver["fallback_policy"],
-                                solver_config=SolverConfig(
-                                    **preset["solver_config"], **preset["covariance_config"]
-                                ),
+                                solver_config=SolverConfig(**preset["solver_config"], **preset["covariance_config"]),
                             )
                         except Exception as exc:
                             reason = str(exc).split(":", 1)[0]
@@ -657,16 +660,16 @@ def run_processed_hb(
                                 }
                             )
                             continue
-                        residual_before = _lag1(
-                            y - bundle.matrix @ np.linalg.lstsq(bundle.matrix, y, rcond=None)[0]
-                        )
-                        residual_after = _lag1(np.asarray(fit["whitened_residuals"]))
+                        ols_beta = np.linalg.lstsq(bundle.matrix, y, rcond=None)[0]
+                        ols_fitted = np.einsum("ij,j->i", bundle.matrix, ols_beta, optimize=True)
+                        residual_before = _lag1(y - ols_fitted)
+                        residual_after = _lag1(np.asarray(fit_result["whitened_residuals"]))
                         whitening_improvement = (
                             abs(residual_before) - abs(residual_after)
                             if residual_before is not None and residual_after is not None
                             else None
                         )
-                        weights = np.asarray(fit["weights"])
+                        weights = np.asarray(fit_result["weights"])
                         low_weight_fraction = float(np.mean(weights < 0.5))
                         qc_reasons = []
                         if (
@@ -681,7 +684,7 @@ def run_processed_hb(
                         if qc_reasons:
                             record_pair_success = False
                             for reason in qc_reasons:
-                                observed = (
+                                qc_observed: float | None = (
                                     whitening_improvement
                                     if reason == "WHITENING_IMPROVEMENT_INSUFFICIENT"
                                     else low_weight_fraction
@@ -703,7 +706,7 @@ def run_processed_hb(
                                         "status": "fail",
                                         "reason_code": reason,
                                         "message": "Frozen solver QC threshold was not met",
-                                        "observed_value": observed,
+                                        "observed_value": qc_observed,
                                         "threshold": threshold,
                                         "policy_id": "processed_hb_qc_gates_v1",
                                         "source_artifact": "residual_qc.csv",
@@ -715,9 +718,9 @@ def run_processed_hb(
                             "channel": channel.channel,
                             "chromophore": chromophore,
                             "design_hash": bundle.design_hash,
-                            "solver_requested": fit["solver_requested"],
-                            "solver_effective": fit["solver_effective"],
-                            "covariance_method": fit["covariance_method"],
+                            "solver_requested": fit_result["solver_requested"],
+                            "solver_effective": fit_result["solver_effective"],
+                            "covariance_method": fit_result["covariance_method"],
                             "absolute_unit_verified": False,
                             "calculation_status": "success",
                             "reason_code": "",
@@ -729,12 +732,12 @@ def run_processed_hb(
                                 {
                                     **common,
                                     "regressor": name,
-                                    "beta": fit["beta"][index],
-                                    "standard_error": fit["standard_error"][index],
-                                    "statistic": fit["statistic"][index],
+                                    "beta": np.asarray(fit_result["beta"])[index],
+                                    "standard_error": np.asarray(fit_result["standard_error"])[index],
+                                    "statistic": np.asarray(fit_result["statistic"])[index],
                                     "statistic_type": "t",
-                                    "df": fit["df"],
-                                    "p_value": fit["p_value"][index],
+                                    "df": fit_result["df"],
+                                    "p_value": np.asarray(fit_result["p_value"])[index],
                                     "input_sha256": recording.provenance.sha256,
                                 }
                             )
@@ -745,13 +748,13 @@ def run_processed_hb(
                                         **common,
                                         "regressor_i": name,
                                         "regressor_j": name_j,
-                                        "covariance": fit["covariance"][index, j],
+                                        "covariance": np.asarray(fit_result["covariance"])[index, j],
                                     }
                                 )
                         for definition in definitions[bundle.model_id]:
                             try:
                                 result = estimate_contrast(
-                                    fit,
+                                    fit_result,
                                     np.asarray(definition["weights"]),
                                     contrast_id=definition["contrast_id"],
                                 )
@@ -821,17 +824,17 @@ def run_processed_hb(
                                 "residual_lag1_before": residual_before,
                                 "residual_lag1_after": residual_after,
                                 "whitening_improvement": whitening_improvement,
-                                "ar1_rho": fit["ar1_rho"],
-                                "ar_iterations": fit["ar_iterations"],
-                                "ar_converged": fit["ar_converged"],
-                                "irls_iterations": fit["irls_iterations"],
-                                "irls_converged": fit["irls_converged"],
+                                "ar1_rho": fit_result["ar1_rho"],
+                                "ar_iterations": fit_result["ar_iterations"],
+                                "ar_converged": fit_result["ar_converged"],
+                                "irls_iterations": fit_result["irls_iterations"],
+                                "irls_converged": fit_result["irls_converged"],
                                 "weight_min": float(weights.min()),
                                 "weight_median": float(np.median(weights)),
                                 "weight_max": float(weights.max()),
                                 "low_weight_fraction": low_weight_fraction,
-                                "solver_requested": fit["solver_requested"],
-                                "solver_effective": fit["solver_effective"],
+                                "solver_requested": fit_result["solver_requested"],
+                                "solver_effective": fit_result["solver_effective"],
                                 "covariance_status": "pass",
                                 "qc_status": "pass" if series_pass[chromophore] else "fail",
                                 "reason_code": ";".join(qc_reasons),

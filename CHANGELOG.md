@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased] - 2026-08-25
+## [Unreleased] - 2026-08-27
 
 ### Added
 
@@ -21,16 +21,36 @@
 - Removed research-specific literature records and their evidence links from
   the bundled MethodAtom library, and normalized non-portable evidence paths.
 - Rebuilt packaged WebUI assets after the identifier changes.
+- Made the Shimadzu OMM preset generic and canonical across both preset APIs;
+  recording-specific condition values now come only from parsed input headers.
+- Added Python-version markers so Python 3.13 resolves to NumPy 2.1 or newer.
+
+### Fixed
+
+- Removed the public processed-Hb split command's dependency on excluded
+  development modules and replaced private-data tests with synthetic fixtures.
+- Made Shimadzu layout parsing fail closed for proprietary or malformed binary
+  files instead of inventing wavelengths or channel geometry.
+- Kept Shimadzu Applied Voltage and Amp. Gain rows separate and reject
+  ambiguous, conflicting, or count-mismatched condition metadata.
+- Applied the shared macOS metadata filter to source, atom, inventory, package,
+  output-manifest, and governance scanners used on AppleDouble-producing disks.
+- Replaced warning-prone matrix products and pseudoinverse reconstruction with
+  finite-checked contractions for Python 3.13 numerical compatibility.
+- Restored ASCII-safe package-verifier output and all Ruff/layered-mypy gates.
 
 ### Validation
 
-- Development Python suite: 1,351 passed, 2 skipped.
-- Clean public Python suite: 1,340 passed, 13 skipped.
-- Ruff passed for `fnirs_flow tests scripts tools`.
-- Clean public WebUI unit tests: 25 passed; production build and locked npm
-  dependency audit passed with 0 vulnerabilities.
+- Development Python suite: 1,380 passed, 2 skipped.
+- Clean public Python suite: 1,351 passed, 12 skipped.
+- Ruff and all core/MNE/Cedalion mypy profiles passed.
+- WebUI unit tests: 26 passed; production build and locked npm dependency audit
+  passed with 0 vulnerabilities.
 - Public synchronization dry-run, English-only gate, generic naming gate, and
   full-repository prohibited-term scan passed.
+- Python dependency vulnerability queries against both PyPI and OSV were
+  attempted but did not complete because the remote endpoints stopped
+  responding; no Python vulnerability result is claimed for this run.
 
 ## [1.2.5] - 2026-08-23
 

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 from scipy import stats
+
+from fnirs_flow.analysis.numerics import finite_pinv
 
 
 def estimate_contrast(
@@ -15,12 +19,12 @@ def estimate_contrast(
         raise ValueError("contrast weights do not match design")
     if not np.isfinite(c).all() or np.allclose(c, 0):
         raise ValueError("contrast is non-finite or all zero")
-    estimate = c @ beta
-    contrast_covariance = c @ cov @ c.T
+    estimate = np.einsum("ij,j->i", c, beta, optimize=True)
+    contrast_covariance = np.einsum("ij,jk,lk->il", c, cov, c, optimize=True)
     contrast_covariance = (contrast_covariance + contrast_covariance.T) / 2
     if not np.isfinite(contrast_covariance).all():
         raise ValueError("CONTRAST_COVARIANCE_NONFINITE")
-    df = int(fit["df"])
+    df = int(cast(int | float | str, fit["df"]))
     if c.shape[0] == 1:
         variance = float(contrast_covariance[0, 0])
         if variance < 0:
@@ -46,7 +50,10 @@ def estimate_contrast(
     dimension = c.shape[0]
     if np.linalg.matrix_rank(contrast_covariance) != dimension:
         raise ValueError("CONTRAST_COVARIANCE_SINGULAR")
-    statistic = float(estimate @ np.linalg.pinv(contrast_covariance) @ estimate / dimension)
+    inverse_estimate = np.einsum(
+        "ij,j->i", finite_pinv(contrast_covariance), estimate, optimize=True
+    )
+    statistic = float(np.einsum("i,i->", estimate, inverse_estimate, optimize=True) / dimension)
     return {
         "contrast_id": contrast_id,
         "contrast_dimension": dimension,

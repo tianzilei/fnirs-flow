@@ -3,30 +3,15 @@ import type { Project } from '../../api/client';
 import type { StoreGet, StoreSet, StoreState } from '../../store/types';
 import { restoreExecutionAttempt } from '../execution/store';
 import { normalizeFlowPayload } from '../flow/normalization';
+import { selectProjectStatus } from './projectStatus';
 
 export const selectProject = (state: StoreState) => state.project;
 export const selectProjects = (state: StoreState) => state.projects;
-export const selectProjectStatus = (state: StoreState) => state.projectStatus();
 export const selectReadiness = (state: StoreState) => state.readiness;
 
 export function createProjectActions(set: StoreSet, get: StoreGet) {
   return {
-    projectStatus: () => {
-      const { project, flow, validation, compileResult, discoverResult, executeInfo, readiness } = get();
-      const hasFatalRisk = validation?.risks?.some(
-        (risk: Record<string, unknown>) => risk.severity === 'fatal',
-      ) ?? false;
-      return {
-        selected: !!project,
-        flowSaved: Object.keys(flow).length > 0 || !!readiness?.flow_saved,
-        validated: validation ? validation.is_valid && !hasFatalRisk : !!readiness?.validated,
-        compiled: !!compileResult || !!readiness?.compiled,
-        dataDiscovered: !!discoverResult || !!readiness?.data_discovered,
-        executed: !!executeInfo || !!readiness?.executed,
-        hasFatalRisk,
-        quarantinedAtoms: readiness?.quarantined_atoms ?? [],
-      };
-    },
+    projectStatus: () => selectProjectStatus(get()),
 
     loadProjects: async (): Promise<void> => {
       try {

@@ -996,14 +996,14 @@ def discover_project_data(
             missing = [name for name in required if not (root / name).is_file()]
             if missing:
                 raise ValueError(f"Missing frozen processed-Hb inputs: {missing}")
-            manifest = discover_frozen_processed_hb(
+            processed_manifest = discover_frozen_processed_hb(
                 root / required[0],
                 root / required[1],
                 runtime_root=root,
                 events_uri=str(root / required[2]),
                 contrast_matrix_uri=str(root / required[3]),
             )
-            manifest_payload = manifest.model_dump(mode="json")
+            manifest_payload = processed_manifest.model_dump(mode="json")
             manifest_payload["dataset_id"] = dataset_id
             compiled_dir = tx.output_dir / "compiled"
             compiled_dir.mkdir(parents=True, exist_ok=True)
@@ -1017,7 +1017,7 @@ def discover_project_data(
             result = DiscoverResult(
                 dataset_id=dataset_id,
                 files=sum(record["discovery_status"] == "available" for record in preview["records"]),
-                runs=len(manifest.runs),
+                runs=len(processed_manifest.runs),
                 local_root=str(root),
                 metadata_tables=4,
                 processed_hb=preview,
@@ -1043,18 +1043,18 @@ def discover_project_data(
         else:
             root_value = data_root or store.get_project_data_root(project_id) or None
             effective_data_root = Path(root_value) if root_value is not None else None
-        manifest = discover_dataset(dataset_id, outdir, local_root=effective_data_root)
-        if manifest.runtime_local_root:
-            store.bind_dataset(manifest.dataset_id, Path(manifest.runtime_local_root))
+        discovered_manifest = discover_dataset(dataset_id, outdir, local_root=effective_data_root)
+        if discovered_manifest.runtime_local_root:
+            store.bind_dataset(discovered_manifest.dataset_id, Path(discovered_manifest.runtime_local_root))
         result = DiscoverResult(
-            dataset_id=manifest.dataset_id,
-            files=len(manifest.files),
-            runs=len(manifest.subject_session_runs),
-            local_root=manifest.runtime_local_root,
-            source_url=manifest.source.url,
-            metadata_tables=len(manifest.metadata_tables),
+            dataset_id=discovered_manifest.dataset_id,
+            files=len(discovered_manifest.files),
+            runs=len(discovered_manifest.subject_session_runs),
+            local_root=discovered_manifest.runtime_local_root,
+            source_url=discovered_manifest.source.url,
+            metadata_tables=len(discovered_manifest.metadata_tables),
         )
-        store.update_state(project_id, dataset_id=manifest.dataset_id, discovered_runs=result.runs)
+        store.update_state(project_id, dataset_id=discovered_manifest.dataset_id, discovered_runs=result.runs)
         tx.commit()
 
     return result
@@ -1383,13 +1383,13 @@ def execute_project_runs(
             progress_callback=progress_callback,
             cancel_check=cancel_check,
         )
-        result = service.execute(request)
+        execution_result = service.execute(request)
 
         response = ExecuteResult(
-            attempt_id=result.attempt_id,
-            total_runs=result.total_runs,
-            successful=result.successful_runs,
-            failed=result.failed_runs,
+            attempt_id=execution_result.attempt_id,
+            total_runs=execution_result.total_runs,
+            successful=execution_result.successful_runs,
+            failed=execution_result.failed_runs,
             runs=[
                 RunSummary(
                     run_id=rr.run_id,
@@ -1440,14 +1440,16 @@ def execute_project_runs(
                         for art in rr.artifacts
                     ],
                 )
-                for rr in result.run_results
+                for rr in execution_result.run_results
             ],
-            failure_ids=result.failure_ids,
+            failure_ids=execution_result.failure_ids,
         )
         store.update_state(
             project_id,
-            last_attempt_id=result.attempt_id,
-            last_execution_status="failed" if result.failed_runs or result.skipped_runs else "completed",
+            last_attempt_id=execution_result.attempt_id,
+            last_execution_status=(
+                "failed" if execution_result.failed_runs or execution_result.skipped_runs else "completed"
+            ),
         )
         return response
     except (OSError, KeyError, ValueError, RuntimeError) as e:

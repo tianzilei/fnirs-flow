@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -73,6 +75,34 @@ def test_public_ci_tools_are_in_copy_plan(tmp_path):
 
     assert set(module.PUBLIC_TOOL_FILES) <= copied
     assert any(path.startswith("fnirs_flow/resources/webui/dist/") for path in copied)
+    assert "docs/processed_hb_analysis.md" not in copied
+    assert not any(path.startswith("fnirs_flow/processed_hb/") for path in copied)
+    assert "tests/test_processed_hb.py" not in copied
+    assert "tests/test_release_governance.py" not in copied
+
+
+def test_public_tree_imports_without_private_processed_hb_package(tmp_path):
+    module = _load_sync_module()
+    root = Path(__file__).parents[1]
+    target = tmp_path / "public"
+    plan = module.build_copy_plan(root, target)
+    module.copy_items(plan, dry_run=False)
+
+    split_test = (target / "tests" / "test_processed_hb_split.py").read_text(encoding="utf-8")
+    assert "fnirs_flow.processed_hb" not in split_test
+    assert "Sample/" not in split_test
+
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = str(target)
+    completed = subprocess.run(
+        [sys.executable, "-c", "import fnirs_flow.adapters; import fnirs_flow.cli"],
+        cwd=target,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_unexpected_target_file_is_rejected(tmp_path):

@@ -11,15 +11,33 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from fnirs_flow.registry.acquisition_presets import get_builtin_acquisition_preset
+
 
 class AcquisitionConfig(BaseModel):
     """Acquisition configuration derived from literature."""
 
     device_brand_model: str = ""
     wavelengths_nm: list[int] = Field(default_factory=lambda: [760, 850])
-    source_detector_distance_mm: int = 30
-    short_channel_distance_mm: int = 8
+    source_detector_distance_mm: int | None = 30
+    short_channel_distance_mm: int | None = 8
     sampling_rate_hz: float = 10.0
+    # Shimadzu OMM metadata.  These fields are deliberately separate from
+    # ``wavelengths_nm``: the values shown in the OMM AnalysisInfo "Applied
+    # Voltage" table are source drive voltages, not optical wavelengths.
+    applied_voltage: list[float] = Field(default_factory=list)
+    amp_gain: list[str] = Field(default_factory=list)
+    collection_interval_ms: float | None = None
+    get_data_time_ms: float | None = None
+    average: int | None = None
+    data_format: str = ""
+    condition_file: str = ""
+    protocol: str = ""
+    measurement_mode: str = ""
+    gain_change: str = ""
+    task_change: bool | None = None
+    hb_calculation_formula_id: str = ""
+    hb_calculation_coefficients: dict[str, Any] = Field(default_factory=dict)
 
 
 class PreprocessingConfig(BaseModel):
@@ -138,7 +156,11 @@ class ConfigManager:
             Acquisition configuration
         """
         acq_presets = self._presets.get("acquisition", {})
-        preset = acq_presets.get(device, acq_presets.get("standard_cw_fnirs", {}))
+        preset = acq_presets.get(device)
+        if preset is None:
+            preset = get_builtin_acquisition_preset(device)
+        if preset is None:
+            preset = acq_presets.get("standard_cw_fnirs", {})
 
         return AcquisitionConfig(
             device_brand_model=preset.get("device_brand_model", ""),
@@ -146,6 +168,19 @@ class ConfigManager:
             source_detector_distance_mm=preset.get("source_detector_distance_mm", 30),
             short_channel_distance_mm=preset.get("short_channel_distance_mm", 8),
             sampling_rate_hz=preset.get("sampling_rate_hz", 10.0),
+            applied_voltage=preset.get("applied_voltage", []),
+            amp_gain=preset.get("amp_gain", []),
+            collection_interval_ms=preset.get("collection_interval_ms"),
+            get_data_time_ms=preset.get("get_data_time_ms"),
+            average=preset.get("average"),
+            data_format=preset.get("data_format", ""),
+            condition_file=preset.get("condition_file", ""),
+            protocol=preset.get("protocol", ""),
+            measurement_mode=preset.get("measurement_mode", ""),
+            gain_change=preset.get("gain_change", ""),
+            task_change=preset.get("task_change"),
+            hb_calculation_formula_id=preset.get("hb_calculation_formula_id", ""),
+            hb_calculation_coefficients=preset.get("hb_calculation_coefficients", {}),
         )
 
     def get_preprocessing_config(

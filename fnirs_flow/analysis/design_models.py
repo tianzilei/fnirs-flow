@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -23,10 +24,18 @@ class DesignBundle:
     hash_payload: dict[str, object] | None = None
 
 
+class EventLike(Protocol):
+    @property
+    def onset(self) -> float: ...
+
+    @property
+    def duration(self) -> float: ...
+
+
 DESIGN_IMPLEMENTATION_VERSION = "processed_hb_design_v2"
 
 
-def _canonical_events(events: list[object]) -> list[dict[str, object]]:
+def _canonical_events(events: Sequence[object]) -> list[dict[str, object]]:
     selected = [e for e in events if getattr(e, "event_eligible", True) and not getattr(e, "duplicate_of_window", "")]
     return [
         {
@@ -62,11 +71,11 @@ def _bundle(
     model_id: str,
     matrix: np.ndarray,
     names: list[str],
-    diagnostics: dict[str, object] | None = None,
+    diagnostics: Mapping[str, object] | None = None,
     *,
     timestamps_s: np.ndarray,
-    events: list[object],
-    design_parameters: dict[str, object],
+    events: Sequence[object],
+    design_parameters: Mapping[str, object],
 ) -> DesignBundle:
     matrix = np.asarray(matrix, dtype=float)
     canonical_matrix = np.ascontiguousarray(matrix, dtype="<f8")
@@ -97,7 +106,7 @@ def _bundle(
         rank,
         float(np.linalg.cond(matrix)) if matrix.size else float("inf"),
         matrix.shape[0] - rank,
-        diagnostics or {},
+        dict(diagnostics or {}),
         "confirmatory",
         nonestimable,
         payload,
@@ -136,7 +145,9 @@ def bind_design_contrasts(
     )
 
 
-def compile_condition_glm(timestamps_s: np.ndarray, events: list[object], *, hrf_model: str = "glover") -> DesignBundle:
+def compile_condition_glm(
+    timestamps_s: np.ndarray, events: Sequence[EventLike], *, hrf_model: str = "glover"
+) -> DesignBundle:
     from fnirs_flow.adapters.mne_nirs_analysis import _canonical_hrf
 
     t = np.asarray(timestamps_s, dtype=float)
@@ -159,7 +170,10 @@ def compile_condition_glm(timestamps_s: np.ndarray, events: list[object], *, hrf
     x = np.column_stack(cols) if cols else np.empty((len(t), 0))
     x = np.column_stack([x, np.ones(len(t))])
     names.append("constant")
-    parameters = {"basis": "canonical_hrf_with_temporal_derivative", "hrf_model": hrf_model}
+    parameters: dict[str, object] = {
+        "basis": "canonical_hrf_with_temporal_derivative",
+        "hrf_model": hrf_model,
+    }
     return _bundle(
         "glm_conditions_canonical_td_v1",
         x,
@@ -173,7 +187,7 @@ def compile_condition_glm(timestamps_s: np.ndarray, events: list[object], *, hrf
 
 def compile_post_event_fir(
     timestamps_s: np.ndarray,
-    events: list[object],
+    events: Sequence[EventLike],
     *,
     bins: tuple[tuple[float, float], ...] = ((0, 10), (10, 20), (20, 30)),
 ) -> DesignBundle:
@@ -202,7 +216,7 @@ def compile_post_event_fir(
     )
 
 
-def compile_event_order_glm(timestamps_s: np.ndarray, events: list[object]) -> DesignBundle:
+def compile_event_order_glm(timestamps_s: np.ndarray, events: Sequence[EventLike]) -> DesignBundle:
     t = np.asarray(timestamps_s, float)
     selected = [e for e in events if getattr(e, "event_eligible", True) and not getattr(e, "duplicate_of_window", "")]
     if len(selected) < 2:
@@ -233,7 +247,7 @@ def compile_event_order_glm(timestamps_s: np.ndarray, events: list[object]) -> D
     x = np.column_stack(cols) if cols else np.empty((len(t), 0))
     x = np.column_stack([x, np.ones(len(t))])
     names.append("constant")
-    parameters = {
+    parameters: dict[str, object] = {
         "basis": "canonical_hrf_with_temporal_derivative",
         "hrf_model": "glover",
         "trend_scores": list(scores),

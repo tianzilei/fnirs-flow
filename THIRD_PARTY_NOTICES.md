@@ -42,7 +42,7 @@ after publication.
 
 ## Referenced External Toolboxes and Repositories
 
-The private development repository may contain local reference repositories,
+The development repository may contain local reference repositories,
 literature extraction materials, manuscript drafts, sample data, generated
 outputs, or other non-release artifacts. These are not redistributed in the
 public `fnirs-flow` release.
@@ -62,10 +62,10 @@ Reference-only materials include:
 | `References/NIRS-KIT/` | GPL version 3 indicated by `LICENSE` and README; additional academic-use terms appear in `LICENCE` | GPL/academic-use reference only; not copied into, linked into, or redistributed with `fnirs-flow`. |
 | `References/NIRS_SPM_v4_r1/` | No standalone top-level license file found in the local copy; source files include SPM-dependent/modified SPM routines | SPM-dependent reference only; not copied into, linked into, or redistributed with `fnirs-flow`. |
 
-## Adapted Owner Utilities
+## Adapted NIRS-SPM Utilities
 
-`fnirs_flow/adapters/private_fnirs_tools.py` adapts small parsing utilities from
-the repository owner's `tianzilei/MainCodeRepo` at commit
+`fnirs_flow/adapters/nirs_spm_tools.py` adapts small NIRS-SPM parsing and
+probe-layout utilities from `tianzilei/MainCodeRepo` at commit
 `3d904b444c7965c3aad5dfde82dbbe91dfa4f647`:
 
 - `fnirs_processing/fnirs_sorter.py`

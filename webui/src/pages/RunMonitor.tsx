@@ -10,6 +10,7 @@ import {
   selectRuns,
 } from '../features/execution/store';
 import { selectImportStatus } from '../features/packages/store';
+import { selectProjectStatus } from '../features/project/projectStatus';
 import { getProjectResults, type AtomExecutionSummary } from '../api/client';
 
 interface ProcessedQcRow {
@@ -62,7 +63,7 @@ export function RunMonitor() {
   const cancelExecution = useStore((s) => s.cancelExecution);
   const fork = useStore((s) => s.fork);
   const trustAtom = useStore((s) => s.trustAtom);
-  const projectStatus = useStore(useShallow((s) => s.projectStatus()));
+  const projectStatus = useStore(useShallow(selectProjectStatus));
   const quarantinedAtoms = Array.from(new Set([
     ...(importStatus?.quarantined_atoms ?? []),
     ...projectStatus.quarantinedAtoms,

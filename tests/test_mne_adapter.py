@@ -71,10 +71,15 @@ class TestMneNirsAdapter:
 
         import numpy as np
 
+        from fnirs_flow.adapters.mne_nirs_adapter import MneNirsAdapter as CurrentMneNirsAdapter
+
         raw = MagicMock()
         raw.info = {"sfreq": 10.0}
         raw.get_data.return_value = np.ones((2, 100), dtype=float)
-        adapter = MneNirsAdapter()
+        # Lazy-loading tests deliberately remove backend modules from
+        # sys.modules. Resolve the current class so patch targets and method
+        # globals belong to the same module instance.
+        adapter = CurrentMneNirsAdapter()
 
         with (
             patch(

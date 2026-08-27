@@ -42,6 +42,11 @@ Excluded content must never be present in the public repository:
 - `.agents/`, `.mimocode/`, `.tmp/`
 - `References/`, `Sample/`, `audit/`
 - `docs/literature/`, `docs/manuscript/`
+- Study-bound processed-Hb analysis code and documentation under
+  `fnirs_flow/processed_hb/`, `tests/test_processed_hb.py`, and
+  `docs/processed_hb_analysis.md`
+- Development CI governance tests; the public repository owns and validates
+  its preserved `.github/` policy independently
 - `legacy/`, `outputs/`
 - caches, virtual environments, build artifacts, logs, backups, and platform
   metadata files

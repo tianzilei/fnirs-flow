@@ -298,7 +298,7 @@ class GroupExecutor:
                     "nirs_spm_header_inspection",
                     "probe_layout_split",
                 }:
-                    from fnirs_flow.adapters.private_fnirs_tools import (
+                    from fnirs_flow.adapters.nirs_spm_tools import (
                         inspect_nirs_spm_headers,
                         inventory_fnirs_filenames,
                         split_probe_layout_csv,
@@ -306,8 +306,8 @@ class GroupExecutor:
 
                     path = params.get("path") or params.get("source_path")
                     if not path:
-                        raise ValueError(f"PRIVATE_FNIRS_TOOL_SOURCE_MISSING: {operation} requires path")
-                    private_tools = {
+                        raise ValueError(f"NIRS_SPM_TOOL_SOURCE_MISSING: {operation} requires path")
+                    nirs_spm_tools = {
                         "fnirs_filename_inventory": (
                             inventory_fnirs_filenames,
                             "FnirsFilenameInventory",
@@ -325,8 +325,8 @@ class GroupExecutor:
                         ),
                     }
                     tool: Any
-                    tool, artifact_type, state_key = private_tools[operation]
-                    private_params = {
+                    tool, artifact_type, state_key = nirs_spm_tools[operation]
+                    nirs_spm_params = {
                         key: value
                         for key, value in params.items()
                         if key not in {"path", "source_path", "execution_scope", "readiness_status"}
@@ -337,7 +337,7 @@ class GroupExecutor:
                         outdir / "derivatives" / "data_quality",
                         base_dir=outdir,
                         atom_id=atom_id,
-                        **private_params,
+                        **nirs_spm_params,
                     )
                     state[state_key] = tool_result["output"]
                     result.output_handles = tool_result["output"]

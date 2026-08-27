@@ -27,7 +27,7 @@ def _ts_type(schema: dict[str, Any]) -> str:
         return f"Array<{_ts_type(schema.get('items', {}))}>"
     if kind == "object":
         return "Record<string, unknown>"
-    return {"string": "string", "integer": "number", "number": "number", "boolean": "boolean"}.get(
+    return {"string": "string", "integer": "number", "number": "number", "boolean": "boolean", "null": "null"}.get(
         str(kind), "unknown"
     )
 

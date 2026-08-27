@@ -255,33 +255,36 @@ def verify_and_print(package_path: str | Path, expected_profile: str | None = No
     """Verify a package and print results. Returns 0 if valid, 1 otherwise."""
     result = verify_package(package_path, expected_profile)
 
+    def ascii_text(value: object) -> str:
+        return str(value).encode("ascii", errors="backslashreplace").decode("ascii")
+
     print(f"Package Verification: {'PASS' if result.valid else 'FAIL'}")
     print("=" * 60)
 
     if result.profile:
-        print(f"Profile: {result.profile}")
+        print(f"Profile: {ascii_text(result.profile)}")
     if result.schema_version:
-        print(f"Schema Version: {result.schema_version}")
+        print(f"Schema Version: {ascii_text(result.schema_version)}")
 
     if result.errors:
         print(f"\nErrors ({len(result.errors)}):")
         for error in result.errors:
-            print(f"  [ERROR] {error}")
+            print(f"  [ERROR] {ascii_text(error)}")
 
     if result.missing_files:
         print(f"\nMissing Files ({len(result.missing_files)}):")
         for f in result.missing_files:
-            print(f"  [MISSING] {f}")
+            print(f"  [MISSING] {ascii_text(f)}")
 
     if result.checksum_mismatches:
         print(f"\nChecksum Mismatches ({len(result.checksum_mismatches)}):")
         for f in result.checksum_mismatches:
-            print(f"  [CHECKSUM] {f}")
+            print(f"  [CHECKSUM] {ascii_text(f)}")
 
     if result.warnings:
         print(f"\nWarnings ({len(result.warnings)}):")
         for w in result.warnings:
-            print(f"  [WARNING] {w}")
+            print(f"  [WARNING] {ascii_text(w)}")
 
     if result.checked_files:
         print(f"\nChecked Files: {len(result.checked_files)}")

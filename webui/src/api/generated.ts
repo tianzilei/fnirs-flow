@@ -57,7 +57,7 @@ export interface AtomResultSummary {
   "output_handles"?: Record<string, unknown>;
   "artifacts"?: Array<ArtifactSummary>;
   "warnings"?: Array<string>;
-  "error"?: string | unknown;
+  "error"?: string | null;
 }
 
 export interface AtomTemplate {
@@ -83,7 +83,7 @@ export interface AtomTemplate {
   "implementation_callable"?: string | null;
   "implementation_status"?: string;
   "capability_manifest"?: Record<string, unknown> | null;
-  "operation_contract"?: OperationContract | unknown;
+  "operation_contract"?: OperationContract | null;
 }
 
 export interface AuthorInfo {
@@ -94,7 +94,7 @@ export interface AuthorInfo {
 export interface BackendDescription {
   "backend_id": string;
   "class_path": string;
-  "dependency_profile_id"?: string | unknown;
+  "dependency_profile_id"?: string | null;
   "display_name": string;
   "description"?: string;
   "is_available": boolean;
@@ -116,12 +116,12 @@ export interface BundleStatus {
   "save_reason"?: string;
   "size_bytes"?: number;
   "integrity_status"?: string;
-  "last_verified_at"?: string | unknown;
-  "verification_scope"?: string | unknown;
-  "integrity_error"?: string | unknown;
+  "last_verified_at"?: string | null;
+  "verification_scope"?: string | null;
+  "integrity_error"?: string | null;
   "dirty"?: boolean;
-  "busy_operation"?: string | unknown;
-  "lock_owner"?: string | unknown;
+  "busy_operation"?: string | null;
+  "lock_owner"?: string | null;
   "versions"?: Array<Record<string, unknown>>;
 }
 
@@ -181,16 +181,16 @@ export interface DesignCommit {
 }
 
 export interface DesignHistoryStatus {
-  "head"?: Record<string, unknown> | unknown;
+  "head"?: Record<string, unknown> | null;
   "branches"?: Array<Record<string, unknown>>;
   "dirty"?: boolean;
 }
 
 export interface DiffChange {
   "kind": "node_added" | "node_removed" | "node_changed" | "edge_added" | "edge_removed" | "edge_changed" | "flow_hash_changed";
-  "node_id"?: string | unknown;
-  "edge_id"?: string | unknown;
-  "path"?: string | unknown;
+  "node_id"?: string | null;
+  "edge_id"?: string | null;
+  "path"?: string | null;
   "before"?: unknown;
   "after"?: unknown;
 }
@@ -253,14 +253,14 @@ export interface ExecutionJobRead {
   "completed_at"?: string;
   "recovery_count"?: number;
   "cancel_requested"?: boolean;
-  "result"?: ExecuteResult | unknown;
-  "error"?: string | unknown;
+  "result"?: ExecuteResult | null;
+  "error"?: string | null;
 }
 
 export interface ExportRequest {
   "profile"?: string;
-  "snapshot_id"?: string | unknown;
-  "attempt_id"?: string | unknown;
+  "snapshot_id"?: string | null;
+  "attempt_id"?: string | null;
   "include_history"?: boolean;
 }
 
@@ -320,7 +320,7 @@ export interface GenerateAIDraftRequest {
   "conditions"?: Array<string>;
   "assumptions"?: Array<string>;
   "user_confirmations"?: Array<string>;
-  "ai_settings"?: AIDraftSettings | unknown;
+  "ai_settings"?: AIDraftSettings | null;
 }
 
 export interface HTTPValidationError {
@@ -440,10 +440,10 @@ export interface ProjectRead {
   "storage_format"?: string;
   "revision"?: number;
   "integrity_status"?: string;
-  "last_verified_at"?: string | unknown;
-  "verification_scope"?: string | unknown;
-  "integrity_error"?: string | unknown;
-  "busy_operation"?: string | unknown;
+  "last_verified_at"?: string | null;
+  "verification_scope"?: string | null;
+  "integrity_error"?: string | null;
+  "busy_operation"?: string | null;
 }
 
 export interface ProjectResults {
@@ -533,6 +533,7 @@ export interface VersionHistoryEntry {
 export type ApiPath = keyof typeof API_PATHS;
 export const API_PATHS = {
   "/api/ai/draft-flow": true,
+  "/api/atom-registry-status": true,
   "/api/atom-templates": true,
   "/api/backends": true,
   "/api/datasets": true,

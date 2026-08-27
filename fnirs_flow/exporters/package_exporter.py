@@ -367,6 +367,8 @@ def export_package(
             if not atom_root.exists():
                 continue
             for definition in sorted(atom_root.rglob("*.json")):
+                if not is_visible_data_file(definition, root=atom_root):
+                    continue
                 findings = find_absolute_path_records(definition)
                 if findings:
                     raise ValueError(

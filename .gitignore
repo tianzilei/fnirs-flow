@@ -56,6 +56,7 @@ pubmed_*.csv
 
 # Logs and temporary files
 *.log
+python-licenses.json
 *.tmp
 *.bak
 .tmp/
@@ -69,6 +70,11 @@ webui/node_modules/
 webui/dist/
 !fnirs_flow/resources/
 !fnirs_flow/resources/**
+# Re-apply generated/platform exclusions after unignoring packaged resources.
+fnirs_flow/resources/**/__pycache__/
+fnirs_flow/resources/**/*.py[cod]
+fnirs_flow/resources/**/._*
+fnirs_flow/resources/**/.DS_Store
 webui/.vite/
 webui/.e2e-state/
 webui/test-results/

@@ -99,6 +99,11 @@ class BackendRegistry:
             display_name: Human-readable name
             description: Backend description
         """
+        # Re-registering an id replaces its entry point.  Drop any class
+        # cached under the old entry so subsequent load/create calls cannot
+        # silently instantiate stale code.
+        self._loaded_classes.pop(backend_id, None)
+        self._instances.pop(backend_id, None)
         self._entries[backend_id] = BackendEntry(
             backend_id=backend_id,
             class_path=class_path,
@@ -150,7 +155,13 @@ class BackendRegistry:
 
         # Fallback: check if module exists
         module_path = entry.class_path.split(":")[0]
-        return importlib.util.find_spec(module_path) is not None
+        try:
+            return importlib.util.find_spec(module_path) is not None
+        except (ImportError, ModuleNotFoundError, ValueError):
+            # find_spec raises when a parent package is missing (rather than
+            # returning None), and can raise ValueError for partially-loaded
+            # modules.  Availability checks are intentionally non-throwing.
+            return False
 
     def get(self, backend_id: str) -> type[BackendProtocol] | None:
         """Get backend class by ID (loads if not cached).

@@ -3,7 +3,7 @@
   "info": {
     "title": "fnirs-flow API",
     "description": "fNIRS analysis Flow orchestration framework",
-    "version": "1.2.0"
+    "version": "1.2.5"
   },
   "paths": {
     "/api/atom-templates": {
@@ -22,6 +22,27 @@
                   },
                   "type": "array",
                   "title": "Response List Atom Templates Api Atom Templates Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/atom-registry-status": {
+      "get": {
+        "summary": "Atom Registry Status",
+        "description": "Return the current built-in, literature, and local Atom composition state.",
+        "operationId": "atom_registry_status_api_atom_registry_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Atom Registry Status Api Atom Registry Status Get"
                 }
               }
             }
@@ -3285,6 +3306,67 @@
             "type": "array",
             "title": "Evidence Refs"
           },
+          "origin": {
+            "type": "string",
+            "title": "Origin",
+            "default": "builtin"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "flow_atom_blueprint": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Flow Atom Blueprint"
+          },
+          "implementation_module": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implementation Module"
+          },
+          "implementation_callable": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implementation Callable"
+          },
+          "implementation_status": {
+            "type": "string",
+            "title": "Implementation Status",
+            "default": "managed"
+          },
+          "capability_manifest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capability Manifest"
+          },
           "operation_contract": {
             "anyOf": [
               {
@@ -3915,6 +3997,11 @@
             "type": "integer",
             "title": "Metadata Tables",
             "default": 0
+          },
+          "processed_hb": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Processed Hb"
           }
         },
         "type": "object",

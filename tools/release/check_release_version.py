@@ -24,7 +24,8 @@ def _read_versions() -> dict[str, str]:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     fallback = re.search(r'__version__\s*=\s*"([^"]+)"', init_text)
     readme_version = re.search(r"\*\*v([^*]+)\*\*", readme)
-    changelog_version = re.search(r"^## \[([^]]+)]", changelog, re.MULTILINE)
+    changelog_versions = re.findall(r"^## \[([^]]+)]", changelog, re.MULTILINE)
+    changelog_version = next((value for value in changelog_versions if re.fullmatch(r"\d+\.\d+\.\d+", value)), None)
     if not fallback or not readme_version or not changelog_version:
         raise SystemExit("Unable to read all release version declarations")
     return {
@@ -34,7 +35,7 @@ def _read_versions() -> dict[str, str]:
         "webui_lock": str(package_lock["version"]),
         "webui_lock_root": str(package_lock["packages"][""]["version"]),
         "readme": readme_version.group(1),
-        "changelog": changelog_version.group(1),
+        "changelog": changelog_version,
     }
 
 

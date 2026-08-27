@@ -3,6 +3,7 @@ import { CheckCircle2, Package } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store';
 import { listPackageProfiles, type PackageProfile } from '../api/client';
+import { selectProjectStatus } from '../features/project/projectStatus';
 
 const FALLBACK_PROFILES: PackageProfile[] = [
   {
@@ -31,7 +32,7 @@ export function ExportPackage() {
   const exportPackage = useStore((s) => s.exportPackage);
   const project = useStore((s) => s.project);
   const refreshStatus = useStore((s) => s.refreshStatus);
-  const projectStatus = useStore(useShallow((s) => s.projectStatus()));
+  const projectStatus = useStore(useShallow(selectProjectStatus));
   const [exported, setExported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastExportResult, setLastExportResult] = useState<typeof exportResult>(null);

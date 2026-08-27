@@ -494,8 +494,10 @@ def create_default_registry() -> OperationRegistry:
             verified_backend_handlers[template.backend_binding.backend_id] = backend_method_factory(
                 template.backend_binding.operation
             )
-        scientific_handler = generic_handler_factory if operation_id in SCIENTIFIC_OPERATIONS else None
-        operation_handler = scientific_handler or (
+        scientific_handler: Callable[[OperationSpec], OperationHandler] | None = (
+            generic_handler_factory if operation_id in SCIENTIFIC_OPERATIONS else None
+        )
+        operation_handler: Callable[[OperationSpec], OperationHandler] | None = scientific_handler or (
             deep_learning_handler_factory if operation_id in DEEP_LEARNING_OPERATIONS else None
         )
         if template.implementation_module and template.implementation_callable:

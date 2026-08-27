@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from fnirs_flow.flow.atoms import MethodAtomOrigin
+from fnirs_flow.infrastructure.filesystem import is_visible_data_file
 from fnirs_flow.registry.node_library import MethodAtomTemplate
 
 LOCAL_ATOM_HEADER = "METHOD_ATOM"
@@ -38,7 +39,11 @@ def local_atom_library_state(directory: str | Path) -> dict[str, Any]:
     """Return a deterministic fingerprint without creating the directory."""
     root = Path(directory).expanduser()
     files = sorted(
-        (path for path in root.rglob("*") if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES),
+        (
+            path
+            for path in root.rglob("*")
+            if is_visible_data_file(path, root=root) and path.suffix.lower() in SUPPORTED_SUFFIXES
+        ),
         key=lambda path: path.as_posix().lower(),
     ) if root.is_dir() else []
     return {

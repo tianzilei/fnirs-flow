@@ -713,13 +713,13 @@ def _execute(op: str, context: OperationContext) -> Any:
             "feature_importance_std": importance.importances_std.tolist(),
         }
     if op in {"data_export", "methods_report_generation", "methods_report", "reporting_checklist", "risk_register"}:
-        out = p.get("outdir") or p.get("path")
+        output_target = p.get("outdir") or p.get("path")
         payload = raw if isinstance(raw, (dict, list)) else {"result": str(raw)}
-        if out:
-            path = Path(out)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(payload, default=str, indent=2), encoding="utf-8")
-            return path
+        if output_target:
+            output_path = Path(str(output_target))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(json.dumps(payload, default=str, indent=2), encoding="utf-8")
+            return output_path
         return payload
     if op in {"block_average", "artifact_detection", "signal_quality_check", "batch_effect_diagnostics"}:
         data = _array(raw)

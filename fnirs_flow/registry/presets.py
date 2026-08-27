@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from fnirs_flow.registry.acquisition_presets import get_builtin_acquisition_preset
+
 
 class ParameterPreset(BaseModel):
     preset_id: str
@@ -438,6 +440,18 @@ BUILTIN_PRESETS: list[ParameterPreset] = [
         },
         rationale="Hitachi ETG-4000 system defaults (58 studies)",
         applicable_atom_types=["dataset_discovery", "optical_density"],
+    ),
+    ParameterPreset(
+        preset_id="shimadzu_omm_defaults",
+        name="Shimadzu OMM Defaults",
+        domain="acquisition",
+        parameters=get_builtin_acquisition_preset("shimadzu_omm") or {},
+        rationale="Generic Shimadzu OMM family metadata; recording-specific settings come from the input header",
+        warnings=[
+            "Applied Voltage values are electrical drive settings, not wavelengths",
+            "Source-detector geometry and recording settings must be supplied before dependent processing",
+        ],
+        applicable_atom_types=["dataset_discovery", "optical_density", "mbll_conversion"],
     ),
 ]
 

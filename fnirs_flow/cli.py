@@ -73,6 +73,33 @@ def cmd_backends(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_split_processed_hb(args: argparse.Namespace) -> int:
+    """Split a NIRS-SPM processed-Hb TXT by channels/time and export it."""
+    from fnirs_flow.adapters.processed_hb_split import save_split_processed_hb, split_processed_hb
+    from fnirs_flow.adapters.vendor_processed_hb import parse_vendor_processed_hb
+
+    try:
+        channels = None
+        if args.channels:
+            channels = [
+                int(value.strip()) if value.strip().isdigit() else value.strip()
+                for value in args.channels.split(",")
+                if value.strip()
+            ]
+        window = (args.start, args.end) if args.start is not None or args.end is not None else None
+        if window is not None and (args.start is None or args.end is None):
+            raise ValueError("--start and --end must be supplied together")
+        data, _qc = parse_vendor_processed_hb(args.source)
+        result = split_processed_hb(data, channels=channels, time_window_s=window)
+        output = save_split_processed_hb(result, args.output, fmt=args.format)
+        print(f"Processed-Hb split written to {output}")
+        print(f"  Channels: {result.n_channels}; samples: {result.n_samples}")
+        return 0
+    except (OSError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     from fnirs_flow.application.flow_use_cases import validate_flow_payload
 
@@ -1164,6 +1191,22 @@ def main(argv: list[str] | None = None) -> int:
 
     p_backends = subparsers.add_parser("backends", help="Show backend status and capabilities")
     p_backends.set_defaults(func=cmd_backends)
+
+    p_split = subparsers.add_parser(
+        "split-processed-hb",
+        help="Split a NIRS-SPM processed-Hb TXT by channels/time and export it",
+    )
+    p_split.add_argument("source", help="Input NIRS-SPM processed-Hb TXT file")
+    p_split.add_argument("--output", "-o", required=True, help="Output path")
+    p_split.add_argument(
+        "--format",
+        choices=["csv", "tsv", "txt", "json", "npz"],
+        help="Output format (defaults to extension)",
+    )
+    p_split.add_argument("--channels", help="Comma-separated channel numbers or names (e.g. 1,3,ch- 7)")
+    p_split.add_argument("--start", type=float, help="Inclusive start time in seconds")
+    p_split.add_argument("--end", type=float, help="Inclusive end time in seconds")
+    p_split.set_defaults(func=cmd_split_processed_hb)
 
     # Dependency management commands (§9.2)
     p_deps = subparsers.add_parser("deps", help="Dependency management commands")

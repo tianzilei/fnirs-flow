@@ -429,7 +429,7 @@ FNIRS_FILENAME_INVENTORY = MethodAtomTemplate(
         AtomPort(name="validation_tables", direction="out", schema="CSVFile"),
     ],
     reference="MainCodeRepo: fnirs_processing/fnirs_sorter.py (Apache-2.0)",
-    tags=["data", "fnirs", "filename", "inventory", "private_script_adaptation", "group"],
+    tags=["data", "fnirs", "filename", "inventory", "nirs_spm_tool_adaptation", "group"],
 )
 
 NIRS_SPM_HEADER_INSPECTION = MethodAtomTemplate(
@@ -474,7 +474,7 @@ NIRS_SPM_HEADER_INSPECTION = MethodAtomTemplate(
         AtomPort(name="header_report", direction="out", schema="NirsspmHeaderInspection"),
     ],
     reference="MainCodeRepo: fnirs_processing/nirs_to_snirf.py (Apache-2.0)",
-    tags=["validation", "fnirs", "nirs_spm", "header", "private_script_adaptation", "group"],
+    tags=["validation", "fnirs", "nirs_spm", "header", "nirs_spm_tool_adaptation", "group"],
 )
 
 PROBE_LAYOUT_SPLIT = MethodAtomTemplate(
@@ -520,7 +520,7 @@ PROBE_LAYOUT_SPLIT = MethodAtomTemplate(
         AtomPort(name="layout_manifest", direction="out", schema="ProbeLayoutManifest"),
     ],
     reference="MainCodeRepo: fnirs_processing/nirs_to_snirf.py (Apache-2.0)",
-    tags=["data", "fnirs", "probe", "coordinates", "private_script_adaptation", "group"],
+    tags=["data", "fnirs", "probe", "coordinates", "nirs_spm_tool_adaptation", "group"],
 )
 
 NIRX_READER = MethodAtomTemplate(

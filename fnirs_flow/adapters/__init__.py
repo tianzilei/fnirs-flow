@@ -28,6 +28,8 @@ from fnirs_flow.adapters.homer3_import import (
     parse_homer3_json,
     parse_homer3_process_func,
 )
+from fnirs_flow.adapters.processed_hb_split import SplitProcessedHb, save_split_processed_hb, split_processed_hb
+from fnirs_flow.adapters.shimadzu_layout import ShimadzuLayoutError, read_nirs_spm_ini, read_shimadzu_layout
 
 __all__ = [
     # AnalyzIR export
@@ -54,4 +56,11 @@ __all__ = [
     "parse_homer3_cfg",
     "parse_homer3_json",
     "parse_homer3_process_func",
+    # Shimadzu/NIRS-SPM layout import
+    "ShimadzuLayoutError",
+    "read_nirs_spm_ini",
+    "read_shimadzu_layout",
+    "SplitProcessedHb",
+    "split_processed_hb",
+    "save_split_processed_hb",
 ]

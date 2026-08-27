@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store';
 import type { Project } from '../api/client';
+import { selectProjectStatus } from '../features/project/projectStatus';
 
 type NavId = 'projects' | 'flow' | 'atoms' | 'data' | 'checks' | 'runs' | 'results' | 'compile' | 'package' | 'import' | 'system';
 
@@ -54,7 +55,7 @@ export function AppShell() {
   const loading = useStore((s) => s.loading);
   const error = useStore((s) => s.error);
   const clearError = useStore((s) => s.clearError);
-  const status = useStore(useShallow((s) => s.projectStatus()));
+  const status = useStore(useShallow(selectProjectStatus));
   const saveFlow = useStore((s) => s.saveFlow);
   const validate = useStore((s) => s.validate);
   const compile = useStore((s) => s.compile);

@@ -10,7 +10,7 @@ import math
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 def _fields(*groups: str) -> list[str]:
@@ -150,8 +150,8 @@ def write_processed_hb_derivatives(
 
 
 def object_dict(value: Any) -> dict[str, Any]:
-    if is_dataclass(value):
-        return asdict(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return cast(dict[str, Any], asdict(value))
     if hasattr(value, "model_dump"):
-        return value.model_dump()
+        return cast(dict[str, Any], value.model_dump())
     return dict(value)

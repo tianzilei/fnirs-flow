@@ -699,12 +699,16 @@ class MneNirsAdapter:
             "response_window": list(response_window),
             "baseline_correction": baseline_correction,
         }
+        if len(baseline_window) != 2 or len(response_window) != 2:
+            raise ValueError("baseline_window and response_window must contain exactly two values")
+        baseline_bounds = (float(baseline_window[0]), float(baseline_window[1]))
+        response_bounds = (float(response_window[0]), float(response_window[1]))
         result = block_averaging(
             raw.get_data(),
             np.asarray(events),
             sfreq=float(raw.info["sfreq"]),
-            baseline_window=tuple(baseline_window),
-            response_window=tuple(response_window),
+            baseline_window=baseline_bounds,
+            response_window=response_bounds,
             baseline_correction=baseline_correction,
         )
         self._provenance.log(step_id="block_averaging", parameters=parameters)

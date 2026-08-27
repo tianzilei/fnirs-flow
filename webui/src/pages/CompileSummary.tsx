@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../store';
 import { DagLayerPreview } from '../components/DagLayerPreview';
+import { selectProjectStatus } from '../features/project/projectStatus';
 
 export function CompileSummary() {
   const result = useStore((s) => s.compileResult);
@@ -11,7 +12,7 @@ export function CompileSummary() {
   const compile = useStore((s) => s.compile);
   const createSnapshot = useStore((s) => s.createSnapshot);
   const validation = useStore((s) => s.validation);
-  const status = useStore(useShallow((s) => s.projectStatus()));
+  const status = useStore(useShallow(selectProjectStatus));
   const navigate = useNavigate();
   const { id: projectId } = useParams();
   const hasFatalRisk = validation?.risks.some((risk) => risk.severity === 'fatal') ?? false;

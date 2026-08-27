@@ -1,6 +1,6 @@
 # Documentation Index
 
-> Last updated: 2026-08-25
+> Last updated: 2026-08-27
 
 This page indexes the public documentation shipped with the release tree.
 Private research notes, literature worktables, generated outputs, caches, and
@@ -42,11 +42,12 @@ kept outside this code-oriented release tree.
 The repository does not include hosted CI/CD workflows. Maintainers run these
 checks locally before creating a release.
 
-The 2026-08-25 development sync passed 1,351 Python tests with 2 skips, all 25
-WebUI unit tests, Ruff, the production WebUI build, the public English-only
-gate, and the generic naming gate. The clean public-tree validation result is
-1,340 Python tests passed with 13 skips; all 25 WebUI unit tests, Ruff, the
-production build, and the locked npm dependency audit also passed.
+The 2026-08-27 development sync passed 1,380 Python tests with 2 skips, all 26
+WebUI unit tests, Ruff, the layered mypy profiles, the production WebUI build,
+the public English-only gate, and the generic naming gate. The clean public-tree
+validation result is 1,351 Python tests passed with 12 skips; all 26 WebUI unit
+tests, Ruff, the development-mode build, and the locked npm dependency audit
+also passed with 0 vulnerabilities.
 
 The primary local reproduction commands are:
 

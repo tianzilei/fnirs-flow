@@ -4,6 +4,8 @@ import ast
 import re
 from pathlib import Path
 
+from fnirs_flow.infrastructure.filesystem import is_macos_metadata_path
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = PROJECT_ROOT / "fnirs_flow"
 
@@ -38,10 +40,18 @@ def _absolute_imports(path: Path) -> set[str]:
     return imports
 
 
+def _visible_source_files(root: Path, pattern: str) -> list[Path]:
+    return [
+        path
+        for path in root.rglob(pattern)
+        if path.is_file() and not is_macos_metadata_path(path.relative_to(PROJECT_ROOT))
+    ]
+
+
 def test_lower_layers_do_not_import_api() -> None:
     violations: list[str] = []
     for package in ("application", "flow", "validation", "security", "data", "execution", "exporters"):
-        for path in (PACKAGE_ROOT / package).rglob("*.py"):
+        for path in _visible_source_files(PACKAGE_ROOT / package, "*.py"):
             for imported in _absolute_imports(path):
                 if imported == "fnirs_flow.api" or imported.startswith("fnirs_flow.api."):
                     violations.append(f"{path.relative_to(PROJECT_ROOT)} -> {imported}")
@@ -51,7 +61,7 @@ def test_lower_layers_do_not_import_api() -> None:
 def test_infrastructure_does_not_import_api() -> None:
     violations = [
         f"{path.relative_to(PROJECT_ROOT)} -> {imported}"
-        for path in (PACKAGE_ROOT / "infrastructure").rglob("*.py")
+        for path in _visible_source_files(PACKAGE_ROOT / "infrastructure", "*.py")
         for imported in _absolute_imports(path)
         if imported == "fnirs_flow.api" or imported.startswith("fnirs_flow.api.")
     ]
@@ -61,7 +71,7 @@ def test_infrastructure_does_not_import_api() -> None:
 def test_application_does_not_import_api() -> None:
     violations = [
         f"{path.relative_to(PROJECT_ROOT)} -> {imported}"
-        for path in (PACKAGE_ROOT / "application").rglob("*.py")
+        for path in _visible_source_files(PACKAGE_ROOT / "application", "*.py")
         for imported in _absolute_imports(path)
         if imported == "fnirs_flow.api" or imported.startswith("fnirs_flow.api.")
     ]
@@ -71,7 +81,7 @@ def test_application_does_not_import_api() -> None:
 def test_cross_package_dependencies_match_allowlist() -> None:
     violations: list[str] = []
     for package, allowed in ALLOWED_INTERNAL_DEPENDENCIES.items():
-        for path in (PACKAGE_ROOT / package).rglob("*.py"):
+        for path in _visible_source_files(PACKAGE_ROOT / package, "*.py"):
             for imported in _absolute_imports(path):
                 if not imported.startswith("fnirs_flow."):
                     continue
@@ -82,7 +92,7 @@ def test_cross_package_dependencies_match_allowlist() -> None:
 
 
 def test_api_routers_are_isolated_modules() -> None:
-    router_files = list((PACKAGE_ROOT / "api" / "routers").glob("*.py"))
+    router_files = _visible_source_files(PACKAGE_ROOT / "api" / "routers", "*.py")
     assert {path.stem for path in router_files} >= {
         "registry",
         "progress",
@@ -142,7 +152,7 @@ def test_production_code_does_not_import_migrated_compatibility_modules() -> Non
         "fnirs_flow.adapters.mne_nirs_steps",
     }
     violations = []
-    for path in PACKAGE_ROOT.rglob("*.py"):
+    for path in _visible_source_files(PACKAGE_ROOT, "*.py"):
         if path.name in {"participants.py", "mne_nirs_steps.py"}:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -189,7 +199,7 @@ def test_frontend_flow_compatibility_is_centralized() -> None:
     legacy_access = re.compile(r"\batom\.type\b|\bflow\.nodes\b|\bpayload\.nodes\b")
     violations = [
         str(path.relative_to(PROJECT_ROOT))
-        for path in source_root.rglob("*.ts*")
+        for path in _visible_source_files(source_root, "*.ts*")
         if path != compatibility_module and legacy_access.search(path.read_text(encoding="utf-8"))
     ]
     assert not violations, "Frontend legacy Flow parsing found outside normalization.ts:\n" + "\n".join(violations)
