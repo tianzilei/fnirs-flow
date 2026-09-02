@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from fnirs_flow.execution.operations import CallableOperationHandler, OperationContext, OperationSpec
+from fnirs_flow.execution.operation_contracts import CallableOperationHandler, OperationContext, OperationSpec
 
 # Operations implemented by this module.  The registry uses this allowlist so
 # catalogue entries that still require a domain-specific backend remain
@@ -493,7 +493,7 @@ def _execute(op: str, context: OperationContext) -> Any:
         if y.size == 0:
             raise ValueError(f"{op} requires y labels")
         model = (
-            SVC(probability=True)
+            SVC()
             if op in {"svm", "ml_model", "classification"}
             else (LinearDiscriminantAnalysis() if op == "lda" else DecisionTreeClassifier(random_state=0))
         )
@@ -697,7 +697,7 @@ def _execute(op: str, context: OperationContext) -> Any:
         y = np.asarray(p.get("y"))
         if y.size == 0:
             raise ValueError(f"{op} requires y labels")
-        model = SVC(probability=True)
+        model = SVC()
         if op == "hyperparameter_optimization":
             grid = GridSearchCV(
                 model,

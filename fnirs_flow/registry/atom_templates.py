@@ -10,10 +10,6 @@ but are discouraged for new code.
 from __future__ import annotations
 
 from fnirs_flow.registry import methodatom_library
-from fnirs_flow.registry.local_atoms import (
-    discover_local_method_atom_templates,
-    local_atom_library_state,
-)
 from fnirs_flow.registry.node_library import MethodAtomLibrary, MethodAtomTemplate
 
 # Re-export all templates with MethodAtom-first naming
@@ -86,6 +82,11 @@ def refresh_method_atom_templates(
 ) -> dict[str, object]:
     """Refresh literature-derived built-in templates if bundled CSVs changed."""
     global LITERATURE_METHOD_ATOM_TEMPLATES, ALL_METHOD_ATOM_TEMPLATES, _LOCAL_LIBRARY_STATE
+
+    from fnirs_flow.registry.local_atoms import (
+        discover_local_method_atom_templates,
+        local_atom_library_state,
+    )
 
     state = methodatom_library.ensure_literature_method_atom_templates_current(
         force=force,

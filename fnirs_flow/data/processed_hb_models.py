@@ -19,7 +19,11 @@ class ProcessedHbRun(BaseModel):
     linked_record_id: str
     fnirs_record_id: str
     record_pair_id: str
+    subject_id: str = ""
+    session_id: str = ""
     signal_uri: str
+    artifact_mask_uri: str = ""
+    artifact_mask_sha256: str = ""
     runtime_signal_path: str = Field(default="", exclude=True)
     input_sha256: str = ""
     declared_channel_count: int | None = None

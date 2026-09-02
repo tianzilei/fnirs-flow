@@ -19,8 +19,10 @@ their own licenses.
 
 Dependency license checks were generated from the 2026-07-14 release-candidate
 environment. The direct runtime and optional dependencies declared by
-the project include Pydantic, FastAPI, Uvicorn, MNE, MNE-NIRS, MNE-BIDS,
-NumPy, SciPy, scikit-learn, PyWavelets, pytest, React, React DOM,
+the project include Pydantic, JSON Schema, FastAPI, Uvicorn, HTTPX2,
+MNE, MNE-NIRS, MNE-BIDS,
+NumPy, SciPy, scikit-learn, PyWavelets, PyTorch, NetworkX, statsmodels,
+setuptools, pytest, pytest-cov, mypy, Ruff, React, React DOM,
 React Router, React Flow, Zustand, Axios, Lucide React, TypeScript, Vite, and
 the Vite React plugin. Cedalion is an optional, independently installed
 scientific backend pinned by the `cedalion` extra/CI profile and remains under

@@ -1,6 +1,6 @@
 # MethodAtom Parameter UI Contract
 
-Last updated: 2026-07-20
+Last updated: 2026-09-02
 
 This document defines how MethodAtom templates control parameter editing in the WebUI. The goal is to keep parameter behavior owned by the atom registry, so adding or changing atoms does not require React component changes.
 

@@ -13,33 +13,27 @@ Execution dispatch is handled by ExecutionService via operation_id lookup.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any
 
+from fnirs_flow.execution.operation_contracts import (
+    OPERATION_ALIASES,
+    CallableOperationHandler,
+    OperationContext,
+    OperationHandler,
+    OperationSpec,
+    canonical_operation,
+)
 
-class OperationHandler(Protocol):
-    """Runtime handler contract exposed to adapters and UI tooling."""
-
-    spec: OperationSpec
-
-    def execute(self, context: Any) -> Any: ...
-
-
-@dataclass
-class OperationContext:
-    adapter: Any
-    raw: Any
-    parameters: dict[str, Any]
-    service: Any = None
-
-
-class CallableOperationHandler:
-    def __init__(self, spec: OperationSpec, callback: Callable[[OperationContext], Any]) -> None:
-        self.spec = spec
-        self.callback = callback
-
-    def execute(self, context: OperationContext) -> Any:
-        return self.callback(context)
+__all__ = [
+    "OPERATION_ALIASES",
+    "CallableOperationHandler",
+    "OperationContext",
+    "OperationHandler",
+    "OperationRegistry",
+    "OperationSpec",
+    "canonical_operation",
+    "create_default_registry",
+]
 
 
 class ReviewedNoopHandler:
@@ -115,33 +109,6 @@ def local_callable_factory(module_name: str, callable_name: str) -> Callable[[Op
         return CallableOperationHandler(spec, execute)
 
     return factory
-
-
-@dataclass
-class OperationSpec:
-    """Specification for a registered operation."""
-
-    operation_id: str
-    category: str = ""
-    input_schemas: list[str] = field(default_factory=list)
-    output_schemas: list[str] = field(default_factory=list)
-    capabilities: list[str] = field(default_factory=list)
-    description: str = ""
-    aliases: list[str] = field(default_factory=list)
-    execution_scope: str = "run"
-    supported_backends: list[str] = field(default_factory=list)
-    artifact_contract: dict[str, Any] = field(default_factory=dict)
-    allow_reviewed_noop: bool = False
-    handler_factory: Callable[..., OperationHandler] | None = None
-    backend_handler_factories: dict[str, Callable[..., OperationHandler]] = field(default_factory=dict)
-    contract_variants: dict[str, dict[str, Any]] = field(default_factory=dict)
-
-    def handler_factory_for(self, backend_id: str | None = None) -> Callable[..., OperationHandler] | None:
-        if backend_id and backend_id in self.backend_handler_factories:
-            return self.backend_handler_factories[backend_id]
-        if backend_id and self.supported_backends and backend_id not in self.supported_backends:
-            return None
-        return self.handler_factory
 
 
 class OperationRegistry:
@@ -247,45 +214,6 @@ class OperationRegistry:
         if spec is None:
             return [f"Unknown operation: {operation_id}"]
         return [s for s in spec.input_schemas if s not in available_schemas]
-
-
-OPERATION_ALIASES: dict[str, str] = {
-    # Literature MethodAtoms use descriptive operation ids.  Keep those ids
-    # in serialized flows, but route them through the same native adapter
-    # implementations as the canonical built-in atoms.  Without this bridge
-    # the declarative library silently fell back to simplified NumPy/SciPy
-    # implementations (most notably MBLL), producing backend-dependent
-    # scientific results.
-    "data_import": "read_run",
-    "hardware_import": "read_run",
-    "bandpass_filter": "filtering",
-    "hpf_lpf_filter": "filtering",
-    "mbll_conversion": "beer_lambert_law",
-    "signal_quality_check": "compute_qc",
-    "snirf_reader": "read_run",
-    "optical_density_conversion": "optical_density",
-    "qc_metrics": "compute_qc",
-    "sci_check": "compute_qc",
-    "cv_check": "compute_qc",
-    "snr_check": "compute_qc",
-    "bad_channel_detection": "compute_qc",
-    "tddr": "motion_correction",
-    "wavelet": "motion_correction",
-    "spline": "motion_correction",
-    "ica": "motion_correction",
-    "pca": "motion_correction",
-    "bandpass": "filtering",
-    "notch": "filtering",
-    "lowpass": "filtering",
-    "mbll": "beer_lambert_law",
-    "design_matrix": "build_design_matrix",
-    "contrast": "estimate_contrast",
-}
-
-
-def canonical_operation(operation_id: str) -> str:
-    """Return the execution operation used by the current backend dispatch."""
-    return OPERATION_ALIASES.get(operation_id, operation_id)
 
 
 def create_default_registry() -> OperationRegistry:
@@ -458,12 +386,51 @@ def create_default_registry() -> OperationRegistry:
     # the compile gate instead of degrading to a pass-through.
     from fnirs_flow.adapters.cedalion_bindings import is_verified_cedalion_atom
     from fnirs_flow.execution.deep_learning_handlers import DEEP_LEARNING_OPERATIONS, deep_learning_handler_factory
+    from fnirs_flow.execution.processed_hb_handlers import (
+        aggregate_window_modality_availability_handler,
+        evaluate_processed_hb_window_qc_handler,
+        extract_processed_hb_channel_window_features_handler,
+        freeze_processed_hb_feature_artifacts_handler,
+        ingest_frozen_window_set_handler,
+        join_channel_annotation_table_handler,
+        nested_grouped_regression_handler,
+        run_continuous_vas_models_handler,
+        validate_information_boundary_handler,
+        write_processed_hb_ml_derivatives_handler,
+    )
     from fnirs_flow.execution.scientific_handlers import SCIENTIFIC_OPERATIONS, generic_handler_factory
-    from fnirs_flow.registry.atom_templates import ALL_METHOD_ATOM_TEMPLATES, refresh_method_atom_templates
+    from fnirs_flow.registry import atom_templates
 
-    refresh_method_atom_templates()
+    atom_templates.refresh_method_atom_templates()
 
-    for template in ALL_METHOD_ATOM_TEMPLATES:
+    processed_hb_handlers = {
+        "ingest_frozen_window_set": ingest_frozen_window_set_handler,
+        "join_channel_annotation_table": join_channel_annotation_table_handler,
+        "evaluate_processed_hb_window_qc": evaluate_processed_hb_window_qc_handler,
+        "aggregate_window_modality_availability": aggregate_window_modality_availability_handler,
+        "extract_processed_hb_channel_window_features": extract_processed_hb_channel_window_features_handler,
+        "write_processed_hb_ml_derivatives": write_processed_hb_ml_derivatives_handler,
+        "freeze_processed_hb_feature_artifacts": freeze_processed_hb_feature_artifacts_handler,
+        "nested_grouped_regression": nested_grouped_regression_handler,
+        "validate_information_boundary": validate_information_boundary_handler,
+        "run_continuous_vas_models": run_continuous_vas_models_handler,
+    }
+    for operation_id, handler in processed_hb_handlers.items():
+        if not registry.has(operation_id):
+            registry.register(
+                OperationSpec(
+                    operation_id=operation_id,
+                    category="analysis"
+                    if operation_id
+                    not in {"freeze_processed_hb_feature_artifacts", "write_processed_hb_ml_derivatives"}
+                    else "output",
+                    execution_scope="run",
+                    handler_factory=handler,
+                    backend_handler_factories={"core": handler},
+                )
+            )
+
+    for template in atom_templates.ALL_METHOD_ATOM_TEMPLATES:
         operation_id = str(template.operation or template.atom_type)
         if not operation_id:
             continue

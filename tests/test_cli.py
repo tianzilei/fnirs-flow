@@ -193,3 +193,21 @@ class TestCLI:
         assert data["flow_id"].startswith("draft-task-")
         assert "ai_generation" in data["metadata"]
         assert data["metadata"]["ai_generation"]["not_used_for_execution"]
+
+    def test_run_continuous_vas_cli_dispatches_frozen_payload(self, tmp_path):
+        payload = tmp_path / "vas.json"
+        payload.write_text(json.dumps({"subject_ids": ["s1", "s2"]}), encoding="utf-8")
+        output = tmp_path / "vas-derivatives"
+        mocked = {
+            "model_ids": ["M0-static", "M3", "M0-AR", "M4", "naive_persistence"],
+            "config_hash": "a" * 64,
+        }
+        with patch("fnirs_flow.processed_hb.run_continuous_vas_models", return_value=mocked) as runner:
+            result = main(["run-continuous-vas", "--input", str(payload), "--outdir", str(output)])
+        assert result == 0
+        runner.assert_called_once()
+        kwargs = runner.call_args.kwargs
+        assert kwargs["subject_ids"] == ["s1", "s2"]
+        assert kwargs["n_permutations"] == 10000
+        assert kwargs["n_bootstrap"] == 2000
+        assert kwargs["outdir"] == str(output)

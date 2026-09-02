@@ -90,7 +90,8 @@ def main() -> None:
     if missing_web:
         raise SystemExit("Direct WebUI dependencies lack license metadata: " + ", ".join(missing_web))
 
-    licenses = [*inventory.values(), *web.values()]
+    direct_python_licenses = [inventory[name] for name in declared if name in inventory]
+    licenses = [*direct_python_licenses, *web.values()]
     forbidden = sorted(
         license_name
         for license_name in licenses
@@ -99,7 +100,16 @@ def main() -> None:
     if forbidden:
         raise SystemExit("Forbidden dependency licenses found: " + ", ".join(forbidden))
 
-    notice_groups = ("pydantic", "fastapi", "mne", "cedalion", "react", "typescript", "vite")
+    notice_groups = (
+        "pydantic",
+        "fastapi",
+        "mne",
+        "cedalion",
+        "pytorch",
+        "react",
+        "typescript",
+        "vite",
+    )
     missing_notices = [name for name in notice_groups if name not in notices]
     if missing_notices:
         raise SystemExit("THIRD_PARTY_NOTICES.md lacks dependency groups: " + ", ".join(missing_notices))

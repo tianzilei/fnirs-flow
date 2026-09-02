@@ -79,13 +79,21 @@ async def get_version_history_endpoint(project_id: str) -> Any:
 async def export_package_endpoint(project_id: str, data: ExportRequest | None = None) -> Any:
     request = data or ExportRequest()
     try:
-        result = await run_in_threadpool(export_project_package, _store(), project_id, profile_id=request.profile)
+        result = await run_in_threadpool(
+            export_project_package,
+            _store(),
+            project_id,
+            profile_id=request.profile,
+            snapshot_id=request.snapshot_id,
+            attempt_id=request.attempt_id,
+            include_history=request.include_history,
+        )
     except StaleCompiledPlanError as exc:
         raise api_error(409, "STALE_COMPILED_PLAN", str(exc), "export", recoverable=True,
                         suggested_action="Compile the current Flow again") from exc
     except ValueError as exc:
-        raise api_error(422, "EXPORT_PROFILE_INVALID", str(exc), "export", recoverable=True,
-                        suggested_action="Choose a supported package profile") from exc
+        raise api_error(422, "EXPORT_REQUEST_INVALID", str(exc), "export", recoverable=True,
+                        suggested_action="Choose an existing snapshot, attempt, and package profile") from exc
     except (OSError, RuntimeError) as exc:
         logger.exception("Package export failed for project %s", project_id)
         raise api_error(500, "EXPORT_FAILED", str(exc), "export", recoverable=True,

@@ -8,6 +8,7 @@ MethodAtom-first naming:
 
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 from typing import Any
@@ -335,11 +336,10 @@ def discover_method_atom_templates(namespace: dict[str, Any]) -> list[MethodAtom
 
 def create_builtin_library() -> MethodAtomLibrary:
     """Create a MethodAtomLibrary with all built-in templates."""
-    from fnirs_flow.registry.atom_templates import ALL_METHOD_ATOM_TEMPLATES, refresh_method_atom_templates
-
-    refresh_method_atom_templates()
+    atom_templates = importlib.import_module("fnirs_flow.registry.atom_templates")
+    atom_templates.refresh_method_atom_templates()
     library = MethodAtomLibrary()
-    library.register_many(ALL_METHOD_ATOM_TEMPLATES)
+    library.register_many(atom_templates.ALL_METHOD_ATOM_TEMPLATES)
     return library
 
 

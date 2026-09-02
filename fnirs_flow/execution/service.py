@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
+from fnirs_flow.execution.errors import ExecutionCancelledError
 from fnirs_flow.execution.models import (
     ExecutionRequest,
     ExecutionResult,
     RunExecutionResult,
 )
 from fnirs_flow.execution.orchestrator_impl import (
-    ExecutionCancelledError,
-    resolve_atom_backend_id,
+    ExecutionService as _ExecutionOrchestrator,
 )
 from fnirs_flow.execution.orchestrator_impl import (
-    ExecutionService as _ExecutionOrchestrator,
+    resolve_atom_backend_id,
 )
 
 

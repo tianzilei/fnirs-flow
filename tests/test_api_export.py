@@ -53,8 +53,126 @@ def test_export_package_success(tmp_path):
     with zipfile.ZipFile(pkg) as zf:
         names = zf.namelist()
         assert "plan.json" in names
+        assert "flow_snapshot.json" in names
+        assert "history/snapshots.jsonl" not in names
         assert "RELINK_INSTRUCTIONS.json" in names
         assert "manifest.json" in names
+
+
+def test_export_honors_snapshot_attempt_and_history_options(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    pid = _create_and_compile_flow(client, tmp_path)
+    first_snapshot = client.post(f"/api/projects/{pid}/snapshots").json()
+
+    import fnirs_flow.api.app as api_module
+
+    attempts_dir = api_module.get_store().get_output_dir(pid) / "attempts"
+    for attempt_id in ("attempt-one", "attempt-two"):
+        attempt_dir = attempts_dir / attempt_id
+        attempt_dir.mkdir(parents=True)
+        (attempt_dir / "job.json").write_text(
+            json.dumps(
+                {
+                    "project_id": pid,
+                    "attempt_id": attempt_id,
+                    "snapshot_id": first_snapshot["snapshot_id"],
+                    "status": "completed",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    response = client.post(
+        f"/api/projects/{pid}/export-package",
+        json={
+            "snapshot_id": first_snapshot["snapshot_id"],
+            "attempt_id": "attempt-one",
+            "include_history": True,
+        },
+    )
+
+    assert response.status_code == 200
+    with zipfile.ZipFile(response.json()["package_path"]) as archive:
+        assert json.loads(archive.read("flow_snapshot.json"))["snapshot_id"] == first_snapshot["snapshot_id"]
+        assert json.loads(archive.read("action_attempt.json"))["attempt_id"] == "attempt-one"
+        snapshot_history = archive.read("history/snapshots.jsonl").decode().splitlines()
+        attempt_history = archive.read("history/attempts.jsonl").decode().splitlines()
+        assert len(snapshot_history) == 1
+        assert {json.loads(line)["attempt_id"] for line in attempt_history} == {
+            "attempt-one",
+            "attempt-two",
+        }
+
+
+def test_export_rejects_unknown_snapshot_or_attempt(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    pid = _create_and_compile_flow(client, tmp_path)
+
+    unknown_snapshot = client.post(
+        f"/api/projects/{pid}/export-package",
+        json={"snapshot_id": "snap-missing"},
+    )
+    unknown_attempt = client.post(
+        f"/api/projects/{pid}/export-package",
+        json={"attempt_id": "attempt-missing"},
+    )
+
+    assert unknown_snapshot.status_code == 422
+    assert unknown_attempt.status_code == 422
+    assert unknown_snapshot.json()["detail"]["code"] == "EXPORT_REQUEST_INVALID"
+
+
+def test_export_rejects_snapshot_or_attempt_that_does_not_match_compiled_flow(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    pid = _create_and_compile_flow(client, tmp_path)
+    old_snapshot = client.post(f"/api/projects/{pid}/snapshots").json()
+
+    demo_path = Path(__file__).parent.parent / "configs" / "demo_task_flow.json"
+    updated_flow = json.loads(demo_path.read_text(encoding="utf-8"))
+    updated_flow["description"] = "Updated flow for export consistency test"
+    client.put(f"/api/projects/{pid}/flow", json={"flow": updated_flow})
+    client.post(f"/api/projects/{pid}/compile")
+    current_snapshot = client.post(f"/api/projects/{pid}/snapshots").json()
+
+    import fnirs_flow.api.app as api_module
+
+    attempt_id = "attempt-for-old-snapshot"
+    attempt_dir = api_module.get_store().get_output_dir(pid) / "attempts" / attempt_id
+    attempt_dir.mkdir(parents=True)
+    (attempt_dir / "job.json").write_text(
+        json.dumps(
+            {
+                "project_id": pid,
+                "attempt_id": attempt_id,
+                "snapshot_id": old_snapshot["snapshot_id"],
+                "status": "completed",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    stale_snapshot = client.post(
+        f"/api/projects/{pid}/export-package",
+        json={"snapshot_id": old_snapshot["snapshot_id"]},
+    )
+    mismatched_attempt = client.post(
+        f"/api/projects/{pid}/export-package",
+        json={
+            "snapshot_id": current_snapshot["snapshot_id"],
+            "attempt_id": attempt_id,
+        },
+    )
+
+    assert stale_snapshot.status_code == 422
+    assert mismatched_attempt.status_code == 422
+    assert "does not match the compiled Flow" in stale_snapshot.json()["detail"]["message"]
+    assert "references snapshot" in mismatched_attempt.json()["detail"]["message"]
 
 
 def test_export_removes_macos_appledouble_sidecar(tmp_path, monkeypatch):
@@ -210,7 +328,9 @@ def test_relink_imported_data_updates_manifest(tmp_path):
         ),
         encoding="utf-8",
     )
-    package_path = client.post(f"/api/projects/{source_id}/export-package").json()["package_path"]
+    package_response = client.post(f"/api/projects/{source_id}/export-package")
+    assert package_response.status_code == 200, package_response.text
+    package_path = package_response.json()["package_path"]
     target_id = client.post("/api/projects", json={"name": "Relink"}).json()["id"]
     assert (
         client.post(
@@ -295,6 +415,34 @@ def test_results_endpoint_sanitizes_svg_figures(tmp_path):
     assert "javascript:" not in svg.lower()
     assert "onload" not in svg.lower()
     assert "onclick" not in svg.lower()
+
+
+def test_results_endpoint_bounds_csv_preview(tmp_path):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    project = client.post("/api/projects", json={"name": "Bounded Results"}).json()
+    import fnirs_flow.api.app as api_module
+
+    table_dir = (
+        api_module.get_store().get_output_dir(project["id"])
+        / "derivatives"
+        / "processed_hb_first_level"
+    )
+    table_dir.mkdir(parents=True)
+    rows = ["metric,value", *(f"m{index},{index}" for index in range(12))]
+    (table_dir / "residual_qc.csv").write_text("\n".join(rows), encoding="utf-8")
+
+    response = client.get(
+        f"/api/projects/{project['id']}/results/qc",
+        params={"row_limit": 5},
+    )
+
+    assert response.status_code == 200
+    result_file = response.json()["files"][0]
+    assert len(result_file["data"]) == 5
+    assert result_file["returned_rows"] == 5
+    assert result_file["rows_truncated"] is True
 
 
 # ============================================================================

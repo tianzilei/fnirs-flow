@@ -17,7 +17,6 @@ class TestDatasetRegistry:
     def test_builtin_datasets_exist(self):
         assert "mne-fnirs-motor" in BUILTIN_DATASETS
         assert "bids-nirs-tapping" in BUILTIN_DATASETS
-        assert BUILTIN_DATASETS["ds007738"].folder_name == "Sample/ds007738-download"
 
     def test_registry_get(self):
         reg = DatasetRegistry()

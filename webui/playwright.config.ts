@@ -24,7 +24,7 @@ export default defineConfig({
     },
     {
       name: 'firefox',
-      testIgnore: '**/ds007738-real.spec.ts',
+      testIgnore: '**/*-real.spec.ts',
       use: {
         ...devices['Desktop Firefox'],
         launchOptions: {
@@ -38,7 +38,7 @@ export default defineConfig({
     },
     {
       name: 'webkit',
-      testIgnore: '**/ds007738-real.spec.ts',
+      testIgnore: '**/*-real.spec.ts',
       use: { ...devices['Desktop Safari'] },
     },
   ],

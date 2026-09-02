@@ -613,7 +613,21 @@ export function FlowCanvas({
       const payload = event.dataTransfer.getData('application/atom-template');
       if (!payload) return;
 
-      const template = JSON.parse(payload) as AtomTemplate;
+      let template: AtomTemplate;
+      try {
+        const parsed = JSON.parse(payload) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Atom template payload must be an object.');
+        }
+        template = parsed as AtomTemplate;
+      } catch {
+        setCanvasNotice('The dropped atom template is invalid. Refresh the library and try again.');
+        return;
+      }
+      if (!template.id || !template.atom_type) {
+        setCanvasNotice('The dropped atom template is missing its identifier or atom type.');
+        return;
+      }
       if (processedHb && !['frozen_manifest_discovery', 'read_vendor_processed_hb', 'ingest_frozen_events', 'regularize_processed_hb_time', 'compile_processed_hb_designs', 'fit_processed_hb_first_level', 'estimate_full_contrasts', 'write_processed_hb_derivatives'].includes(template.operation || template.id)) {
         setCanvasNotice('This atom is incompatible with the vendor processed-Hb branch.');
         return;

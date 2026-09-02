@@ -55,7 +55,7 @@ def test_datasets_api_lists_builtin_registry():
     response = TestClient(app).get("/api/datasets")
     assert response.status_code == 200
     dataset_ids = {item["dataset_id"] for item in response.json()}
-    assert {"mne-fnirs-motor", "bids-nirs-tapping", "ds007738"} <= dataset_ids
+    assert {"mne-fnirs-motor", "bids-nirs-tapping"} <= dataset_ids
 
 
 def test_example_flow_api_loads_official_demo():

@@ -1,0 +1,13 @@
+{
+  "profile_version": "2.0.0-machine-verifiable",
+  "frozen": true,
+  "claim_type_dimensions": {
+    "method_definition": ["source_completeness", "study_design_explicit", "sample_traceability", "acquisition_parameters_complete", "preprocessing_complete", "qc_reported", "statistical_or_ml_leakage_addressed", "open_materials", "reproducibility_information", "design_adequacy", "methodological_limitations"],
+    "comparative_choice": ["source_completeness", "study_design_explicit", "sample_traceability", "qc_reported", "statistical_or_ml_leakage_addressed", "design_adequacy", "methodological_limitations"],
+    "parameter_candidate": ["source_completeness", "acquisition_parameters_complete", "preprocessing_complete", "qc_reported"],
+    "risk_or_contraindication": ["source_completeness", "study_design_explicit", "sample_traceability", "qc_reported"],
+    "reporting_requirement": ["source_completeness", "reproducibility_information"]
+  },
+  "score_enabled": false,
+  "locked_test_tuning_allowed": false
+}

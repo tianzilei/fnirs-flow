@@ -7,7 +7,7 @@ import logging
 import shutil
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol, cast
 
 from fnirs_flow.application.errors import (
     ProjectRevisionConflictError,
@@ -16,8 +16,16 @@ from fnirs_flow.application.errors import (
 from fnirs_flow.infrastructure.concurrency import CrossProcessLock, LockHolder, get_lock_registry
 from fnirs_flow.infrastructure.filesystem import macos_metadata_ignore
 
-if TYPE_CHECKING:
-    from fnirs_flow.application.project_use_cases import ProjectStore
+
+class ProjectStoreProtocol(Protocol):
+    _bundles: Any
+    _projects: dict[str, Any]
+
+    def ensure_project_loaded(self, project_id: str) -> bool: ...
+
+    def register_transaction(self, project_id: str, transaction: ProjectTransaction) -> None: ...
+
+    def unregister_transaction(self, project_id: str) -> None: ...
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +70,7 @@ class ProjectTransaction:
 
     def __init__(
         self,
-        store: ProjectStore,
+        store: ProjectStoreProtocol,
         project_id: str,
         reason: str,
         *,
@@ -229,7 +237,7 @@ class ProjectTransaction:
             )
 
         self._committed = True
-        return manifest
+        return cast(dict[str, Any], manifest)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -237,7 +245,7 @@ class ProjectTransaction:
 
     @property
     def _base_dir(self) -> Path:
-        return self._store._bundles.base_dir
+        return cast(Path, self._store._bundles.base_dir)
 
     def _check_expected_head(self) -> None:
         """Verify the design history HEAD matches the expected commit."""

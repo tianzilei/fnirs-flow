@@ -73,29 +73,36 @@ def _relink_manifest(manifest: dict[str, Any], data_root: Path) -> dict[str, Any
     hash_mismatches = []
     if manifest.get("data_branch") == "vendor_processed_hb":
         for run in manifest.get("runs", []):
-            signal_uri = str(run.get("signal_uri", ""))
-            relative_text = _relative_data_path(signal_uri, old_root)
-            if not relative_text:
-                relative_text = Path(signal_uri).name
-            signal_path = root / relative_text
-            if not signal_path.exists() and relative_text:
-                basename_candidate = root / Path(relative_text).name
-                if basename_candidate.exists():
-                    signal_path = basename_candidate
-                    relative_text = Path(relative_text).name
             dataset_id = str(manifest.get("dataset_id") or "vendor-processed-hb")
-            run["signal_uri"] = str(create_external_data_uri(dataset_id, relative_text))
             run.pop("runtime_signal_path", None)
-            if not signal_path.exists():
-                missing_paths.append(str(signal_path))
-                continue
-            expected = str(run.get("input_sha256", ""))
-            actual = hashlib.sha256(signal_path.read_bytes()).hexdigest()
-            if expected and actual != expected:
-                hash_mismatches.append({
-                    "fnirs_record_id": str(run.get("fnirs_record_id", "")),
-                    "path": str(signal_path), "expected_sha256": expected, "actual_sha256": actual,
-                })
+            for uri_field, hash_field in (
+                ("signal_uri", "input_sha256"),
+                ("artifact_mask_uri", "artifact_mask_sha256"),
+            ):
+                uri = str(run.get(uri_field, ""))
+                relative_text = _relative_data_path(uri, old_root) or Path(uri).name
+                local_path = root / relative_text
+                if not local_path.exists() and relative_text:
+                    basename_candidate = root / Path(relative_text).name
+                    if basename_candidate.exists():
+                        local_path = basename_candidate
+                        relative_text = Path(relative_text).name
+                run[uri_field] = str(create_external_data_uri(dataset_id, relative_text))
+                if not local_path.exists():
+                    missing_paths.append(str(local_path))
+                    continue
+                expected = str(run.get(hash_field, ""))
+                actual = hashlib.sha256(local_path.read_bytes()).hexdigest()
+                if expected and actual != expected:
+                    hash_mismatches.append(
+                        {
+                            "fnirs_record_id": str(run.get("fnirs_record_id", "")),
+                            "artifact": uri_field,
+                            "path": str(local_path),
+                            "expected_sha256": expected,
+                            "actual_sha256": actual,
+                        }
+                    )
         if hash_mismatches:
             ids = [item["fnirs_record_id"] for item in hash_mismatches]
             raise ValueError(f"Processed-Hb input SHA-256 mismatch for records: {ids}")

@@ -38,13 +38,13 @@ def test_external_data_uri_round_trip(tmp_path: Path) -> None:
     snirf.parent.mkdir(parents=True)
     snirf.write_bytes(b"fixture")
 
-    uri = create_external_data_uri("ds007738", "sub-01/run.snirf")
+    uri = create_external_data_uri("synthetic-dataset", "sub-01/run.snirf")
 
-    assert uri.uri == "external-data://ds007738/sub-01/run.snirf"
-    assert uri.dataset_id == "ds007738"
+    assert uri.uri == "external-data://synthetic-dataset/sub-01/run.snirf"
+    assert uri.dataset_id == "synthetic-dataset"
     assert uri.path.as_posix() == "sub-01/run.snirf"
-    assert resolve_external_data_uri(uri, {"ds007738": data_root}) == snirf.resolve()
-    assert path_to_external_data_uri(snirf, {"ds007738": data_root}) == uri
+    assert resolve_external_data_uri(uri, {"synthetic-dataset": data_root}) == snirf.resolve()
+    assert path_to_external_data_uri(snirf, {"synthetic-dataset": data_root}) == uri
 
 
 @pytest.mark.parametrize(
@@ -104,11 +104,11 @@ def test_binding_store_persists_and_resolves(tmp_path: Path) -> None:
     source.write_bytes(b"fixture")
 
     store = URIBindingStore(state_dir)
-    store.bind("ds007738", data_root)
+    store.bind("synthetic-dataset", data_root)
 
     reloaded = URIBindingStore(state_dir)
-    uri = create_external_data_uri("ds007738", "sub-01/run.snirf")
-    assert reloaded.get_binding("ds007738") == data_root.resolve()
+    uri = create_external_data_uri("synthetic-dataset", "sub-01/run.snirf")
+    assert reloaded.get_binding("synthetic-dataset") == data_root.resolve()
     assert reloaded.resolve_uri(uri) == source.resolve()
 
 

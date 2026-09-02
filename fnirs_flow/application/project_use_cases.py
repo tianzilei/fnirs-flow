@@ -10,7 +10,7 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fnirs_flow.history.service import HistoryService
 from fnirs_flow.history.zip_json_store import ZipJsonHistoryStore
@@ -436,6 +436,8 @@ class ProjectStore:
                 "flow": {},
                 "snapshots": [],
                 "attempts": [],
+                "recommendation_decisions": [],
+                "current_recommendation_decision_id": None,
                 "state": {},
                 "pending_draft": None,
             }
@@ -693,6 +695,16 @@ class ProjectStore:
             return []
         return self._bundles.list_versions(project_id)
 
+    def get_project_snapshots(self, project_id: str) -> list[dict[str, Any]]:
+        """Return detached snapshot records in creation order."""
+        if not self.ensure_project_loaded(project_id):
+            return []
+        with self._lock:
+            return cast(
+                list[dict[str, Any]],
+                json.loads(json.dumps(self._projects[project_id].get("snapshots", []))),
+            )
+
     def get_output_dir(self, project_id: str) -> Path:
         tx = self._active_transactions.get(project_id)
         if tx is not None:
@@ -713,17 +725,71 @@ class ProjectStore:
             flow=flow,
             revision=revision,
             created_at=datetime.now(timezone.utc).isoformat(),
+            recommendation_decision_id=self._projects[project_id].get("current_recommendation_decision_id"),
+            recommendation_rules_version=(
+                self._projects[project_id].get("current_recommendation_rules_version")
+            ),
         )
 
         with self._lock:
             self._projects[project_id]["snapshots"].append(snapshot.model_dump())
-            self._persist(project_id, reason="flow_snapshot_created")
+            try:
+                self._persist(project_id, reason="flow_snapshot_created")
+            except Exception:
+                stored_snapshots = self._projects[project_id]["snapshots"]
+                if stored_snapshots and stored_snapshots[-1].get("snapshot_id") == snapshot_id:
+                    stored_snapshots.pop()
+                raise
 
         return ProjectSnapshot(
             snapshot_id=snapshot_id,
             revision=revision,
             created_at=snapshot.created_at,
+            recommendation_decision_id=snapshot.recommendation_decision_id,
+            recommendation_rules_version=snapshot.recommendation_rules_version,
         )
+
+    def save_recommendation_decision(self, project_id: str, decision: Any) -> Any:
+        """Persist an immutable recommendation decision in the project bundle."""
+        from fnirs_flow.recommendation.contracts import RecommendationDecision
+
+        self.ensure_project_loaded(project_id)
+        if project_id not in self._projects:
+            raise KeyError(project_id)
+        validated = (
+            decision
+            if isinstance(decision, RecommendationDecision)
+            else RecommendationDecision.model_validate(decision)
+        )
+        with self._lock:
+            records = self._projects[project_id].setdefault("recommendation_decisions", [])
+            if any(item.get("decision_id") == validated.decision_id for item in records):
+                raise ValueError(f"Recommendation decision already exists: {validated.decision_id}")
+            records.append(validated.model_dump(mode="json"))
+            self._projects[project_id]["current_recommendation_decision_id"] = validated.decision_id
+            self._projects[project_id]["current_recommendation_rules_version"] = validated.rules_version
+            # Materialize the selected decision for package/report consumers.
+            output_dir = self.get_output_dir(project_id)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            (output_dir / "recommendation_decision.json").write_text(
+                json.dumps(validated.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            self._persist(project_id, reason="recommendation_decision_saved")
+        return validated
+
+    def get_recommendation_decision(self, project_id: str, decision_id: str | None = None) -> Any | None:
+        from fnirs_flow.recommendation.contracts import RecommendationDecision
+
+        self.ensure_project_loaded(project_id)
+        project = self._projects.get(project_id)
+        if project is None:
+            return None
+        target = decision_id or project.get("current_recommendation_decision_id")
+        for raw in project.get("recommendation_decisions", []):
+            if raw.get("decision_id") == target:
+                return RecommendationDecision.model_validate(raw)
+        return None
 
     # -- Design History (FlowVCS) --
 
@@ -1364,6 +1430,7 @@ def execute_project_runs(
         design_head = store.get_design_head(project_id)
         design_commit_id = design_head["commit_id"] if design_head else ""
         snapshot_id = snap.snapshot_id if snap else ""
+        recommendation = store.get_recommendation_decision(project_id)
 
         # Create execution request
         manifest = _load_data_manifest(outdir / "compiled") or {}
@@ -1376,6 +1443,8 @@ def execute_project_runs(
             attempt_id=attempt_id,
             commit_id=design_commit_id,
             snapshot_id=snapshot_id,
+            recommendation_decision_id=(recommendation.decision_id if recommendation else ""),
+            recommendation_rules_version=(recommendation.rules_version if recommendation else ""),
         )
 
         # Execute via ExecutionService
@@ -1585,6 +1654,10 @@ def export_project_package(
     store: ProjectStore,
     project_id: str,
     profile_id: str = "reproducibility_package",
+    *,
+    snapshot_id: str | None = None,
+    attempt_id: str | None = None,
+    include_history: bool = False,
 ) -> ExportResult | None:
     """Export a compiled project as a .fnirsflow.zip package.
 
@@ -1601,6 +1674,67 @@ def export_project_package(
         return None
     _assert_compiled_plan_current(store, project_id)
 
+    snapshots = store.get_project_snapshots(project_id)
+    if snapshot_id is None:
+        current_flow = store.get_flow(project_id) or {}
+        selected_snapshot = next(
+            (snapshot for snapshot in reversed(snapshots) if snapshot.get("flow") == current_flow),
+            None,
+        )
+        if selected_snapshot is None:
+            selected_snapshot = Snapshot(
+                snapshot_id=f"snap-export-{uuid.uuid4().hex[:12]}",
+                flow=current_flow,
+                revision=int(project.revision),
+                created_at=datetime.now(timezone.utc).isoformat(),
+                description="Package export snapshot",
+            ).model_dump()
+    else:
+        selected_snapshot = next(
+            (snapshot for snapshot in snapshots if snapshot.get("snapshot_id") == snapshot_id),
+            None,
+        )
+        if selected_snapshot is None:
+            raise ValueError(f"Unknown project snapshot: {snapshot_id}")
+
+    from fnirs_flow.compiler.matching import flows_match
+
+    try:
+        compiled_flow = json.loads((compiled_dir / "flow.json").read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise StaleCompiledPlanError("Compiled Flow is unreadable; compile the Flow again") from exc
+    snapshot_flow = selected_snapshot.get("flow")
+    if not isinstance(snapshot_flow, dict) or not flows_match(snapshot_flow, compiled_flow):
+        raise ValueError(
+            f"Project snapshot {selected_snapshot.get('snapshot_id', '<unknown>')} "
+            "does not match the compiled Flow"
+        )
+
+    attempts: list[dict[str, Any]] = []
+    attempts_root = store.get_output_dir(project_id) / "attempts"
+    if attempts_root.is_dir():
+        for job_path in sorted(attempts_root.glob("*/job.json")):
+            try:
+                attempts.append(json.loads(job_path.read_text(encoding="utf-8")))
+            except (OSError, json.JSONDecodeError):
+                logger.warning("Skipping invalid execution attempt record: %s", job_path)
+    selected_attempt = None
+    if attempt_id is not None:
+        selected_attempt = next(
+            (attempt for attempt in attempts if attempt.get("attempt_id") == attempt_id),
+            None,
+        )
+        if selected_attempt is None:
+            raise ValueError(f"Unknown project execution attempt: {attempt_id}")
+        attempt_snapshot_id = selected_attempt.get("snapshot_id")
+        if not attempt_snapshot_id:
+            raise ValueError(f"Project execution attempt {attempt_id} has no snapshot anchor")
+        if attempt_snapshot_id != selected_snapshot.get("snapshot_id"):
+            raise ValueError(
+                f"Project execution attempt {attempt_id} references snapshot {attempt_snapshot_id}, "
+                f"not {selected_snapshot.get('snapshot_id')}"
+            )
+
     import shutil
     import tempfile
 
@@ -1608,9 +1742,17 @@ def export_project_package(
 
     pkg_path = None
     try:
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
             tmp_pkg = Path(tmp_dir) / f"{project_id}.fnirsflow.zip"
-            export_package(compiled_dir, tmp_pkg, profile_id=profile_id)
+            export_package(
+                compiled_dir,
+                tmp_pkg,
+                profile_id=profile_id,
+                selected_snapshot=selected_snapshot,
+                selected_attempt=selected_attempt,
+                snapshot_history=snapshots if include_history else (),
+                attempt_history=attempts if include_history else (),
+            )
             # Copy to final location in export/
             final_dir = outdir / "export"
             final_dir.mkdir(parents=True, exist_ok=True)

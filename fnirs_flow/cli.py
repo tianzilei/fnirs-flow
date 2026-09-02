@@ -7,6 +7,7 @@ import csv
 import ipaddress
 import json
 import shutil
+import subprocess
 from collections.abc import Callable
 from importlib.resources import files
 from pathlib import Path
@@ -96,6 +97,73 @@ def cmd_split_processed_hb(args: argparse.Namespace) -> int:
         print(f"  Channels: {result.n_channels}; samples: {result.n_samples}")
         return 0
     except (OSError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+
+def cmd_run_continuous_vas(args: argparse.Namespace) -> int:
+    """Run the frozen project-level M0/M3/M0-AR/M4 specification."""
+    from fnirs_flow.processed_hb import run_continuous_vas_models
+
+    try:
+        payload = json.loads(Path(args.input).read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("continuous VAS input must be a JSON object")
+        input_path = Path(args.input)
+        input_sha256 = __import__("hashlib").sha256(input_path.read_bytes()).hexdigest()
+        git_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parent.parent,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        git_commit = git_result.stdout.strip() if git_result.returncode == 0 else ""
+        command_parts = [
+            "fnirs-flow",
+            "run-continuous-vas",
+            "--input",
+            input_path.name,
+            "--outdir",
+            "<output>",
+            "--inner-folds",
+            str(args.inner_folds),
+            "--n-permutations",
+            str(args.n_permutations),
+            "--n-bootstrap",
+            str(args.n_bootstrap),
+            "--random-seed",
+            str(args.random_seed),
+            "--modality-pca-variance",
+            str(args.modality_pca_variance),
+        ]
+        for flag, value in (
+            ("--feature-selection-k", args.feature_selection_k),
+            ("--minimum-gain-mae", args.minimum_gain_mae),
+            ("--gain-alpha", args.gain_alpha),
+        ):
+            if value is not None:
+                command_parts.extend([flag, str(value)])
+        result = run_continuous_vas_models(
+            **payload,
+            inner_folds=args.inner_folds,
+            n_permutations=args.n_permutations,
+            n_bootstrap=args.n_bootstrap,
+            random_seed=args.random_seed,
+            modality_pca_variance=args.modality_pca_variance,
+            feature_selection_k=args.feature_selection_k,
+            minimum_gain_mae=args.minimum_gain_mae,
+            gain_alpha=args.gain_alpha,
+            input_sha256=input_sha256,
+            git_commit=git_commit,
+            execution_command=" ".join(command_parts),
+            outdir=args.outdir,
+        )
+        print(f"Continuous VAS derivatives written to {args.outdir}")
+        print(f"  Models: {', '.join(result['model_ids'])}")
+        print(f"  Config SHA-256: {result['config_hash']}")
+        return 0
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
         print(f"Error: {exc}")
         return 1
 
@@ -992,6 +1060,38 @@ def cmd_processed_hb_acceptance(args: argparse.Namespace) -> int:
     return 0 if report["release_ready"] else 2
 
 
+def cmd_run_fixed_event_processed_hb(args: argparse.Namespace) -> int:
+    """Run the standalone manifest-driven processed-Hb analysis."""
+    from fnirs_flow.processed_hb.pipeline import run_fixed_event_processed_hb_analysis
+
+    try:
+        summary = run_fixed_event_processed_hb_analysis(
+            provenance_csv=args.provenance,
+            population_csv=args.population,
+            events_tsv=args.events,
+            contrast_csv=args.contrasts,
+            outdir=args.outdir,
+            analysis_version=args.analysis_version,
+            solver=args.solver,
+            drift_order=args.drift_order,
+            condition_number_limit=args.condition_number_limit,
+            include_ineligible=args.include_ineligible,
+            record_ids=args.record_id,
+            max_records=args.max_records,
+            write_design_matrices=args.write_design_matrices,
+            overwrite=args.overwrite,
+        )
+    except (FileNotFoundError, FileExistsError, ValueError) as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    output = Path(args.outdir).expanduser().resolve()
+    print("Processed-Hb analysis complete")
+    print(f"  Counts: {json.dumps(summary['counts'], sort_keys=True)}")
+    print(f"  Output: {output}")
+    return 0 if summary["counts"]["failed_records"] == 0 else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="fnirs-flow",
@@ -1101,6 +1201,79 @@ def main(argv: list[str] | None = None) -> int:
     p_acceptance.add_argument("--frozen-root", help="Directory containing the four external frozen inputs")
     p_acceptance.add_argument("--package-path", help="Optional reproducibility package to audit")
     p_acceptance.set_defaults(func=cmd_processed_hb_acceptance)
+
+    fixed_event_pipeline = Path(__file__).resolve().parent / "processed_hb" / "pipeline.py"
+    if fixed_event_pipeline.is_file():
+        p_processed_hb = subparsers.add_parser(
+            "run-processed-hb",
+            help="Run the development-only fixed-event processed-Hb analysis",
+        )
+        p_processed_hb.add_argument("--provenance", required=True, help="Frozen signal-provenance CSV")
+        p_processed_hb.add_argument("--population", required=True, help="Frozen analysis-population CSV")
+        p_processed_hb.add_argument("--events", required=True, help="Frozen events TSV")
+        p_processed_hb.add_argument("--contrasts", help="Optional frozen contrast-matrix CSV")
+        p_processed_hb.add_argument("--outdir", required=True, help="Output directory")
+        p_processed_hb.add_argument("--analysis-version", default="processed_hb_v1", help="Analysis version label")
+        p_processed_hb.add_argument(
+            "--solver",
+            choices=["ols", "ar1", "ar1_irls"],
+            default="ar1_irls",
+            help="First-level solver (default: ar1_irls)",
+        )
+        p_processed_hb.add_argument("--drift-order", type=int, default=2, help="Polynomial drift order (default: 2)")
+        p_processed_hb.add_argument(
+            "--condition-number-limit",
+            type=float,
+            default=1e8,
+            help="Maximum accepted design condition number (default: 1e8)",
+        )
+        p_processed_hb.add_argument(
+            "--record-id",
+            action="append",
+            help="Exact fNIRS record or record-pair ID; may be repeated",
+        )
+        p_processed_hb.add_argument("--max-records", type=int, help="Maximum number of selected records")
+        p_processed_hb.add_argument(
+            "--include-ineligible",
+            action="store_true",
+            help="Include records that fail frozen eligibility gates",
+        )
+        p_processed_hb.add_argument(
+            "--no-design-matrices",
+            action="store_false",
+            dest="write_design_matrices",
+            help="Do not write per-record design matrices",
+        )
+        p_processed_hb.add_argument("--overwrite", action="store_true", help="Replace known outputs in the target")
+        p_processed_hb.set_defaults(func=cmd_run_fixed_event_processed_hb)
+
+    p_continuous_vas = subparsers.add_parser(
+        "run-continuous-vas",
+        help="Run leakage-safe continuous VAS M0/M3/M0-AR/M4 nested LOSO models",
+    )
+    p_continuous_vas.add_argument(
+        "--input",
+        required=True,
+        help="Frozen JSON matrices, schemas, record IDs, windows, targets and evaluation-mask provenance",
+    )
+    p_continuous_vas.add_argument("--outdir", required=True, help="Output derivative directory")
+    p_continuous_vas.add_argument("--inner-folds", type=int, default=5)
+    p_continuous_vas.add_argument("--n-permutations", type=int, default=10000)
+    p_continuous_vas.add_argument("--n-bootstrap", type=int, default=2000)
+    p_continuous_vas.add_argument("--random-seed", type=int, default=0)
+    p_continuous_vas.add_argument("--modality-pca-variance", type=float, default=0.95)
+    p_continuous_vas.add_argument("--feature-selection-k", type=int)
+    p_continuous_vas.add_argument(
+        "--minimum-gain-mae",
+        type=float,
+        help="Frozen minimum MAE improvement required before reporting supported gain",
+    )
+    p_continuous_vas.add_argument(
+        "--gain-alpha",
+        type=float,
+        help="Frozen paired-permutation alpha required before reporting supported gain",
+    )
+    p_continuous_vas.set_defaults(func=cmd_run_continuous_vas)
 
     # Backend adapter commands
     p_import_h3 = subparsers.add_parser(

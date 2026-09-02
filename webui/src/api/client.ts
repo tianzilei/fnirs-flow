@@ -424,6 +424,45 @@ export async function getBackends(): Promise<BackendDescription[]> {
 
 export type SnapshotResult = Generated.ProjectSnapshot;
 
+export type RecommendationDecision = Record<string, unknown> & {
+  decision_id: string;
+  source_mode: string;
+  decision_status: string;
+  execution_status: string;
+  tier?: string | null;
+  reasons?: string[];
+};
+
+export async function getProjectRecommendation(projectId: string): Promise<RecommendationDecision> {
+  const { data } = await api.get(`/projects/${projectId}/recommendations`);
+  return data;
+}
+
+export async function confirmProjectRecommendation(
+  projectId: string,
+  decisionId: string,
+  confirmedBy: string,
+): Promise<{ decision: RecommendationDecision; supersedes_decision_id: string }> {
+  const { data } = await api.post(`/projects/${projectId}/recommendations/${decisionId}/confirm`, { confirmed_by: confirmedBy });
+  return data;
+}
+
+export async function createProjectRecommendation(
+  projectId: string,
+  request: Generated.StaticRecommendationRequest,
+): Promise<RecommendationDecision> {
+  const { data } = await api.post(`/projects/${projectId}/recommendations/static`, request);
+  return data;
+}
+
+export async function reevaluateProjectRecommendation(
+  projectId: string,
+  decisionId: string,
+): Promise<{ decision: RecommendationDecision; diff: Record<string, unknown> }> {
+  const { data } = await api.post(`/projects/${projectId}/recommendations/${decisionId}/reevaluate`);
+  return data;
+}
+
 export async function createSnapshot(projectId: string): Promise<SnapshotResult> {
   const { data } = await api.post(`/projects/${projectId}/snapshots`);
   return data;

@@ -1,7 +1,7 @@
 # fnirs-flow Public API Contract
 
-Version: 1.1.0
-Updated: 2026-08-19
+Version: 1.3.0
+Updated: 2026-09-02
 
 This document defines the stable public surface of fnirs-flow. Any breaking change to these surfaces requires a schema version bump and changelog entry.
 

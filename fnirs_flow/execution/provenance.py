@@ -44,6 +44,11 @@ class ProvenanceRecord:
         self._commit_id = commit_id
         self._snapshot_id = snapshot_id
 
+    def set_recommendation_anchor(self, *, decision_id: str = "", rules_version: str = "") -> None:
+        """Attach the selected recommendation decision to subsequent records."""
+        self._recommendation_decision_id = decision_id
+        self._recommendation_rules_version = rules_version
+
     def log(
         self,
         step_id: str,
@@ -60,6 +65,9 @@ class ProvenanceRecord:
             record["commit_id"] = self._commit_id
         if self._snapshot_id:
             record["snapshot_id"] = self._snapshot_id
+        if getattr(self, "_recommendation_decision_id", ""):
+            record["recommendation_decision_id"] = self._recommendation_decision_id
+            record["recommendation_rules_version"] = self._recommendation_rules_version
         self._records.append(record)
 
     def all(self) -> list[dict[str, Any]]:

@@ -7,16 +7,17 @@ without changing CLI/API contracts.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from fnirs_flow.execution.models import ExecutionRequest, ExecutionResult
 
-if TYPE_CHECKING:
-    from fnirs_flow.execution.orchestrator_impl import ExecutionService
+
+class ExecutionServiceHost(Protocol):
+    def _execute_impl(self, request: ExecutionRequest) -> ExecutionResult: ...
 
 
 class ExecutionOrchestrator:
-    def __init__(self, service: ExecutionService) -> None:
+    def __init__(self, service: ExecutionServiceHost) -> None:
         self.service = service
 
     def execute(self, request: ExecutionRequest) -> ExecutionResult:

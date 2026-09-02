@@ -20,7 +20,7 @@ fall back to serial before execution starts. Benchmark both modes on the target
 machine with `tools/benchmark/run_execution_benchmark.py`; Windows process
 startup can make small workloads slower.
 
-**v1.2.5** | Python 3.10+
+**v1.3.0** | Python 3.10+
 
 ---
 
@@ -77,11 +77,11 @@ python cli.py compile configs/demo_task_glm_real.json --outdir outputs/demo
 
 # 3. Discover a local BIDS-NIRS dataset
 python cli.py discover bids-nirs-tapping --outdir outputs/demo \
-  --data-root Sample/BIDS-NIRS-Tapping-master
+  --data-root /path/to/bids-nirs-dataset
 
 # 4. Run the analysis; requires MNE-NIRS
 python cli.py run outputs/demo --outdir outputs/demo \
-  --data-root Sample/BIDS-NIRS-Tapping-master
+  --data-root /path/to/bids-nirs-dataset
 ```
 
 ### Start the WebUI
@@ -117,9 +117,9 @@ cd webui && npm install && npm run dev               # Frontend :5173
 |---|---|---|
 | `validate` | Validate a flow JSON file | `python cli.py validate configs/demo_task_glm_real.json` |
 | `compile` | Compile a flow into plan, DAG, and manifests | `python cli.py compile configs/demo_task_glm_real.json --outdir outputs/demo` |
-| `discover` | Discover and register public datasets | `python cli.py discover bids-nirs-tapping --outdir outputs/demo --data-root Sample/BIDS-NIRS-Tapping-master` |
+| `discover` | Discover and register public datasets | `python cli.py discover bids-nirs-tapping --outdir outputs/demo --data-root /path/to/bids-nirs-dataset` |
 | `dry-run` | Enumerate all subject/session/run combinations without execution | `python cli.py dry-run outputs/demo --outdir outputs/demo` |
-| `run` | Execute analysis with MNE-NIRS | `python cli.py run outputs/demo --outdir outputs/demo --data-root Sample/BIDS-NIRS-Tapping-master` |
+| `run` | Execute analysis with MNE-NIRS | `python cli.py run outputs/demo --outdir outputs/demo --data-root /path/to/bids-nirs-dataset` |
 | `export` | Export a reproducibility package | `python cli.py export outputs/demo --outdir outputs/demo` |
 | `rerun` | Rerun an imported package | `python cli.py rerun outputs/imported_package` |
 | `import-homer3` | Import Homer3 configuration into fnirs-flow atoms | `python cli.py import-homer3 pipeline.cfg --outdir outputs/imported` |
@@ -133,6 +133,8 @@ cd webui && npm install && npm run dev               # Frontend :5173
 
 ### Vendor-Processed Hb Branch
 
+The Flow-integrated route is available for compiled
+projects, package reruns, URI binding, and WebUI/API orchestration.
 `vendor_processed_hb` is a data branch, not one MethodAtom. Its example flow is
 composed from eight generic MethodAtoms for manifest discovery, signal reading,
 event ingestion, time regularization, design compilation, first-level fitting,
@@ -144,20 +146,20 @@ python cli.py compile configs/vendor_processed_hb_flow.json --outdir outputs/pro
 python cli.py discover vendor-processed-hb --outdir outputs/processed --manifest-root /path/to/frozen-inputs
 python cli.py dry-run outputs/processed --outdir outputs/processed
 python cli.py run outputs/processed --outdir outputs/processed
-python cli.py processed-hb-acceptance outputs/processed --output outputs/processed/acceptance.json
+python cli.py processed-hb-acceptance outputs/processed --output outputs/processed/acceptance.json  # compatibility acceptance
 ```
 
-This branch accepts already converted HbO/HbR data. It does not reconstruct or
+This route accepts already converted HbO/HbR data. It does not reconstruct or
 claim raw intensity, optical density, motion correction, filtering, or MBLL.
-The bundled preset is experimental; confirmatory use remains blocked until all
-scientific thresholds are explicitly supplied and frozen. See
+The bundled Flow preset is experimental; confirmatory use remains blocked until
+all scientific thresholds are explicitly supplied and frozen. See
 `docs/specs/vendor_processed_hb_analysis.md`.
 
 `run` supports filters:
 
 ```bash
 python cli.py run outputs/demo --outdir outputs/demo \
-  --data-root Sample/BIDS-NIRS-Tapping-master \
+  --data-root /path/to/bids-nirs-dataset \
   --participant-label sub-01 sub-02 \
   --session-label ses-01 \
   --run-label run-01
@@ -197,6 +199,22 @@ Related documents:
 - Generation guide: `ai_flow_generation_guide.md`
 - Example Flow: `configs/ai_draft_task_glm.json`
 - Public API spec: `docs/specs/fnirs_flow_public_api.md`
+
+## Recommendation System (v1.3.0)
+
+v1.3.0 completes the recommendation system's engineering layer. It provides
+candidate generation, scientific eligibility, method-fit and execution-
+feasibility checks, deterministic decision policy, immutable decision history,
+API/package provenance, WebUI explanations, and explicit user confirmation.
+Static rule-based fallback and shadow decisions are available without changing
+the Flow analysis path.
+
+The evidence system is a separate follow-up workstream. Evidence inventory,
+claim review, calibration, holdout evaluation, and evidence-driven ranking are
+not represented as completed scientific validation in this release. Until that
+work is supplied and passes its gates, evidence-driven `best` recommendations
+remain disabled; missing evidence is shown as `unverified` or `needs_review` and
+does not block Flow editing, validation, compilation, or execution.
 
 ---
 
@@ -246,7 +264,8 @@ instance is reused during runtime.
 | `AtomPort` | MethodAtom input/output port |
 | `FlowGraph` | Analysis workflow graph built from FlowAtoms and edges |
 | `ExecutionPlan` | Executable plan compiled from a FlowGraph |
-| `Evidence Store` | Structured storage for extracted literature evidence |
+| `Evidence Store` | Structured storage for extracted literature evidence; evidence-system development continues after v1.3.0 |
+| `RecommendationDecision` | Versioned, explainable recommendation result with execution status and provenance |
 | `Scenario` | Research scenario router for `task`, `resting_state`, `real_world`, `hyperscanning`, and `machine_learning` |
 | `Adapter` | Converter between upstream and downstream MethodAtom inputs and outputs |
 | `Cedalion Adapter` | Optional Cedalion backend adapter with DOT, signal decomposition, synthetic data, and related backend-specific capabilities |
@@ -262,11 +281,11 @@ and generated release metadata.
 
 It intentionally excludes non-release research worktables, local datasets,
 generated analysis artifacts, reference checkouts, caches, platform metadata,
-and submission working files. See `PUBLIC_RELEASE_MANIFEST.json` for the exact
-published file list.
+and submission working files. See `PUBLIC_SYNC_SPEC.md` and the release
+artifacts under `outputs/release/` for the published-file policy and checks.
 
-Repository-hosted CI/CD workflows are not included. Releases are validated
-locally with the commands in `docs/README.md` and published manually.
+Repository-hosted CI checks are defined in `.github/workflows/ci.yml`. Releases
+are validated with those checks and the local commands in `docs/README.md`.
 
 ---
 

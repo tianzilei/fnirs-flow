@@ -26,6 +26,45 @@ def _csv_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(stream))
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _verify_feature_freeze(feature_root: Path) -> tuple[bool, list[str]]:
+    manifests = sorted(feature_root.glob("feature_freeze_manifest*.json"))
+    if not manifests:
+        return False, ["feature_freeze_manifest.json"]
+    all_failures = []
+    # Freeze histories intentionally preserve multiple identities. Acceptance
+    # succeeds when any manifest exactly describes the current artifacts; a
+    # filename sort is not a valid proxy for creation order or active identity.
+    for manifest_path in manifests:
+        failures = []
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            all_failures.append(f"{manifest_path.name}:invalid_json")
+            continue
+        direct = {
+            "feature_table_sha256": feature_root / "channel_window_features.csv.gz",
+            "qc_table_sha256": feature_root / "channel_window_qc.csv.gz",
+        }
+        for key, path in direct.items():
+            if not path.is_file() or manifest.get(key) != _sha256(path):
+                failures.append(key)
+        for relative, expected in manifest.get("artifact_sha256", {}).items():
+            path = feature_root / relative
+            if not path.is_file() or _sha256(path) != expected:
+                failures.append(relative)
+        for key in ("config_sha256", "input_manifest_sha256", "mapping_sha256"):
+            if not manifest.get(key):
+                failures.append(key)
+        if not failures:
+            return True, []
+        all_failures.extend(failures)
+    return False, sorted(set(all_failures))
+
+
 def _series_key(row: dict[str, str]) -> tuple[str, str, str, str]:
     return (
         row.get("fnirs_record_id", ""),
@@ -70,8 +109,7 @@ def _reconstruct_contrasts(
             beta = [betas[key][name] for name in names]
             exported_covariance = json.loads(row["covariance_json"])
             reconstructed_estimate = [
-                sum(weight * value for weight, value in zip(component, beta, strict=True))
-                for component in matrix
+                sum(weight * value for weight, value in zip(component, beta, strict=True)) for component in matrix
             ]
             reconstructed_covariance = [
                 [
@@ -169,6 +207,25 @@ def build_processed_hb_acceptance_report(
         "raw_signal_members": [],
         "absolute_path_records": [],
     }
+    feature_root = derivatives / "processed_hb_window_features"
+    feature_files = {
+        "channel_window_features.csv.gz": feature_root / "channel_window_features.csv.gz",
+        "channel_window_qc.csv.gz": feature_root / "channel_window_qc.csv.gz",
+        "window_modality_availability.csv": feature_root / "window_modality_availability.csv",
+        "channel_annotation_table.csv": feature_root / "channel_annotation_table.csv",
+        "input_manifest.csv": feature_root / "input_manifest.csv",
+        "feature_dictionary.json": feature_root / "feature_dictionary.json",
+        "feature_freeze_manifest.json": next(
+            iter(feature_root.glob("feature_freeze_manifest*.json")), feature_root / "feature_freeze_manifest.json"
+        ),
+    }
+    feature_present = any(path.exists() for path in feature_files.values())
+    feature_missing = [name for name, path in feature_files.items() if not path.exists()]
+    freeze_valid, freeze_failures = _verify_feature_freeze(feature_root)
+    feature_checks = {
+        "feature_artifacts_complete": feature_present and not feature_missing,
+        "feature_freeze_hashes": freeze_valid,
+    }
     if package_path:
         with zipfile.ZipFile(package_path) as archive:
             names = archive.namelist()
@@ -180,11 +237,17 @@ def build_processed_hb_acceptance_report(
                     if any(marker in payload for marker in absolute_markers):
                         package_audit["absolute_path_records"].append(name)
 
+    expected_counts = analysis_manifest.get("expected_counts", {}) if isinstance(analysis_manifest, dict) else {}
+    expected_runs = expected_counts.get("runs")
+    expected_local = expected_counts.get("local_inputs")
+    expected_header = expected_counts.get("header_warning_decisions")
     checks = {
-        "frozen_record_count_644": len(runs) == 644,
-        "local_input_count_627": len([row for row in runs if row.get("discovery_status") == "available"]) == 627,
+        "frozen_record_count": expected_runs is None or len(runs) == int(expected_runs),
+        "local_input_count": expected_local is None
+        or len([row for row in runs if row.get("discovery_status") == "available"]) == int(expected_local),
         "provenance_sha256_for_local_inputs": bool(provenance) and all(row.get("sha256") for row in provenance),
-        "header_warning_decisions_191": len(header_decisions) == 191
+        "header_warning_decisions": expected_header is None
+        or len(header_decisions) == int(expected_header)
         and all(row.get("status") in {"pass", "warn", "fail"} for row in header_decisions),
         "per_estimand_counts_present": bool(per_estimand),
         "hbo_hbr_pairing": not unpaired,
@@ -194,6 +257,7 @@ def build_processed_hb_acceptance_report(
         "portable_raw_data_free_package": bool(package_path)
         and not package_audit["raw_signal_members"]
         and not package_audit["absolute_path_records"],
+        **feature_checks,
     }
     blocked = []
     if missing_external:
@@ -217,6 +281,7 @@ def build_processed_hb_acceptance_report(
         "per_contrast_chromophore": analysis_manifest.get("record_pairs_by_contrast_chromophore", {}),
         "contrast_reconstruction": contrast_reconstruction,
         "artifact_hash_failures": artifact_hash_failures,
+        "feature_freeze_hash_failures": freeze_failures,
         "unpaired_successes": unpaired,
         "package_audit": package_audit,
     }

@@ -11,12 +11,16 @@
   },
   "$defs": {"run": {
     "type": "object",
-    "required": ["linked_record_id", "fnirs_record_id", "record_pair_id", "signal_uri", "analysis_included", "data_branch"],
+    "required": ["linked_record_id", "fnirs_record_id", "record_pair_id", "subject_id", "session_id", "signal_uri", "artifact_mask_uri", "analysis_included", "data_branch"],
     "properties": {
       "linked_record_id": {"type": "string", "minLength": 1},
       "fnirs_record_id": {"type": "string", "minLength": 1},
       "record_pair_id": {"type": "string", "minLength": 1},
+      "subject_id": {"type": "string", "minLength": 1},
+      "session_id": {"type": "string", "minLength": 1},
       "signal_uri": {"type": "string", "minLength": 1},
+      "artifact_mask_uri": {"type": "string", "minLength": 1},
+      "artifact_mask_sha256": {"type": "string"},
       "input_sha256": {"type": "string"},
       "analysis_included": {"type": "boolean"},
       "absolute_unit_verified": {"const": false},

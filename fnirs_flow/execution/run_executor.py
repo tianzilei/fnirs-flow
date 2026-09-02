@@ -9,6 +9,7 @@ from typing import Any, Protocol
 
 from fnirs_flow.execution.dag_payload import execution_atoms
 from fnirs_flow.execution.engine import RunContext
+from fnirs_flow.execution.errors import ExecutionCancelledError
 from fnirs_flow.execution.models import AtomExecutionResult, RunExecutionResult
 
 logger = logging.getLogger(__name__)
@@ -82,8 +83,6 @@ class RunExecutor:
                 self.host._write_run_outputs(run_result, outdir)
         except Exception as exc:
             # Cancellation is intentionally not translated into a failed run.
-            from fnirs_flow.execution.orchestrator_impl import ExecutionCancelledError
-
             if isinstance(exc, ExecutionCancelledError):
                 raise
             if isinstance(exc, ImportError):

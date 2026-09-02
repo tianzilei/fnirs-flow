@@ -13,7 +13,10 @@ PACKAGE_ROOT = PROJECT_ROOT / "fnirs_flow"
 # Interface packages are deliberately excluded: lower layers may never depend
 # on ``api`` or ``cli``.
 ALLOWED_INTERNAL_DEPENDENCIES: dict[str, set[str]] = {
-    "application": {"compiler", "data", "execution", "exporters", "flow", "history", "infrastructure", "validation"},
+    "application": {
+        "compiler", "data", "execution", "exporters", "flow", "history",
+        "infrastructure", "validation", "recommendation",
+    },
     "flow": {"validation"},  # migration compatibility only; removed with schema v0.1
     "validation": {"flow", "registry", "security"},
     "security": {"flow", "validation"},
@@ -24,7 +27,7 @@ ALLOWED_INTERNAL_DEPENDENCIES: dict[str, set[str]] = {
     "compiler": {"dependencies", "execution", "flow", "infrastructure", "validation"},
     # Processed-Hb orchestration consumes the dedicated scientific-analysis
     # kernel; execution remains the owner of I/O and task fan-out.
-    "execution": {"adapters", "analysis", "data", "infrastructure", "registry", "settings"},
+        "execution": {"adapters", "analysis", "data", "infrastructure", "processed_hb", "registry", "settings"},
     "exporters": {"execution", "infrastructure", "validation"},
 }
 

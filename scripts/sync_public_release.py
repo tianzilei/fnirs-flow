@@ -88,12 +88,7 @@ PUBLIC_DOC_FILES = [
 # explicit so private analysis and manuscript automation are not copied by
 # broadening the whitelist to the entire scripts directory.
 PUBLIC_SCRIPT_FILES = [
-    "scripts/analyze_ds007738_qc_sensitivity.py",
-    "scripts/audit_ds007738_outputs.py",
     "scripts/benchmark_performance.py",
-    "scripts/build_ds007738_exclusion_manifests.py",
-    "scripts/compare_ds007738_golden_rerun.py",
-    "scripts/run_ds007738_full_analysis.py",
     "scripts/sync_public_release.py",
 ]
 
@@ -142,16 +137,37 @@ EXCLUDED_SUFFIXES = (
     ".swo",
 )
 
-# Study-bound analysis code can coexist in the development repository, but it
-# must not leak into the generic public package. Keep these paths explicit so
-# the public sync remains fail-closed instead of weakening the naming gate.
+# Tests that require development-only output artifacts or internal audit tools
+# cannot run in the code-only public tree. Keep the exclusions explicit so the
+# public test suite remains complete and runnable.
 PRIVATE_PUBLIC_REL_PATHS = (
     "docs/processed_hb_analysis.md",
-    "fnirs_flow/processed_hb",
-    "tests/test_processed_hb.py",
+    "fnirs_flow/processed_hb/modeling.py",
+    "fnirs_flow/processed_hb/pipeline.py",
+    "schemas/processed_hb_analysis.schema.json",
+    "tests/test_calibration_holdout_validation.py",
+    "tests/test_evidence_count_report.py",
+    "tests/test_evidence_inventory.py",
+    "tests/test_v130_readiness.py",
     # The development repository tests its hosted CI workflow. The public
     # repository owns and preserves its own .github policy instead.
     "tests/test_release_governance.py",
+    # Development-only real-data benchmark workflow and its fixtures.
+    "configs/" + "ds" + "007738_covert_glm_flow.json",
+    "scripts/" + "analyze_" + "ds" + "007738_qc_sensitivity.py",
+    "scripts/" + "audit_" + "ds" + "007738_outputs.py",
+    "scripts/" + "build_" + "ds" + "007738_exclusion_manifests.py",
+    "scripts/compare_" + "ds" + "007738_golden_rerun.py",
+    "scripts/run_" + "ds" + "007738_full_analysis.py",
+    "tests/test_" + "ds" + "007738_analysis.py",
+    "tests/test_compile_gate.py",
+    "tests/integration/test_cedalion_reference_equivalence.py",
+    "tests/integration/test_mne_reference_equivalence.py",
+    "tests/integration/test_process_reference_equivalence.py",
+    "tests/integration/test_real_data_smoke.py",
+    "webui/e2e/" + "ds" + "007738-real.spec.ts",
+    "tests/test_processed_hb.py",
+    "tests/test_processed_hb_cli.py",
 )
 
 # The public repository owns these paths. A clean sync must preserve them
@@ -190,6 +206,7 @@ FORBIDDEN_DOMAIN_TERMS = (
     "glm" + "_five",
     "fir" + "_offset_0_30_10s",
     "glm" + "_trend_linear",
+    "ds" + "007738",
 )
 
 PUBLIC_RELEASE_README = """# Public Release Tree

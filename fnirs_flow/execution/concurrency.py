@@ -53,7 +53,7 @@ def _available_memory_mb() -> int | None:
 
 def _native_threadpools() -> list[dict[str, Any]]:
     try:
-        from threadpoolctl import threadpool_info  # type: ignore[import-untyped]
+        from threadpoolctl import threadpool_info  # type: ignore[import-not-found,import-untyped]
     except ImportError:
         return []
     return [

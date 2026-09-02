@@ -40,12 +40,16 @@ export function subscribeExecutionProgress(projectId: string, set: StoreSet): ()
   });
 }
 
-export async function restoreExecutionAttempt(projectId: string, set: StoreSet): Promise<void> {
+export async function restoreExecutionAttempt(
+  projectId: string,
+  set: StoreSet,
+  isCurrent: () => boolean = () => true,
+): Promise<void> {
   const remembered = recallActiveAttempt();
   const latest = remembered?.projectId === projectId
     ? await api.getExecutionAttempt(projectId, remembered.attemptId)
     : (await api.listExecutionAttempts(projectId))[0];
-  if (!latest) return;
+  if (!latest || !isCurrent()) return;
 
   const result = latest.result;
   set({
@@ -58,7 +62,7 @@ export async function restoreExecutionAttempt(projectId: string, set: StoreSet):
       failure_ids: result.failure_ids,
     } : null,
   });
-  if (['completed', 'failed', 'cancelled'].includes(latest.status)) clearActiveAttempt();
+  if (isCurrent() && ['completed', 'failed', 'cancelled'].includes(latest.status)) clearActiveAttempt();
 }
 
 export function createExecutionActions(set: StoreSet, get: StoreGet) {

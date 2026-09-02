@@ -18,6 +18,7 @@ from fnirs_flow.api.routers.ai import router as ai_router
 from fnirs_flow.api.routers.dependencies import router as dependencies_router
 from fnirs_flow.api.routers.diagnostics import router as diagnostics_router
 from fnirs_flow.api.routers.discovery import router as discovery_router
+from fnirs_flow.api.routers.evidence_automation import router as evidence_automation_router
 from fnirs_flow.api.routers.execution import router as execution_router
 from fnirs_flow.api.routers.history import router as history_router
 from fnirs_flow.api.routers.packages import router as packages_router
@@ -31,6 +32,7 @@ from fnirs_flow.api.routers.progress import (
     router as progress_router,
 )
 from fnirs_flow.api.routers.projects import router as projects_router
+from fnirs_flow.api.routers.recommendations import router as recommendations_router
 from fnirs_flow.api.routers.registry import router as registry_router
 from fnirs_flow.api.routers.results import router as results_router
 from fnirs_flow.api.static import router as static_router
@@ -92,6 +94,8 @@ app.include_router(history_router)
 app.include_router(packages_router)
 app.include_router(discovery_router)
 app.include_router(projects_router)
+app.include_router(recommendations_router)
+app.include_router(evidence_automation_router)
 app.include_router(execution_router)
 app.include_router(results_router)
 app.include_router(ai_router)

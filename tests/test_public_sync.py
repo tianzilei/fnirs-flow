@@ -74,14 +74,23 @@ def test_public_ci_tools_are_in_copy_plan(tmp_path):
     copied = {item.source.relative_to(root).as_posix() for item in plan}
 
     assert set(module.PUBLIC_TOOL_FILES) <= copied
+    assert not any(any(part.startswith("._") for part in Path(path).parts) for path in copied)
     assert any(path.startswith("fnirs_flow/resources/webui/dist/") for path in copied)
     assert "docs/processed_hb_analysis.md" not in copied
-    assert not any(path.startswith("fnirs_flow/processed_hb/") for path in copied)
+    assert any(path.startswith("fnirs_flow/processed_hb/") for path in copied)
+    assert "fnirs_flow/processed_hb/modeling.py" not in copied
+    assert "fnirs_flow/processed_hb/pipeline.py" not in copied
+    assert "schemas/processed_hb_analysis.schema.json" not in copied
     assert "tests/test_processed_hb.py" not in copied
+    assert "tests/test_processed_hb_cli.py" not in copied
+    assert "tests/test_calibration_holdout_validation.py" not in copied
+    assert "tests/test_evidence_count_report.py" not in copied
+    assert "tests/test_evidence_inventory.py" not in copied
+    assert "tests/test_v130_readiness.py" not in copied
     assert "tests/test_release_governance.py" not in copied
 
 
-def test_public_tree_imports_without_private_processed_hb_package(tmp_path):
+def test_public_tree_includes_only_generic_processed_hb_modules(tmp_path):
     module = _load_sync_module()
     root = Path(__file__).parents[1]
     target = tmp_path / "public"
@@ -91,11 +100,22 @@ def test_public_tree_imports_without_private_processed_hb_package(tmp_path):
     split_test = (target / "tests" / "test_processed_hb_split.py").read_text(encoding="utf-8")
     assert "fnirs_flow.processed_hb" not in split_test
     assert "Sample/" not in split_test
+    assert (target / "fnirs_flow" / "processed_hb" / "windows.py").is_file()
+    assert not (target / "fnirs_flow" / "processed_hb" / "pipeline.py").exists()
+    assert not (target / "fnirs_flow" / "processed_hb" / "modeling.py").exists()
+    assert not (target / "docs" / "processed_hb_analysis.md").exists()
 
     environment = dict(os.environ)
-    environment["PYTHONPATH"] = str(target)
+    existing_pythonpath = environment.get("PYTHONPATH", "")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(target), existing_pythonpath) if part
+    )
     completed = subprocess.run(
-        [sys.executable, "-c", "import fnirs_flow.adapters; import fnirs_flow.cli"],
+        [
+            sys.executable,
+            "-c",
+            "import fnirs_flow.adapters; import fnirs_flow.cli; import fnirs_flow.processed_hb",
+        ],
         cwd=target,
         env=environment,
         capture_output=True,
@@ -103,6 +123,16 @@ def test_public_tree_imports_without_private_processed_hb_package(tmp_path):
         check=False,
     )
     assert completed.returncode == 0, completed.stderr
+    help_result = subprocess.run(
+        [sys.executable, "-m", "fnirs_flow.cli", "--help"],
+        cwd=target,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert help_result.returncode == 0, help_result.stderr
+    assert "run-processed-hb" not in help_result.stdout
 
 
 def test_unexpected_target_file_is_rejected(tmp_path):

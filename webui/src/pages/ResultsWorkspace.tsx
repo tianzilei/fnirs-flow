@@ -369,7 +369,7 @@ function ResultDataPanel({
       <div className="results-section-heading">
         <h3>{title}</h3>
       </div>
-      <p className="muted">{result.file_count} files · {rows.length} rows{figures.length ? ` · ${figures.length} figures` : ''}{rows.length > 100 ? ' · showing 100 representative rows' : ''}</p>
+      <p className="muted">{result.file_count} files · {rows.length} preview rows{figures.length ? ` · ${figures.length} figures` : ''}{result.truncated || result.files.some((file) => file.rows_truncated) ? ' · preview limited' : ''}</p>
       {figures.length > 0 && (
         <div className="result-figures">
           {figures.map((figure) => (

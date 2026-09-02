@@ -2150,6 +2150,162 @@ OBSERVATION_PAIRING_PROJECTION = MethodAtomTemplate(
     tags=["metadata", "paired", "repeated_measures", "hyperscanning"],
 )
 
+# Processed-Hb 1.3.0 frozen-window feature chain
+PROCESSED_HB_V130_TEMPLATES = [
+    MethodAtomTemplate(
+        template_id="ingest_frozen_window_set",
+        name="Ingest Frozen Window Set",
+        category=MethodAtomCategory.DESIGN,
+        atom_type="frozen_window_set",
+        operation="ingest_frozen_window_set",
+        default_config={"closure": "left"},
+        ports=[
+            AtomPort(name="config", direction="in", schema="WindowConfig"),
+            AtomPort(name="window_set", direction="out", schema="FrozenWindowSet"),
+        ],
+        tags=["vendor_processed_hb", "windows"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="ingest_frozen_window_set_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="join_channel_annotation_table",
+        name="Join Channel Annotation Table",
+        category=MethodAtomCategory.DATA,
+        atom_type="channel_annotation",
+        operation="join_channel_annotation_table",
+        default_config={},
+        ports=[
+            AtomPort(name="channels", direction="in", schema="Channels"),
+            AtomPort(name="annotations", direction="out", schema="ChannelAnnotationTable"),
+        ],
+        tags=["vendor_processed_hb", "spatial"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="join_channel_annotation_table_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="evaluate_processed_hb_window_qc",
+        name="Evaluate Processed-Hb Window QC",
+        category=MethodAtomCategory.VALIDATION,
+        atom_type="window_qc",
+        operation="evaluate_processed_hb_window_qc",
+        default_config={"min_valid_sample_fraction": 0.8, "max_artifact_duration_s": 10.0},
+        ports=[
+            AtomPort(name="processed_hb", direction="in", schema="ProcessedHb"),
+            AtomPort(name="qc", direction="out", schema="WindowQC"),
+        ],
+        tags=["vendor_processed_hb", "qc"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="evaluate_processed_hb_window_qc_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="aggregate_window_modality_availability",
+        name="Aggregate Window Availability",
+        category=MethodAtomCategory.VALIDATION,
+        atom_type="window_availability",
+        operation="aggregate_window_modality_availability",
+        default_config={"min_valid_channel_fraction": 0.5},
+        ports=[
+            AtomPort(name="qc", direction="in", schema="WindowQC"),
+            AtomPort(name="availability", direction="out", schema="WindowAvailability"),
+        ],
+        tags=["vendor_processed_hb", "qc"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="aggregate_window_modality_availability_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="extract_processed_hb_channel_window_features",
+        name="Extract Channel Window Features",
+        category=MethodAtomCategory.ANALYSIS,
+        atom_type="channel_window_features",
+        operation="extract_processed_hb_channel_window_features",
+        default_config={
+            "feature_names": ["mean", "sd", "median", "iqr", "min", "max", "linear_slope", "auc_abs_signal"]
+        },
+        ports=[
+            AtomPort(name="processed_hb", direction="in", schema="ProcessedHb"),
+            AtomPort(name="features", direction="out", schema="ChannelWindowFeatures"),
+        ],
+        tags=["vendor_processed_hb", "features"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="extract_processed_hb_channel_window_features_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="freeze_processed_hb_feature_artifacts",
+        name="Freeze Processed-Hb Feature Artifacts",
+        category=MethodAtomCategory.OUTPUT,
+        atom_type="feature_freeze",
+        operation="freeze_processed_hb_feature_artifacts",
+        default_config={"approval_status": "pending"},
+        ports=[
+            AtomPort(name="artifacts", direction="in", schema="Artifacts"),
+            AtomPort(name="freeze_manifest", direction="out", schema="FeatureFreezeManifest"),
+        ],
+        tags=["vendor_processed_hb", "freeze"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="freeze_processed_hb_feature_artifacts_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="write_processed_hb_ml_derivatives",
+        name="Write Processed-Hb ML Derivatives",
+        category=MethodAtomCategory.OUTPUT,
+        atom_type="ml_derivatives",
+        operation="write_processed_hb_ml_derivatives",
+        default_config={},
+        ports=[
+            AtomPort(name="features", direction="in", schema="ChannelWindowFeatures"),
+            AtomPort(name="derivatives", direction="out", schema="ProcessedHbDerivatives"),
+        ],
+        tags=["vendor_processed_hb", "derivatives"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="write_processed_hb_ml_derivatives_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="nested_grouped_regression",
+        name="Nested Grouped Regression",
+        category=MethodAtomCategory.ANALYSIS,
+        atom_type="nested_grouped_regression",
+        operation="nested_grouped_regression",
+        default_config={"inner_folds": 5, "preprocessing_in_fold": True},
+        ports=[
+            AtomPort(name="features", direction="in", schema="FeatureMatrix"),
+            AtomPort(name="predictions", direction="out", schema="OOFPredictions"),
+        ],
+        tags=["vendor_processed_hb", "machine_learning", "loso"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="nested_grouped_regression_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="validate_information_boundary",
+        name="Validate Information Boundary",
+        category=MethodAtomCategory.VALIDATION,
+        atom_type="information_boundary",
+        operation="validate_information_boundary",
+        default_config={},
+        ports=[
+            AtomPort(name="features", direction="in", schema="FeatureColumns"),
+            AtomPort(name="validated", direction="out", schema="FeatureColumns"),
+        ],
+        tags=["vendor_processed_hb", "leakage"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="validate_information_boundary_handler",
+    ),
+    MethodAtomTemplate(
+        template_id="run_continuous_vas_models",
+        name="Continuous VAS M0/M3/M0-AR/M4",
+        category=MethodAtomCategory.ANALYSIS,
+        atom_type="continuous_vas_models",
+        operation="run_continuous_vas_models",
+        default_config={"inner_folds": 5, "n_permutations": 10000, "n_bootstrap": 2000},
+        ports=[
+            AtomPort(name="features", direction="in", schema="FeatureMatrix"),
+            AtomPort(name="predictions", direction="out", schema="OOFPredictions"),
+        ],
+        tags=["vendor_processed_hb", "continuous_vas", "m3", "m4", "loso"],
+        implementation_module="fnirs_flow.execution.processed_hb_handlers",
+        implementation_callable="run_continuous_vas_models_handler",
+    ),
+]
+
 ALL_NODE_TEMPLATES.extend(
     [
         PARTICIPANT_TABLE_INPUT,
@@ -2158,6 +2314,7 @@ ALL_NODE_TEMPLATES.extend(
         PARTICIPANT_LABEL_PROJECTION,
         PARTICIPANT_SITE_PROJECTION,
         OBSERVATION_PAIRING_PROJECTION,
+        *PROCESSED_HB_V130_TEMPLATES,
     ]
 )
 

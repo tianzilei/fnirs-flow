@@ -42,9 +42,11 @@ Excluded content must never be present in the public repository:
 - `.agents/`, `.mimocode/`, `.tmp/`
 - `References/`, `Sample/`, `audit/`
 - `docs/literature/`, `docs/manuscript/`
-- Study-bound processed-Hb analysis code and documentation under
-  `fnirs_flow/processed_hb/`, `tests/test_processed_hb.py`, and
-  `docs/processed_hb_analysis.md`
+- Development-only evidence-output and release-readiness tests whose required
+  `outputs/` artifacts and internal audit tools are intentionally excluded
+- Development-only real-data benchmark scripts, dataset-specific golden-path
+  configurations, and their integration/regression tests are intentionally
+  excluded; public examples and tests must use synthetic or domain-neutral data
 - Development CI governance tests; the public repository owns and validates
   its preserved `.github/` policy independently
 - `legacy/`, `outputs/`

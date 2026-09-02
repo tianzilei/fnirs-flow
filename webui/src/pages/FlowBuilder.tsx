@@ -6,6 +6,7 @@ import { FlowCanvas } from '../components/FlowCanvas';
 import { FlowChecklistPanel } from '../components/FlowChecklistPanel';
 import { Sidebar } from '../components/Sidebar';
 import { ValidationPanel } from '../components/ValidationPanel';
+import { RecommendationDecisionPanel } from '../components/RecommendationDecisionPanel';
 
 export function FlowBuilder() {
   const [showAIDraft, setShowAIDraft] = useState(false);
@@ -140,6 +141,7 @@ export function FlowBuilder() {
               focusedSlotId={focusedChecklistSlotId}
               readOnly={readOnly}
             />
+            {project && <RecommendationDecisionPanel projectId={project.id} />}
             <ValidationPanel
               result={validation}
               onOpenAIDraft={() => setShowAIDraft(true)}

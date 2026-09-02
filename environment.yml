@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python>=3.11,<3.14
+  - python>=3.10,<3.14
   - mne>=1.6,<2.0
   - mne-nirs>=0.7,<1.0
   - scipy>=1.10,<2.0

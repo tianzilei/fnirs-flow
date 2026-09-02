@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import zipfile
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
@@ -66,6 +67,7 @@ PACKAGE_PROFILES: dict[str, PackageProfile] = {
             "parameter_confirmation_record.json",
             "analysis_manifest.json",
             "processed_hb_preset.json",
+            "fnirs_re_channel_layout_mapping.csv",
             "run_manifest.csv",
             "event_ingestion_audit.csv",
             "design_matrix_manifest.csv",
@@ -177,9 +179,10 @@ def _portable_data_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
                 portable[field] = relative
         for run in portable.get("runs", []):
             run.pop("runtime_signal_path", None)
-            signal_uri = str(run.get("signal_uri", ""))
-            if signal_uri and not signal_uri.startswith("external-data://"):
-                run["signal_uri"] = str(create_external_data_uri("vendor-processed-hb", Path(signal_uri).name))
+            for field in ("signal_uri", "artifact_mask_uri"):
+                value = str(run.get(field, ""))
+                if value and not value.startswith("external-data://"):
+                    run[field] = str(create_external_data_uri("vendor-processed-hb", Path(value).name))
     access_instructions = str(portable.get("access_instructions", ""))
     if old_root_text and old_root_text in access_instructions:
         portable["access_instructions"] = (
@@ -250,9 +253,12 @@ def export_package(
     outdir: str | Path,
     package_path: str | Path,
     profile_id: str = "reproducibility_package",
-    include_snapshots: bool = True,
-    include_attempts: bool = False,
     exclude_raw_data: bool = True,
+    *,
+    selected_snapshot: Mapping[str, Any] | None = None,
+    selected_attempt: Mapping[str, Any] | None = None,
+    snapshot_history: Sequence[Mapping[str, Any]] = (),
+    attempt_history: Sequence[Mapping[str, Any]] = (),
 ) -> Path:
     """Export a .fnirsflow.zip package.
 
@@ -260,9 +266,11 @@ def export_package(
         outdir: Directory containing compiled outputs
         package_path: Output path for the .zip file
         profile_id: Package profile to use (default: reproducibility_package)
-        include_snapshots: Include ProjectSnapshot files
-        include_attempts: Include ActionAttempt files
         exclude_raw_data: Always True for v1
+        selected_snapshot: Current or explicitly selected immutable design snapshot
+        selected_attempt: Explicitly selected execution attempt metadata
+        snapshot_history: Snapshot records included only for a history export
+        attempt_history: Attempt records included only for a history export
 
     Returns:
         Path to the created package
@@ -279,7 +287,7 @@ def export_package(
     def add_portable_file(zf: zipfile.ZipFile, source: Path, arcname: str) -> None:
         if source.name.upper().endswith("_RE.TXT"):
             return
-        if source.name in {"input_provenance.csv", "run_manifest.csv"}:
+        if source.name in {"input_provenance.csv", "run_manifest.csv", "input_manifest.csv"}:
             with source.open(newline="", encoding="utf-8-sig") as stream:
                 reader = csv.DictReader(stream)
                 rows = list(reader)
@@ -287,6 +295,14 @@ def export_package(
             for row in rows:
                 if "local_path" in row:
                     row["local_path"] = ""
+                for key, value in list(row.items()):
+                    if not value or str(value).startswith(("project://", "external-data://")):
+                        continue
+                    try:
+                        if Path(str(value)).expanduser().is_absolute():
+                            row[key] = ""
+                    except (OSError, ValueError):
+                        continue
                 if source.name == "input_provenance.csv" and row.get("input_uri"):
                     value = row["input_uri"]
                     if not value.startswith("external-data://"):
@@ -323,6 +339,25 @@ def export_package(
         zf.write(source, arcname)
 
     with zipfile.ZipFile(package_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        if selected_snapshot is not None:
+            portable_snapshot = _portable_project_json(dict(selected_snapshot), outdir)
+            zf.writestr("flow_snapshot.json", json.dumps(portable_snapshot, indent=2))
+        if selected_attempt is not None:
+            portable_attempt = _portable_project_json(dict(selected_attempt), outdir)
+            zf.writestr("action_attempt.json", json.dumps(portable_attempt, indent=2))
+        if snapshot_history:
+            snapshot_lines = [
+                json.dumps(_portable_project_json(dict(snapshot), outdir), sort_keys=True)
+                for snapshot in snapshot_history
+            ]
+            zf.writestr("history/snapshots.jsonl", "\n".join(snapshot_lines) + "\n")
+        if attempt_history:
+            attempt_lines = [
+                json.dumps(_portable_project_json(dict(attempt), outdir), sort_keys=True)
+                for attempt in attempt_history
+            ]
+            zf.writestr("history/attempts.jsonl", "\n".join(attempt_lines) + "\n")
+
         # Add profile-specified files (check both root and compiled/ subdirectory)
         for pattern in profile.include_patterns:
             candidates = [
@@ -355,6 +390,18 @@ def export_package(
                         add_portable_file(
                             zf, result_file, result_file.relative_to(outdir).as_posix()
                         )
+                # A processed-Hb rerun needs the reviewed spatial mapping but
+                # never the raw signal. The realized annotation table is a
+                # portable, hash-audited copy of that mapping.
+                realized_mapping = (
+                    derivatives
+                    / "processed_hb_first_level"
+                    / "processed_hb_window_features"
+                    / "channel_annotation_table.csv"
+                )
+                mapping_member = "fnirs_re_channel_layout_mapping.csv"
+                if realized_mapping.is_file() and mapping_member not in zf.namelist():
+                    add_portable_file(zf, realized_mapping, mapping_member)
             for frozen_root in (outdir / "frozen_inputs", outdir / "compiled" / "frozen_inputs"):
                 if frozen_root.exists():
                     for frozen_file in sorted(frozen_root.iterdir()):
@@ -379,6 +426,18 @@ def export_package(
                     f"method_atoms/{definition.relative_to(atom_root).as_posix()}",
                 )
             break
+
+        # Recommendation decisions are immutable provenance. Include only the
+        # selected decision (never the full candidate/context payload) when a
+        # compiled project provides one.
+        recommendation_candidates = [
+            outdir / "recommendation_decision.json",
+            outdir / "compiled" / "recommendation_decision.json",
+        ]
+        for recommendation_path in recommendation_candidates:
+            if recommendation_path.exists():
+                add_portable_file(zf, recommendation_path, "recommendation_decision.json")
+                break
 
         # Add any .md reports if profile includes them
         if profile.include_reports:

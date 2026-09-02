@@ -26,6 +26,8 @@ class ProjectSnapshot(BaseModel):
     created_at: str
     description: str = ""
     tags: list[str] = Field(default_factory=list)
+    recommendation_decision_id: str | None = None
+    recommendation_rules_version: str | None = None
 
 
 class ActionAttempt(BaseModel):

@@ -36,6 +36,17 @@ from fnirs_flow.execution.processed_hb_outputs import (
     write_native_timestamps,
     write_processed_hb_derivatives,
 )
+from fnirs_flow.processed_hb import (
+    aggregate_window_modality_availability,
+    evaluate_processed_hb_window_qc,
+    extract_processed_hb_channel_window_features,
+    freeze_processed_hb_feature_artifacts,
+    ingest_frozen_window_set,
+    join_channel_annotation_table,
+    processed_hb_feature_dictionary,
+    read_processed_hb_artifact_mask,
+    write_processed_hb_ml_derivatives,
+)
 
 PROCESSED_HB_MODEL_IDS = {
     "glm_conditions_canonical_td_v1",
@@ -79,7 +90,7 @@ def _resolve_manifest_artifact(value: str, compiled_dir: Path, data_root: str | 
     return _resolve(value, data_root)
 
 
-def _load_preset(compiled_dir: Path) -> dict[str, Any]:
+def _load_preset(compiled_dir: Path) -> tuple[dict[str, Any], Path]:
     from importlib.resources import files
 
     candidates = [
@@ -89,9 +100,9 @@ def _load_preset(compiled_dir: Path) -> dict[str, Any]:
     ]
     for path in candidates:
         if path.exists():
-            return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+            return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8"))), path
     resource = files("fnirs_flow.resources.presets").joinpath("vendor_processed_hb_v1.json")
-    return cast(dict[str, Any], json.loads(resource.read_text(encoding="utf-8")))
+    return cast(dict[str, Any], json.loads(resource.read_text(encoding="utf-8"))), Path(str(resource))
 
 
 def _unfrozen_preset_values(preset: dict[str, Any]) -> list[str]:
@@ -110,6 +121,12 @@ def _unfrozen_preset_values(preset: dict[str, Any]) -> list[str]:
         missing.extend(f"{section}.{key}" for key, value in values.items() if value is None or value == "TBD")
     if preset.get("scientific_parameters_frozen") is not True:
         missing.append("scientific_parameters_frozen")
+    if not preset.get("channel_annotation_path"):
+        missing.append("channel_annotation_path")
+    if not isinstance(preset.get("expected_channel_count"), int) or preset["expected_channel_count"] <= 0:
+        missing.append("expected_channel_count")
+    if not preset.get("allowed_probe_roles"):
+        missing.append("allowed_probe_roles")
     return missing
 
 
@@ -286,6 +303,15 @@ def _git_commit() -> str:
         return "unavailable"
 
 
+def _portable_execution_command(arguments: list[str] | None = None) -> str:
+    """Retain every CLI argument while redacting machine-specific absolute roots."""
+    portable = []
+    for argument in arguments if arguments is not None else sys.argv:
+        path = Path(argument)
+        portable.append(f"<absolute>/{path.name}" if path.is_absolute() else argument)
+    return subprocess.list2cmdline(portable)
+
+
 def _failure_stage(reason: str, *, parser_completed: bool) -> str:
     if not parser_completed:
         return "parser"
@@ -314,7 +340,7 @@ def run_processed_hb(
 ) -> dict[str, Any]:
     compiled = Path(compiled_dir)
     manifest = _load_manifest(compiled)
-    preset = _load_preset(compiled)
+    preset, preset_path = _load_preset(compiled)
     missing_preset_values = _unfrozen_preset_values(preset)
     if missing_preset_values:
         raise ValueError("UNFROZEN_CONFIRMATORY_THRESHOLDS:" + ",".join(sorted(missing_preset_values)))
@@ -331,6 +357,7 @@ def run_processed_hb(
     successful_pairs: set[str] = set()
     eligible_pairs: set[str] = set()
     requested_estimands: set[tuple[str, str, str]] = set()
+    resolved_mapping_path: Path | None = None
 
     for run in manifest.runs:
         if fnirs_record_ids and run.fnirs_record_id not in fnirs_record_ids:
@@ -339,6 +366,8 @@ def run_processed_hb(
             continue
         base = {
             "analysis_version": preset["analysis_version"],
+            "subject_id": run.subject_id,
+            "session_id": run.session_id,
             "linked_record_id": run.linked_record_id,
             "fnirs_record_id": run.fnirs_record_id,
             "record_pair_id": run.record_pair_id,
@@ -371,7 +400,11 @@ def run_processed_hb(
             {
                 **base,
                 "fnirs_signal_uri": run.signal_uri,
+                "artifact_mask_uri": run.artifact_mask_uri,
+                "artifact_mask_sha256": run.artifact_mask_sha256,
                 "input_sha256": run.input_sha256,
+                "actual_channel_count": run.declared_channel_count,
+                "expected_channel_count": preset.get("expected_channel_count"),
                 "sync_grade": run.sync_grade,
                 "event_primary_eligible": run.event_primary_eligible,
                 "lag_primary_eligible": run.lag_primary_eligible,
@@ -401,6 +434,31 @@ def run_processed_hb(
             recording, parser_qc = parse_vendor_processed_hb(signal_path, uri=run.signal_uri)
             if run.input_sha256 and run.input_sha256 != recording.provenance.sha256:
                 raise ValueError("INPUT_SHA256_MISMATCH")
+            actual_channel_count = int(recording.provenance.channel_count)
+            rows["runs"][-1]["actual_channel_count"] = actual_channel_count
+            expected_channel_count = preset.get("expected_channel_count")
+            if expected_channel_count is None:
+                raise ValueError("EXPECTED_CHANNEL_COUNT_NOT_CONFIGURED")
+            if actual_channel_count != int(expected_channel_count):
+                rows["exclusions"].append(
+                    {
+                        **base,
+                        "stage": "channel_mapping",
+                        "scope_type": "record",
+                        "scope_id": run.fnirs_record_id,
+                        "actual_channel_count": actual_channel_count,
+                        "expected_channel_count": int(expected_channel_count),
+                        "probe_role": "subject_re",
+                        "status": "fail",
+                        "reason_code": "CHANNEL_COUNT_MISMATCH",
+                        "message": "Observed channel count does not match the project preset",
+                        "observed_value": actual_channel_count,
+                        "threshold": int(expected_channel_count),
+                        "policy_id": "processed_hb_channel_gate_v1",
+                        "source_artifact": run.signal_uri,
+                    }
+                )
+                continue
             qc_gates = preset["qc_gates"]
             hbt_exceedance_fraction = None
             hbt_status = recording.provenance.hbt_check_status
@@ -423,6 +481,166 @@ def run_processed_hb(
                 interpolation_method=time_config["interpolation_method"],
                 max_interpolation_deviation_s=time_config["max_interpolation_deviation_s"],
             )
+            # P0 frozen-window QC/feature branch.  Keep this separate from the
+            # first-level GLM rows so failures remain auditable and do not
+            # alter model eligibility.
+            window_cfg = preset.get("windows")
+            if window_cfg:
+                window_set = ingest_frozen_window_set(
+                    {
+                        "window_set_version": preset.get("window_set_version", ""),
+                        "closure": preset.get("window_closure", "left"),
+                        "windows": window_cfg,
+                    }
+                )
+                # Channel annotation is a required analysis input; a missing
+                # or invalid mapping closes this record before feature output.
+                mapping_path = preset.get("channel_annotation_path") or preset.get("channel_mapping_path")
+                if not mapping_path:
+                    raise ValueError("CHANNEL_MAPPING_NOT_CONFIGURED")
+                try:
+                    resolved_mapping_path = _resolve_manifest_artifact(str(mapping_path), compiled, data_root)
+                    channel_annotations = join_channel_annotation_table(
+                        resolved_mapping_path,
+                        recording.channels,
+                        expected_channel_count=int(expected_channel_count),
+                        allowed_probe_roles=preset.get("allowed_probe_roles", ()),
+                        mapping_version=str(preset.get("channel_mapping_version", "")),
+                    )
+                except Exception as exc:
+                    message = str(exc)
+                    reason_code = (
+                        "PROBE_ROLE_NOT_ALLOWED"
+                        if "probe role not allowed" in message
+                        else "CHANNEL_MAPPING_INVALID"
+                        if any(token in message for token in ("duplicate", "one-to-one", "expected"))
+                        else "CHANNEL_MAPPING_MISSING"
+                    )
+                    rows["exclusions"].append(
+                        {
+                            **base,
+                            "stage": "channel_mapping",
+                            "scope_type": "record",
+                            "scope_id": run.fnirs_record_id,
+                            "actual_channel_count": actual_channel_count,
+                            "expected_channel_count": int(expected_channel_count),
+                            "probe_role": ";".join(map(str, preset.get("allowed_probe_roles", ()))),
+                            "status": "fail",
+                            "reason_code": reason_code,
+                            "message": message,
+                            "policy_id": "processed_hb_channel_gate_v1",
+                            "source_artifact": str(mapping_path),
+                        }
+                    )
+                    continue
+                if not run.artifact_mask_uri:
+                    rows["exclusions"].append(
+                        {
+                            **base,
+                            "stage": "window_qc",
+                            "scope_type": "record",
+                            "scope_id": run.fnirs_record_id,
+                            "status": "fail",
+                            "reason_code": "ARTIFACT_MASK_MISSING",
+                            "message": "A frozen artifact-mask sidecar is required for final window QC",
+                            "policy_id": "processed_hb_window_qc_v1",
+                        }
+                    )
+                    continue
+                try:
+                    artifact_path = _resolve_manifest_artifact(run.artifact_mask_uri, compiled, data_root)
+                    artifact_mask = read_processed_hb_artifact_mask(
+                        artifact_path,
+                        regularized.timestamps_s.tolist(),
+                        [channel.channel for channel in recording.channels],
+                        max_time_deviation_s=float(
+                            preset.get("window_qc", {}).get("artifact_mask_max_time_deviation_s", 0.0)
+                        ),
+                        policy_id=str(
+                            preset.get("window_qc", {}).get("artifact_policy_id", "processed_hb_window_qc_v1")
+                        ),
+                        policy_version=str(preset.get("window_qc", {}).get("artifact_policy_version", "1")),
+                    )
+                    if run.artifact_mask_sha256 and run.artifact_mask_sha256 != artifact_mask.sha256:
+                        raise ValueError("ARTIFACT_MASK_SHA256_MISMATCH")
+                except Exception as exc:
+                    rows["exclusions"].append(
+                        {
+                            **base,
+                            "stage": "window_qc",
+                            "scope_type": "record",
+                            "scope_id": run.fnirs_record_id,
+                            "status": "fail",
+                            "reason_code": str(exc).split(":", 1)[0],
+                            "message": str(exc),
+                            "policy_id": "processed_hb_window_qc_v1",
+                            "source_artifact": run.artifact_mask_uri,
+                        }
+                    )
+                    continue
+                # Regularized recordings expose channels x samples; the QC
+                # helper normalizes orientation and emits one row per channel/window.
+                window_qc = evaluate_processed_hb_window_qc(
+                    regularized,
+                    window_set,
+                    channel_annotations,
+                    artifact_mask.mask,
+                    min_valid_sample_fraction=float(preset.get("window_qc", {}).get("min_sample_fraction", 0.8)),
+                    max_artifact_duration_s=float(preset.get("window_qc", {}).get("max_continuous_artifact_s", 10.0)),
+                    qc_policy_id=artifact_mask.policy_id,
+                    qc_policy_version=artifact_mask.policy_version,
+                    input_sha256=recording.provenance.sha256,
+                    artifact_mask_sha256=artifact_mask.sha256,
+                )
+                window_identity = {
+                    "subject_id": run.subject_id,
+                    "session_id": run.session_id,
+                    "record_pair_id": run.record_pair_id,
+                }
+                identified_window_qc = [{**window_identity, **row} for row in window_qc]
+                window_availability = aggregate_window_modality_availability(
+                    identified_window_qc,
+                    min_valid_channel_fraction=float(
+                        preset.get("window_qc", {}).get("min_valid_channel_fraction", 0.5)
+                    ),
+                )
+                window_features = extract_processed_hb_channel_window_features(
+                    regularized,
+                    window_qc,
+                    window_set,
+                    channel_annotations=channel_annotations,
+                    artifact_mask=artifact_mask.mask,
+                    feature_names=preset.get("channel_window_features", {}).get("names"),
+                    sd_ddof=int(preset.get("channel_window_features", {}).get("sd_ddof", 1)),
+                    input_sha256=recording.provenance.sha256,
+                    artifact_mask_sha256=artifact_mask.sha256,
+                )
+                ml_root = derivatives / "processed_hb_window_features"
+                write_processed_hb_ml_derivatives(
+                    ml_root,
+                    features=[{**base, **r} for r in window_features],
+                    qc=[{**base, **r} for r in window_qc],
+                    availability=[{**base, **r} for r in window_availability],
+                    input_manifest=[
+                        {
+                            **base,
+                            "signal_uri": run.signal_uri,
+                            "input_sha256": run.input_sha256,
+                            "artifact_mask_uri": run.artifact_mask_uri,
+                            "artifact_mask_sha256": artifact_mask.sha256,
+                        }
+                    ],
+                    feature_dictionary=processed_hb_feature_dictionary(),
+                    provenance={
+                        "software_version": fnirs_flow.__version__,
+                        "git_commit": _git_commit(),
+                        "window_set_version": preset.get("window_set_version", ""),
+                    },
+                )
+                rows["window_qc"].extend([{**base, **r} for r in identified_window_qc])
+                rows["window_features"].extend([{**base, **r} for r in window_features])
+                rows["window_availability"].extend([{**base, **r} for r in window_availability])
+                rows["channel_annotations"].extend(dict(row) for row in channel_annotations)
             eligible_events = list(event_set.events)
             bundles = []
             compilers = (compile_condition_glm, compile_post_event_fir, compile_event_order_glm)
@@ -942,6 +1160,14 @@ def run_processed_hb(
         "solver_config": preset["solver_config"],
         "covariance_config": preset["covariance_config"],
         "design_gates": preset["design_gates"],
+        "expected_counts": {
+            "runs": len(rows["runs"]),
+            "local_inputs": sum(r.get("discovery_status") == "available" for r in rows["runs"]),
+            "header_warning_decisions": sum(
+                r.get("reason_code") in {"HEADER_POINT_COUNT_MISMATCH", "HEADER_END_TIME_MISMATCH"}
+                for r in rows["exclusions"]
+            ),
+        },
         "qc_gates": preset["qc_gates"],
         "time_regularization": preset["time_regularization"],
         "parser": {"name": "vendor_processed_hb", "version": PARSER_VERSION},
@@ -1008,16 +1234,52 @@ def run_processed_hb(
         channel_map=rows["channel_map"],
         analysis_manifest=analysis_manifest,
     )
+    ml_root = derivatives / "processed_hb_window_features"
+    if rows.get("window_features"):
+        # Rewrite once after all records so the derivative tables contain the
+        # complete cohort rather than being overwritten per recording.
+        write_processed_hb_ml_derivatives(
+            ml_root,
+            features=rows["window_features"],
+            qc=rows["window_qc"],
+            availability=rows["window_availability"],
+            annotations={
+                str(row.get("channel_id", row.get("vendor_channel_number", ""))): row
+                for row in rows["channel_annotations"]
+            }.values(),
+            input_manifest=[r for r in rows["runs"] if r.get("discovery_status") == "available"],
+            feature_dictionary=processed_hb_feature_dictionary(),
+            provenance={
+                "software_version": fnirs_flow.__version__,
+                "git_commit": _git_commit(),
+                "window_set_version": preset.get("window_set_version", ""),
+            },
+        )
+    if (ml_root / "channel_window_features.csv.gz").exists():
+        freeze_processed_hb_feature_artifacts(
+            ml_root,
+            config_path=preset_path,
+            input_manifest_path=compiled / "data_manifest.json",
+            mapping_path=resolved_mapping_path,
+            software_version=fnirs_flow.__version__,
+            git_commit=_git_commit(),
+            command=_portable_execution_command(),
+            approval_status="pending",
+            freeze_id=analysis_manifest.get("analysis_version", preset.get("analysis_version", "v1")),
+        )
     analysis_manifest["output_artifact_sha256"] = {
         path.relative_to(derivatives).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(derivatives.rglob("*"))
         if path.is_file() and path != paths["analysis_manifest"]
     }
-    temporary_manifest = paths["analysis_manifest"].with_name(".analysis_manifest.json.tmp")
-    temporary_manifest.write_text(
+    # ``Path.replace`` is not reliable here on Windows when the destination
+    # was created earlier in the same pipeline run (it can fail with
+    # ``WinError 5`` despite both files being writable).  The manifest is a
+    # generated derivative and this is its final write, so write the complete
+    # payload directly rather than leaving a stale, unhashed manifest behind.
+    paths["analysis_manifest"].write_text(
         json.dumps(analysis_manifest, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8"
     )
-    temporary_manifest.replace(paths["analysis_manifest"])
     return {
         "derivatives": str(derivatives),
         "successful_record_pairs": len(successful_pairs),

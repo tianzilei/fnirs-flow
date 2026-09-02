@@ -28,6 +28,7 @@ from fnirs_flow.execution.concurrency import native_thread_limit, resolve_concur
 from fnirs_flow.execution.dag_payload import execution_atoms
 from fnirs_flow.execution.dag_scheduler import DAGScheduler, resolve_edge_dependency
 from fnirs_flow.execution.engine import RunContext, ensure_derivatives_layout
+from fnirs_flow.execution.errors import ExecutionCancelledError
 from fnirs_flow.execution.failures import FailureStore
 from fnirs_flow.execution.group_executor import GroupExecutor, extract_group_config
 from fnirs_flow.execution.models import AtomExecutionResult, ExecutionRequest, ExecutionResult, RunExecutionResult
@@ -51,10 +52,6 @@ logger = logging.getLogger(__name__)
 def resolve_atom_backend_id(atom: dict[str, Any], default_backend_id: str) -> str:
     """Return the atom backend, treating missing/null backend ids as default."""
     return atom.get("backend_id") or default_backend_id
-
-
-class ExecutionCancelledError(RuntimeError):
-    """Raised when a persistent execution job requests cooperative cancellation."""
 
 
 class ExecutionService:
@@ -152,6 +149,11 @@ class ExecutionService:
             provenance.set_design_anchor(
                 commit_id=request.commit_id,
                 snapshot_id=request.snapshot_id,
+            )
+        if request.recommendation_decision_id:
+            provenance.set_recommendation_anchor(
+                decision_id=request.recommendation_decision_id,
+                rules_version=request.recommendation_rules_version,
             )
         provenance.log(
             step_id="execution/concurrency",
@@ -1267,7 +1269,7 @@ class ExecutionService:
                 break
 
         # Honor dataset-level exclusion decisions. BIDS permits extra columns;
-        # ds007738 uses ``include`` as the final trial eligibility flag.
+        # some datasets use ``include`` as the final trial eligibility flag.
         if "include" in rows[0]:
             rows = [row for row in rows if str(row.get("include", "1")).strip().lower() in {"1", "true", "yes"}]
         if not rows:

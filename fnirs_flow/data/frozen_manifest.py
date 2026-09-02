@@ -56,7 +56,11 @@ def discover_frozen_processed_hb(
                     linked_record_id=pop.get("linked_record_id", ""),
                     fnirs_record_id=record_id,
                     record_pair_id=pop.get("record_pair_id", record_id),
+                    subject_id=pop.get("subject_id", ""),
+                    session_id=pop.get("session_id", ""),
                     signal_uri=pop.get("fnirs_signal_uri", pop.get("fnirs_signal_path", "")),
+                    artifact_mask_uri=pop.get("artifact_mask_uri", ""),
+                    artifact_mask_sha256=pop.get("artifact_mask_sha256", ""),
                     runtime_signal_path="",
                     analysis_included=False,
                     frozen_exclusion_reason="SIGNAL_PROVENANCE_MISSING",
@@ -79,7 +83,13 @@ def discover_frozen_processed_hb(
                 linked_record_id=pop.get("linked_record_id", signal.get("linked_record_id", "")),
                 fnirs_record_id=record_id,
                 record_pair_id=pop.get("record_pair_id", signal.get("record_pair_id", record_id)),
+                subject_id=pop.get("subject_id", signal.get("subject_id", "")),
+                session_id=pop.get("session_id", signal.get("session_id", "")),
                 signal_uri=source,
+                artifact_mask_uri=pop.get("artifact_mask_uri", signal.get("artifact_mask_uri", "")),
+                artifact_mask_sha256=pop.get(
+                    "artifact_mask_sha256", signal.get("artifact_mask_sha256", "")
+                ),
                 runtime_signal_path=runtime,
                 input_sha256=sha,
                 declared_channel_count=(

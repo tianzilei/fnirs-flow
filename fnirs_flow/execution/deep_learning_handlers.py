@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 
-from fnirs_flow.execution.operations import CallableOperationHandler, OperationContext, OperationSpec
+from fnirs_flow.execution.operation_contracts import CallableOperationHandler, OperationContext, OperationSpec
 
 DEEP_LEARNING_OPERATIONS = frozenset(
     {

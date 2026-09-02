@@ -4,6 +4,12 @@
 
 ### Added
 
+- Started the post-release evidence-system E0 implementation with versioned
+  source/claim/event/snapshot contracts, enumerated reason codes and role
+  boundaries, an append-only hash-chained Evidence Store, atomic QA-gated
+  snapshot publication and rollback verification, and conservative dry-run
+  CSV migration. The migration regression accounts for all 3,222 packaged
+  links and keeps every unreviewed legacy record in `needs_repair`.
 - Added a generic vendor-processed Hb branch composed from eight MethodAtoms,
   including strict manifest discovery, event ingestion, time regularization,
   reusable design compilation, first-level solving, full contrasts, derivative
@@ -12,9 +18,23 @@
   the experimental processed-Hb workflow.
 - Added a case-insensitive public naming gate for filenames and UTF-8 content,
   with regression tests and policy requirements in `PUBLIC_SYNC_SPEC.md`.
+- Removed dataset-specific real-data benchmark scripts, configurations, and
+  fixtures from the public synchronization whitelist; public examples now use
+  domain-neutral data paths.
 
 ### Changed
 
+- Completed the processed-Hb public-contract generalization by replacing the
+  residual study-specific paired-record field with `paired_record_id` and the
+  fixed-count model label with `EVENT-SERIES`.
+- Made the public sync tree self-contained for the documented processed-Hb CLI
+  while explicitly excluding only development tests that require private
+  `outputs/` artifacts or internal audit tools.
+- Limited the release license policy gate to declared direct dependencies, as
+  documented, while allowing uninstalled optional dependencies only when they
+  are explicitly covered by `THIRD_PARTY_NOTICES.md`.
+- Removed the hard-coded claim that revision-specific browser and vulnerability
+  gates had passed from the readiness inventory.
 - Generalized processed-Hb dataset, preset, operation, identity, and model IDs
   so they no longer encode a particular project, intervention, condition
   sequence, clinical indication, or analysis freeze.
@@ -41,16 +61,50 @@
 
 ### Validation
 
-- Development Python suite: 1,380 passed, 2 skipped.
-- Clean public Python suite: 1,351 passed, 12 skipped.
-- Ruff and all core/MNE/Cedalion mypy profiles passed.
+- Development Python suite: 1,449 passed, 3 skipped.
+- Clean public Python suite: 1,429 passed, 13 skipped.
+- Ruff and the core/MNE mypy profiles passed.
 - WebUI unit tests: 26 passed; production build and locked npm dependency audit
   passed with 0 vulnerabilities.
+- Playwright Chromium/Firefox/WebKit matrix: 36 passed, 1 opt-in real-data
+  scenario skipped.
+- Rebuilt wheel and sdist passed package-content checks, isolated wheel
+  installation, CLI smoke, API health, packaged registry, and static-asset
+  black-box checks.
 - Public synchronization dry-run, English-only gate, generic naming gate, and
   full-repository prohibited-term scan passed.
-- Python dependency vulnerability queries against both PyPI and OSV were
-  attempted but did not complete because the remote endpoints stopped
-  responding; no Python vulnerability result is claimed for this run.
+- Python and npm dependency audits reported no known vulnerabilities.
+
+## [1.3.0] - 2026-08-28
+
+### Added
+
+- Added evidence-readiness contracts and deterministic recommendation decision
+  persistence with explicit re-evaluation and provenance anchors.
+- Added a reproducible 3,222-row evidence inventory, a five-slot claim repair
+  queue, source-locator accessibility checks, and fail-closed evidence-mode
+  decision construction that cannot produce a best recommendation before
+  calibration.
+
+### Changed
+
+- Completed the v1.3.0 recommendation-system engineering layer: deterministic
+  candidate decisions, method/execution checks, immutable persistence, API and
+  package provenance, WebUI explanations, and user confirmation are released
+  through static/shadow/fallback paths.
+- Kept the evidence system as a separate follow-up workstream. Evidence-driven
+  ranking remains disabled until claim review, calibration, and holdout gates
+  are completed; this does not affect Flow analysis execution.
+
+### Validation
+
+- v1.3.0 RC readiness audit passed with 10 checks and zero release blockers.
+- P6 calibration/holdout validation is decoupled from Flow analysis; absent
+  annotation data is reported as `unverified` and remains a post-release task.
+- Full Python suite: 1,412 passed, 2 skipped; Ruff, package, license/notice,
+  pip-audit, npm-audit, OpenAPI, and WebUI unit/build gates passed.
+- Complete Playwright matrix passed across Chromium, Firefox, and WebKit
+  (`36 passed, 1 skipped`); the skipped test is the opt-in real-data scenario.
 
 ## [1.2.5] - 2026-08-23
 
@@ -89,9 +143,9 @@
 ### Validation
 
 - Public Python suite: 1,287 passed, 13 skipped.
-- Stratified ds007738 numerical comparison: 9 runs and 81 operation checks
+- Stratified numerical comparison: 9 runs and 81 operation checks
   passed within `rtol=1e-10`, `atol=1e-12`.
-- All completed ds007738 comparison: 55 runs and 495 operation checks passed
+- All completed real-data comparisons: 55 runs and 495 operation checks passed
   within the same tolerances.
 - Independently installed wheel black-box checks passed.
 
@@ -271,7 +325,7 @@ Status: stable for the 1.2.0 release line; semantic merge remains deferred.
 ### Changed
 
 - Version boundary: v1.1.1 tag created at commit 6104137b
-- Version finalized as 1.2.0 after FlowVCS, AI Draft Review, package rerun, and ds007738 gates passed
+- Version finalized as 1.2.0 after FlowVCS, AI Draft Review, package rerun, and real-data gates passed
 
 ### Fixed
 
@@ -334,7 +388,7 @@ Status: stable for the 1.2.0 release line; semantic merge remains deferred.
 
 #### Scientific Reproducibility (RC-4)
 - Three-entry-point consistency (CLI, API, WebUI)
-- ds007738 dataset reproducibility tests passing
+- Real-data dataset reproducibility tests passing
 - RC checklist, upgrade guide, rollback guide, and known limitations documentation
 
 #### Type Safety
@@ -346,7 +400,7 @@ Status: stable for the 1.2.0 release line; semantic merge remains deferred.
 
 - The 2026-07-14 correctness pass fixed project URI parsing and traversal safety, made project listing genuinely lazy,
   replaced the invalid synthetic performance benchmark, and increased the final test baseline to 858 passed, 1 skipped.
-- A clean ds007738 export/import/relink/rerun compared 12,493 numeric elements with a maximum absolute difference
+- A clean export/import/relink/rerun compared 12,493 numeric elements with a maximum absolute difference
   of `6.404987651364991e-12` at `rtol=1e-8`, `atol=1e-10`.
 - Python and npm vulnerability audits finished with 0 known vulnerabilities. Pytest was raised to `>=9.0.3`
   after the initial scan detected `PYSEC-2026-1845` in the prior development environment.

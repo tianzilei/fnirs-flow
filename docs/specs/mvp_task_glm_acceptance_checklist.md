@@ -1,7 +1,7 @@
 # MVP Task GLM Flow User-Journey Acceptance Checklist
 
 Generated: 2026-07-10
-Last updated: 2026-07-11
+Last updated: 2026-09-02
 
 ## 1. Acceptance Checklist
 

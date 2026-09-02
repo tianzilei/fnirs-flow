@@ -41,7 +41,8 @@ PROVENANCE_FIELDS = _fields(
     "hbt_error_quantiles hbt_tolerance_exceedance_fraction native_timestamps_sha256 warning_codes parser_status",
 )
 RUN_FIELDS = _fields(
-    "analysis_version linked_record_id fnirs_record_id record_pair_id fnirs_signal_uri input_sha256 sync_grade",
+    "analysis_version subject_id session_id linked_record_id fnirs_record_id record_pair_id fnirs_signal_uri",
+    "artifact_mask_uri artifact_mask_sha256 input_sha256 actual_channel_count expected_channel_count sync_grade",
     "event_primary_eligible lag_primary_eligible observed_coverage analysis_included frozen_exclusion_reason",
     "discovery_status discovery_reason_code",
 )
@@ -61,7 +62,8 @@ RESIDUAL_FIELDS = _fields(
     "weight_max low_weight_fraction solver_requested solver_effective covariance_status qc_status reason_code",
 )
 EXCLUSION_FIELDS = _fields(
-    "fnirs_record_id record_pair_id stage scope_type scope_id model_id channel chromophore status reason_code",
+    "subject_id session_id fnirs_record_id record_pair_id stage scope_type scope_id model_id channel chromophore",
+    "actual_channel_count expected_channel_count probe_role status reason_code",
     "message observed_value threshold policy_id source_artifact",
 )
 CHANNEL_FIELDS = _fields(

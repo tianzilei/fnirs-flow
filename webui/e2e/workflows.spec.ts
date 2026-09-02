@@ -221,12 +221,12 @@ test('imported package can be relinked, trusted, and forked', async ({ page }) =
         read_only: imported,
         quarantined_atoms: quarantined,
         relinked,
-        data_root: relinked ? '/data/ds007738' : '',
+        data_root: relinked ? '/data/example-dataset' : '',
       });
     }
     if (path === '/api/projects/p1/relink-data' && request.method() === 'POST') {
       relinked = true;
-      return json(route, { status: 'relinked', data_root: '/data/ds007738' });
+      return json(route, { status: 'relinked', data_root: '/data/example-dataset' });
     }
     if (path === '/api/projects/p1/trust-atom/custom-glm' && request.method() === 'POST') {
       quarantined = [];
@@ -244,9 +244,9 @@ test('imported package can be relinked, trusted, and forked', async ({ page }) =
     .getByRole('button', { name: 'Import' }).click();
   await expect(page.getByText('Read-Only Package')).toBeVisible();
 
-  await page.getByLabel('Data Root').fill('/data/ds007738');
+  await page.getByLabel('Data Root').fill('/data/example-dataset');
   await page.getByRole('button', { name: 'Relink' }).click();
-  await expect(page.getByText('Linked to /data/ds007738')).toBeVisible();
+  await expect(page.getByText('Linked to /data/example-dataset')).toBeVisible();
 
   await page.locator('.quarantine-item').getByRole('button', { name: 'Trust' }).click();
   await expect(page.locator('.quarantine-item')).toHaveCount(0);

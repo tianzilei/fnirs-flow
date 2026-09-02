@@ -8,7 +8,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fnirs_flow.execution.operations import OperationContext, OperationHandler, OperationSpec, canonical_operation
+from fnirs_flow.execution.operation_contracts import (
+    OperationContext,
+    OperationHandler,
+    OperationSpec,
+    canonical_operation,
+)
 
 
 def _public_params(params: dict[str, Any], *, exclude: set[str] | None = None) -> dict[str, Any]:

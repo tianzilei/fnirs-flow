@@ -158,6 +158,8 @@ class ProjectSnapshot(BaseModel):
     snapshot_id: str
     revision: int
     created_at: str
+    recommendation_decision_id: str | None = None
+    recommendation_rules_version: str | None = None
 
 
 class ExportResult(BaseModel):
@@ -299,6 +301,9 @@ class ImportStatus(BaseModel):
 class ResultFile(BaseModel):
     path: str
     data: Any
+    size_bytes: int = 0
+    returned_rows: int | None = None
+    rows_truncated: bool = False
 
 
 class ResultFigure(BaseModel):
@@ -309,6 +314,8 @@ class ResultFigure(BaseModel):
 class ProjectResults(BaseModel):
     kind: Literal["qc", "channel", "roi", "group"]
     file_count: int
+    returned_file_count: int = 0
+    truncated: bool = False
     files: list[ResultFile] = Field(default_factory=list)
     figures: list[ResultFigure] = Field(default_factory=list)
 

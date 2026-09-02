@@ -130,6 +130,12 @@ export interface CheckoutResponse {
   "target": string;
 }
 
+export interface ClaimReviewRequest {
+  "decision": string;
+  "reviewer_id": string;
+  "rationale"?: string;
+}
+
 export interface CommitIdResponse {
   "commit_id": string;
 }
@@ -226,6 +232,12 @@ export interface EmptyMarkerSpec {
   "label": string;
   "atom_id": string;
   "template_id": string;
+}
+
+export interface EvidenceObjectWriteRequest {
+  "object_id": string;
+  "payload"?: Record<string, unknown>;
+  "expected_version"?: number;
 }
 
 export interface ExampleFlowSummary {
@@ -449,6 +461,8 @@ export interface ProjectRead {
 export interface ProjectResults {
   "kind": "qc" | "channel" | "roi" | "group";
   "file_count": number;
+  "returned_file_count"?: number;
+  "truncated"?: boolean;
   "files"?: Array<ResultFile>;
   "figures"?: Array<ResultFigure>;
 }
@@ -457,6 +471,8 @@ export interface ProjectSnapshot {
   "snapshot_id": string;
   "revision": number;
   "created_at": string;
+  "recommendation_decision_id"?: string | null;
+  "recommendation_rules_version"?: string | null;
 }
 
 export interface ProjectStatus {
@@ -485,6 +501,26 @@ export interface ReadinessResult {
   "checks"?: Array<ReadinessCheck>;
 }
 
+export interface RecommendationConfirmationRequest {
+  "confirmed_by": string;
+}
+
+export interface ReleaseMetrics {
+  "locator_exact_match_rate": number;
+  "schema_and_reference_integrity": number;
+  "numeric_round_trip_accuracy": number;
+  "unit_dimension_accuracy": number;
+  "hard_exclusion_false_accepts": number;
+  "adversarial_false_best": number;
+  "unsupported_claim_admission_rate": number;
+  "critical_field_cross_model_agreement": number;
+  "explanation_and_lineage_completeness": number;
+  "repeatability_failures": number;
+  "corpus_processed_coverage": number;
+  "claim_extraction_coverage": number;
+  "admission_coverage": number;
+}
+
 export interface ResultFigure {
   "path": string;
   "svg": string;
@@ -493,6 +529,16 @@ export interface ResultFigure {
 export interface ResultFile {
   "path": string;
   "data": unknown;
+  "size_bytes"?: number;
+  "returned_rows"?: number | null;
+  "rows_truncated"?: boolean;
+}
+
+export interface RunRequest {
+  "source_ids"?: Array<string>;
+  "slot_ids"?: Array<string>;
+  "versions"?: Record<string, unknown>;
+  "options"?: Record<string, unknown>;
 }
 
 export interface RunSummary {
@@ -505,6 +551,31 @@ export interface RunSummary {
   "completed_at"?: string;
   "atom_results"?: Array<AtomResultSummary>;
   "artifacts"?: Array<ArtifactSummary>;
+}
+
+export interface SnapshotActivateRequest {
+  "snapshot_id": string;
+}
+
+export interface SnapshotBuildRequest {
+  "input_sha256": string;
+  "code_commit"?: string;
+  "model_versions"?: Record<string, unknown>;
+  "prompt_hashes"?: Record<string, unknown>;
+  "rule_set_hash"?: string;
+  "benchmark_version"?: string | null;
+  "slot_id": string;
+  "independent_fnirs_benchmark"?: boolean;
+  "distribution_drift"?: boolean;
+  "release_metrics"?: ReleaseMetrics | null;
+  "gate_attestation_sha256"?: string | null;
+}
+
+export interface StaticRecommendationRequest {
+  "scenario": string;
+  "slot_id": string;
+  "candidate_id": string;
+  "reasons"?: Array<string>;
 }
 
 export interface ValidationError {
@@ -547,6 +618,29 @@ export const API_PATHS = {
   "/api/dependency-environments": true,
   "/api/dependency-environments/{environment_id}": true,
   "/api/empty-marker-specs": true,
+  "/api/evidence/claims/queue": true,
+  "/api/evidence/claims/{claim_id}": true,
+  "/api/evidence/claims/{claim_id}/reviews": true,
+  "/api/evidence/clusters": true,
+  "/api/evidence/lineage/{object_type}/{object_id}": true,
+  "/api/evidence/proposals": true,
+  "/api/evidence/quarantine": true,
+  "/api/evidence/readiness/{slot_id}": true,
+  "/api/evidence/runs/extract": true,
+  "/api/evidence/runs/harvest": true,
+  "/api/evidence/runs/reprocess": true,
+  "/api/evidence/runs/verify": true,
+  "/api/evidence/snapshots/activate": true,
+  "/api/evidence/snapshots/build": true,
+  "/api/evidence/snapshots/{snapshot_id}/activate": true,
+  "/api/evidence/snapshots/{snapshot_id}/qa": true,
+  "/api/evidence/snapshots/{snapshot_id}/rollback": true,
+  "/api/evidence/sources": true,
+  "/api/evidence/syntheses": true,
+  "/api/evidence/syntheses/{claim_id}": true,
+  "/api/evidence/verification-runs/{run_id}": true,
+  "/api/evidence/{evidence_id}/admission": true,
+  "/api/evidence/{evidence_id}/appraisal": true,
   "/api/example-flows": true,
   "/api/example-flows/{example_id}": true,
   "/api/flow-checklists": true,
@@ -588,6 +682,12 @@ export const API_PATHS = {
   "/api/projects/{project_id}/lock": true,
   "/api/projects/{project_id}/participant-table": true,
   "/api/projects/{project_id}/progress": true,
+  "/api/projects/{project_id}/recommendations": true,
+  "/api/projects/{project_id}/recommendations/static": true,
+  "/api/projects/{project_id}/recommendations/{decision_id}": true,
+  "/api/projects/{project_id}/recommendations/{decision_id}/confirm": true,
+  "/api/projects/{project_id}/recommendations/{decision_id}/reevaluate": true,
+  "/api/projects/{project_id}/recommendations/{from_id}/diff/{to_id}": true,
   "/api/projects/{project_id}/relink-data": true,
   "/api/projects/{project_id}/results/{kind}": true,
   "/api/projects/{project_id}/snapshots": true,
@@ -595,6 +695,9 @@ export const API_PATHS = {
   "/api/projects/{project_id}/trust-atom/{atom_id}": true,
   "/api/projects/{project_id}/validate": true,
   "/api/projects/{project_id}/version-history": true,
+  "/api/recommendations/static": true,
+  "/api/recommendations/{decision_id}": true,
+  "/api/recommendations/{decision_id}/confirm": true,
   "/{full_path}": true,
 } as const;
 

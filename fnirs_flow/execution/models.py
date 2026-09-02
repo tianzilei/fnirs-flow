@@ -22,6 +22,8 @@ class ExecutionRequest(BaseModel):
     attempt_id: str = ""
     commit_id: str = ""
     snapshot_id: str = ""
+    recommendation_decision_id: str = ""
+    recommendation_rules_version: str = ""
 
 
 class AtomExecutionResult(BaseModel):

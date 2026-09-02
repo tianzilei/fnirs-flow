@@ -28,6 +28,19 @@ PROCESSED_HB_REQUIRED_OPERATIONS = {
     "write_processed_hb_derivatives",
 }
 
+PROCESSED_HB_V130_OPERATIONS = {
+    "ingest_frozen_window_set",
+    "join_channel_annotation_table",
+    "evaluate_processed_hb_window_qc",
+    "aggregate_window_modality_availability",
+    "extract_processed_hb_channel_window_features",
+    "write_processed_hb_ml_derivatives",
+    "freeze_processed_hb_feature_artifacts",
+    "nested_grouped_regression",
+    "validate_information_boundary",
+    "run_continuous_vas_models",
+}
+
 
 def _missing_values(value: Any, prefix: str = "") -> list[str]:
     missing: list[str] = []
@@ -43,7 +56,8 @@ def _missing_values(value: Any, prefix: str = "") -> list[str]:
 
 def _validate_processed_hb_contract(flow_dict: dict[str, Any], operations: set[str]) -> list[str]:
     errors: list[str] = []
-    required = PROCESSED_HB_REQUIRED_OPERATIONS - operations
+    required_set = PROCESSED_HB_REQUIRED_OPERATIONS | PROCESSED_HB_V130_OPERATIONS
+    required = required_set - operations
     if required:
         errors.append(f"vendor_processed_hb flow is missing required operations: {sorted(required)}")
     raw_only = {

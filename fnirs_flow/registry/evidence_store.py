@@ -1,4 +1,9 @@
-"""Evidence store: manages literature-derived evidence records."""
+"""Deprecated compatibility reader for legacy literature CSV records.
+
+Canonical automated writes belong to :mod:`fnirs_flow.evidence`; this class
+is intentionally read-only so the old in-memory container cannot bypass
+admission, lineage, transactions, or immutable snapshots.
+"""
 
 from __future__ import annotations
 
@@ -32,7 +37,10 @@ class EvidenceStore:
         self._records: list[EvidenceRecord] = []
 
     def add(self, record: EvidenceRecord) -> None:
-        self._records.append(record)
+        raise RuntimeError(
+            "legacy EvidenceStore is read-only; use AutomatedEvidenceWorkspace "
+            "and VersionedEvidenceStore for canonical writes"
+        )
 
     def all(self) -> list[EvidenceRecord]:
         return list(self._records)

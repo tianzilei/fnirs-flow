@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 from typing import Any
 
@@ -32,9 +33,8 @@ def execute_run_worker(request_payload: dict[str, Any]) -> dict[str, Any]:
     """Execute one run without receiving locks, callbacks, adapters, or MNE objects."""
     request = RunWorkerRequest.model_validate(request_payload)
     run_context = RunContext.model_validate(request.run_context)
-    from fnirs_flow.execution.orchestrator_impl import ExecutionService
-
-    service = ExecutionService(progress_callback=None, cancel_check=None)
+    service_type = getattr(importlib.import_module("fnirs_flow.execution.service"), "ExecutionService")
+    service = service_type(progress_callback=None, cancel_check=None)
     service._active_attempt_id = request.attempt_id
     with native_thread_limit(request.blas_threads):
         result = service.run_executor.execute(

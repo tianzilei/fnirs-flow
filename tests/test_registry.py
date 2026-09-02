@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 
+import pytest
+
 from fnirs_flow.registry.evidence_store import EvidenceItem, EvidenceRecord, EvidenceStore
 from fnirs_flow.registry.methods import BUILTIN_METHODS, MethodLibrary
 from fnirs_flow.registry.node_library import NodeLibrary
@@ -21,9 +23,9 @@ class TestEvidenceStore:
             method_domain="preprocessing",
             items=[EvidenceItem(item_id="i1", field="method", value="TDDR", confidence="direct")],
         )
-        store.add(rec)
-        assert len(store.all()) == 1
-        assert store.by_domain("preprocessing") == [rec]
+        with pytest.raises(RuntimeError, match="read-only"):
+            store.add(rec)
+        assert store.all() == []
 
     def test_direct_items(self):
         store = EvidenceStore()
@@ -34,8 +36,9 @@ class TestEvidenceStore:
                 EvidenceItem(item_id="i2", confidence="conditional"),
             ],
         )
-        store.add(rec)
-        assert len(store.direct_items()) == 1
+        with pytest.raises(RuntimeError, match="read-only"):
+            store.add(rec)
+        assert store.direct_items() == []
 
     def test_load_from_csv(self, tmp_path):
         csv_path = tmp_path / "evidence.csv"

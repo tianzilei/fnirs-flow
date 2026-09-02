@@ -3,15 +3,21 @@
   "analysis_version": "vendor_processed_hb_v1",
   "status": "experimental_not_for_confirmatory_inference",
   "scientific_parameters_frozen": false,
+  "channel_annotation_path": "data/interim/fnirs_re_channel_layout_mapping.csv",
+  "channel_mapping_version": "cap_fnirs_re_layout_v1",
+  "expected_channel_count": 42,
+  "allowed_probe_roles": ["subject_re"],
   "encoding_candidates": ["utf-8-sig", "utf-8", "cp932", "gb18030"],
   "delimiter": "tab",
   "time_regularization": {
-    "max_duplicate_fraction": null,
-    "max_jitter_abs_s": null,
-    "max_jitter_relative": null,
+    "max_duplicate_fraction": 0.0,
+    "max_jitter_abs_s": 0.005,
+    "max_jitter_relative": 0.1,
     "target_sfreq_policy": "median_native",
     "interpolation_method": "linear",
-    "max_interpolation_deviation_s": null
+    "max_interpolation_deviation_s": 0.03,
+    "allow_interpolated_samples_for_window_qc": true,
+    "allow_interpolated_samples_for_features": true
   },
   "solver": {"requested": "ar1_irls", "fallback_policy": "forbid", "confirmatory": false},
   "models": ["glm_conditions_canonical_td_v1", "fir_post_event_0_30_10s_v1", "glm_event_order_linear_canonical_td_v1"],
@@ -31,4 +37,9 @@
     "whitening_improvement_min": null, "low_weight_fraction_max": null,
     "event_coverage_tolerance_s": null
   }
+  ,"window_set_version":"cap_processed_hb_window_features_v1",
+  "window_closure":"left",
+  "windows":[{"window_id":"t7","start_s":360,"end_s":420},{"window_id":"t8","start_s":420,"end_s":480},{"window_id":"t9","start_s":480,"end_s":540},{"window_id":"t10","start_s":540,"end_s":600},{"window_id":"t11","start_s":600,"end_s":660}],
+  "window_qc":{"min_sample_fraction":0.8,"max_continuous_artifact_s":10.0,"min_valid_channel_fraction":0.5,"bad_channel_action":"missing_with_reason","spatial_imputation":"forbid","artifact_mask_required":true,"artifact_mask_max_time_deviation_s":0.03,"artifact_policy_id":"cap_processed_hb_artifact_mask_v1","artifact_policy_version":"1"},
+  "channel_window_features":{"contract_version":"processed_hb_channel_window_features_v1","chromophores":["hbo","hbr"],"names":["mean","sd","median","iqr","min","max","linear_slope","auc_abs_signal"],"sd_ddof":1,"iqr_quantile_method":"linear","slope_time_axis":"observed_time_s","slope_intercept":true,"auc_definition":"integral_abs_signal","auc_integration":"trapezoid","single_sample_auc":0.0,"missing_artifact_policy":"exclude_masked_and_nonfinite_without_imputation","hbt_role":"audit_only"}
 }

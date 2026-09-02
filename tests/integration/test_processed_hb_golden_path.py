@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import zipfile
 from pathlib import Path
@@ -38,6 +39,11 @@ def _fixture(root: Path) -> Path:
             values.extend([f"{hbo:.8f}", f"{hbr:.8f}", f"{hbo + hbr:.8f}"])
         lines.append("\t".join(values))
     signal.write_text("\n".join(lines), encoding="utf-8")
+    artifact_mask = freeze / "record_RE_artifact_mask.csv"
+    with artifact_mask.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(["time_s", *(f"ch{channel:03d}" for channel in range(1, 43))])
+        writer.writerows([[f"{timestamp:.3f}", *([0] * 42)] for timestamp in t])
     with (freeze / "fnirs_signal_provenance.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=["fnirs_record_id", "fnirs_signal_path"])
         writer.writeheader()
@@ -45,8 +51,12 @@ def _fixture(root: Path) -> Path:
     with (freeze / "analysis_population_manifest.csv").open("w", newline="", encoding="utf-8") as stream:
         fields = [
             "fnirs_record_id",
+            "subject_id",
+            "session_id",
             "linked_record_id",
             "record_pair_id",
+            "artifact_mask_uri",
+            "artifact_mask_sha256",
             "analysis_included",
             "event_primary_eligible",
         ]
@@ -55,8 +65,12 @@ def _fixture(root: Path) -> Path:
         writer.writerow(
             {
                 "fnirs_record_id": "F1",
+                "subject_id": "sub-01",
+                "session_id": "ses-01",
                 "linked_record_id": "L1",
                 "record_pair_id": "P1",
+                "artifact_mask_uri": str(artifact_mask),
+                "artifact_mask_sha256": hashlib.sha256(artifact_mask.read_bytes()).hexdigest(),
                 "analysis_included": "true",
                 "event_primary_eligible": "true",
             }
@@ -147,6 +161,48 @@ def test_processed_hb_discover_dry_run_run_golden_path(tmp_path):
         "low_weight_fraction_max": 1.0,
         "event_coverage_tolerance_s": 0.0,
     }
+    mapping = compiled / "fnirs_re_channel_layout_mapping.csv"
+    with mapping.open("w", newline="", encoding="utf-8") as stream:
+        fields = [
+            "channel_id",
+            "vendor_channel_number",
+            "source_id",
+            "detector_id",
+            "source_detector_pair",
+            "mni_x",
+            "mni_y",
+            "mni_z",
+            "aal_label",
+            "roi_label",
+            "laterality",
+            "probe_role",
+            "localization_method",
+            "mapping_source",
+            "mapping_version",
+        ]
+        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer.writeheader()
+        for channel in range(1, 43):
+            writer.writerow(
+                {
+                    "channel_id": f"ch{channel:03d}",
+                    "vendor_channel_number": channel,
+                    "source_id": f"S{channel}",
+                    "detector_id": f"D{channel}",
+                    "source_detector_pair": f"S{channel}-D{channel}",
+                    "mni_x": channel,
+                    "mni_y": 0,
+                    "mni_z": 0,
+                    "aal_label": "fixture",
+                    "roi_label": "fixture",
+                    "laterality": "left" if channel <= 21 else "right",
+                    "probe_role": "subject_re",
+                    "localization_method": "fixture",
+                    "mapping_source": "fixture",
+                    "mapping_version": "v1",
+                }
+            )
+    preset["channel_annotation_path"] = mapping.name
     (compiled / "processed_hb_preset.json").write_text(json.dumps(preset, indent=2), encoding="utf-8")
     dry = dry_run_processed_hb(compiled)
     assert dry["counts"] == {"total": 1, "eligible": 1, "missing": 0}
@@ -198,8 +254,15 @@ def test_processed_hb_discover_dry_run_run_golden_path(tmp_path):
     acceptance = build_processed_hb_acceptance_report(project, frozen_root=freeze, package_path=package)
     assert acceptance["checks"]["contrast_reconstruction"] is True
     assert acceptance["checks"]["output_artifact_hashes"] is True
+    assert acceptance["checks"]["feature_freeze_hashes"] is True
     assert acceptance["contrast_reconstruction"]["failures"] == []
     assert acceptance["per_contrast_chromophore"]
+
+    feature_table = derivatives / "processed_hb_window_features" / "channel_window_features.csv.gz"
+    feature_table.write_bytes(feature_table.read_bytes() + b"tamper")
+    tampered = build_processed_hb_acceptance_report(project, frozen_root=freeze, package_path=package)
+    assert tampered["checks"]["feature_freeze_hashes"] is False
+    assert "feature_table_sha256" in tampered["feature_freeze_hash_failures"]
 
 
 def test_processed_hb_relink_rejects_sha256_mismatch(tmp_path):
